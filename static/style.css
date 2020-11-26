@@ -1,0 +1,160 @@
+html, body {
+	height: 100%;
+}
+
+.flex-container {
+	height: 100%;
+	display: flex;
+	flex-flow: column;
+}
+
+.flex-content {
+	flex-grow: 1;
+}
+
+.table-row-select tr {
+	cursor: pointer;
+}
+.table-row-select tr:hover {
+	background-color: lightblue;
+}
+.table-row-select tr.selected {
+	background-color: lightgreen;
+}
+
+.short-input {
+	max-width: 200px;
+}
+
+.small-container {
+	max-width: 600px;
+}
+
+.bordered-div {
+	border: 1px solid black;
+}
+
+.plaintext-div {
+	font-family: Courier New, monospace;
+}
+
+/* canvas on image */
+.canvas-container {
+	display: inline-block;
+	margin: 0;
+	position: relative;
+}
+.canvas-container img {
+	position: absolute;
+}
+.canvas-container canvas {
+	position: absolute;
+}
+.canvas-container .konva {
+	position: absolute;
+}
+
+/* nodes panel */
+
+#n-div {
+	height: 100%;
+	display: grid;
+	grid-template-columns: 200px auto;
+}
+
+#n-organizer {
+	height: 100%;
+	float: left;
+	display: flex;
+	flex-flow: column;
+}
+
+#n-node-list {
+	flex-grow: 1;
+	border: 1px solid;
+}
+
+.n-btn-node {
+	width: 100%;
+}
+
+/* graph-based panel */
+
+.graph-div {
+	display: flex;
+	flex-flow: row;
+}
+
+.graph-view {
+	flex-grow: 1;
+}
+
+.graph-edit-container {
+	height: 100%;
+	display: flex;
+	flex-flow: column;
+}
+
+.graph-edit-div {
+	flex-grow: 1;
+}
+
+/* explore panel */
+
+#explore-div {
+	height: 100%;
+	display: flex;
+	flex-flow: column;
+}
+
+#explore-exec-div {
+	display: flex;
+	flex-flow: row;
+	justify-content: space-evenly;
+}
+
+#explore-results-div {
+	flex-grow: 1;
+}
+
+#explore-test-btn, #explore-run-btn {
+	width: 100%;
+}
+
+.explore-results-row {
+	display: flex;
+	flex-direction: row;
+}
+
+.explore-results-col {
+	flex-grow: 1;
+	flex-shrink: 1;
+	padding: 5px;
+}
+.explore-results-col:hover {
+	background-color: orange;
+}
+.explore-results-col.selected {
+	background-color: lightblue;
+}
+.explore-results-col.selected:hover {
+	background-color: #0099FF;
+}
+
+.explore-result-img {
+	max-width: 100%;
+	min-width: 50%;
+}
+
+.el-big {
+	height: 100%;
+	width: 100%;
+}
+
+.el-wide {
+	width: 100%;
+}
+
+.el-high {
+	height: 100%;
+}

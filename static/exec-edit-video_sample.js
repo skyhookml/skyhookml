@@ -1,0 +1,67 @@
+Vue.component('exec-edit-video_sample', {
+	data: function() {
+		return {
+			mode: 'uniform',
+			length: 1,
+			count: 1000,
+		};
+	},
+	props: ['node'],
+	created: function() {
+		try {
+			let s = JSON.parse(this.node.Params);
+			this.mode = s.Mode;
+			this.length = s.Length;
+			this.count = s.Count;
+		} catch(e) {}
+	},
+	methods: {
+		save: function() {
+			let params = JSON.stringify({
+				Mode: this.mode,
+				Length: parseInt(this.length),
+				Count: parseInt(this.count),
+			});
+			let dataTypes;
+			if(params.Length > 1) {
+				dataTypes = ['video'];
+			} else {
+				dataTypes = ['image'];
+			}
+			myCall('POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
+				Params: params,
+				DataTypes: dataTypes,
+			}));
+		},
+	},
+	template: `
+<div class="small-container m-2">
+	<div class="form-group row">
+		<label class="col-sm-2 col-form-label">Mode</label>
+		<div class="col-sm-10">
+			<div class="form-check">
+				<input class="form-check-input" type="radio" v-model="mode" value="uniform">
+				<label class="form-check-label">Uniform</label>
+			</div>
+			<div class="form-check">
+				<input class="form-check-input" type="radio" v-model="mode" value="random">
+				<label class="form-check-label">Random</label>
+			</div>
+		</div>
+	</div>
+	<div class="form-group row">
+		<label class="col-sm-2 col-form-label">Length</label>
+		<div class="col-sm-10">
+			<input v-model="length" type="text" class="form-control">
+		</div>
+	</div>
+	<div class="form-group row">
+		<label class="col-sm-2 col-form-label">Count</label>
+		<div class="col-sm-10">
+			<input v-model="count" type="text" class="form-control">
+		</div>
+	</div>
+	<button v-on:click="save" type="button" class="btn btn-primary">Save</button>
+</div>
+	`,
+});
