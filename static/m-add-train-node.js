@@ -13,6 +13,16 @@ Vue.component('m-add-train-node', {
 							Name: "Keras",
 							Description: "Keras",
 						},
+						{
+							ID: "pytorch",
+							Name: "Pytorch",
+							Description: "Pytorch",
+						},
+						{
+							ID: "yolov3",
+							Name: "YOLOv3",
+							Description: "YOLOv3 Object Detector (darknet implementation)",
+						},
 					],
 				},
 			],

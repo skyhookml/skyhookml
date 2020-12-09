@@ -20,6 +20,10 @@ type Database struct {
 	mu sync.Mutex
 }
 
+func GetDB() *Database {
+	return db
+}
+
 func init() {
 	sdb, err := sql.Open("sqlite3", "./skyhook.sqlite3")
 	if err != nil {
@@ -54,7 +58,12 @@ func init() {
 		tool TEXT,
 		params TEXT
 	)`)
-	db.Exec(`CREATE TABLE IF NOT EXISTS keras_archs (
+	db.Exec(`CREATE TABLE IF NOT EXISTS pytorch_archs (
+		id INTEGER PRIMARY KEY ASC,
+		name TEXT,
+		params TEXT
+	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS pytorch_components (
 		id INTEGER PRIMARY KEY ASC,
 		name TEXT,
 		params TEXT
@@ -66,7 +75,8 @@ func init() {
 		params TEXT,
 		parents TEXT,
 		outputs TEXT,
-		trained INTEGER
+		trained INTEGER,
+		workspace_id INTEGER
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS exec_nodes (
 		id INTEGER PRIMARY KEY ASC,
@@ -74,8 +84,19 @@ func init() {
 		op TEXT,
 		params TEXT,
 		parents TEXT,
+		filter_parents TEXT,
 		data_types TEXT,
-		datasets TEXT
+		datasets TEXT,
+		workspace_id INTEGER
+	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS workspaces (
+		id INTEGER PRIMARY KEY ASC,
+		name TEXT
+	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS ws_datasets (
+		dataset_id INTEGER,
+		workspace_id INTEGER,
+		UNIQUE(dataset_id, workspace_id)
 	)`)
 }
 

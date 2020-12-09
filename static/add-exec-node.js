@@ -7,6 +7,18 @@ Vue.component('add-exec-node', {
 			op: null,
 			categories: [
 				{
+					ID: "basic",
+					Name: "Basic",
+					Ops: [
+						{
+							ID: "filter",
+							Name: "Filter",
+							Description: "Filter",
+							DataTypes: ["int"],
+						},
+					],
+				},
+				{
 					ID: "model",
 					Name: "Model",
 					Ops: [
@@ -154,9 +166,10 @@ Vue.component('add-exec-node', {
 													<option value="image">Image</option>
 													<option value="video">Video</option>
 													<option value="detection">Detection</option>
+													<option value="shape">Shape</option>
 													<option value="track">Track</option>
 													<option value="int">Integer</option>
-													<option value="float">Float</option>
+													<option value="floats">Floats</option>
 													<option value="imlist">Image List</option>
 													<option value="text">Text</option>
 													<option value="string">String</option>

@@ -121,6 +121,12 @@ func init() {
 			return
 		}
 
+		if format == "meta" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(item.Metadata))
+			return
+		}
+
 		item.Handle(format, w, r)
 	})
 }

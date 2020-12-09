@@ -327,7 +327,14 @@ Vue.component('queries-tab', {
 			this.update();
 		},
 		selectNode: function(node) {
-			this.selectedNode = node;
+			if(this.selectedNode) {
+				this.selectedNode = null;
+				Vue.nextTick(() => {
+					this.selectedNode = node;
+				});
+			} else {
+				this.selectedNode = node;
+			}
 		},
 		editNode: function() {
 			this.editor = 'exec-edit-' + this.selectedNode.Op;
@@ -344,16 +351,18 @@ Vue.component('queries-tab', {
 			this.editor = '';
 			this.update();
 		},
-		addParent: function(parent) {
-			let parents = this.selectedNode.Parents.concat([parent]);
-			let params = JSON.stringify({Parents: parents});
+		addParent: function(parent, key) {
+			let params = {};
+			params[key] = this.selectedNode[key].concat([parent]);
+			params = JSON.stringify(params);
 			myCall('POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
-		removeParent: function(idx) {
-			let parents = this.selectedNode.Parents.filter((parent, i) => i != idx);
-			let params = JSON.stringify({Parents: parents});
+		removeParent: function(idx, key) {
+			let params = {};
+			params[key] = this.selectedNode[key].filter((parent, i) => i != idx);
+			params = JSON.stringify(params);
 			myCall('POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
@@ -386,11 +395,24 @@ Vue.component('queries-tab', {
 				<div>
 					<exec-node-parents
 						:node="selectedNode"
+						pkey="Parents"
 						:nodes="nodes"
 						:datasets="datasets"
 						label="Parents"
-						v-on:add="addParent($event)"
-						v-on:remove="removeParent($event)"
+						v-on:add="addParent($event, 'Parents')"
+						v-on:remove="removeParent($event, 'Parents')"
+						>
+					</exec-node-parents>
+				</div>
+				<div>
+					<exec-node-parents
+						:node="selectedNode"
+						pkey="FilterParents"
+						:nodes="nodes"
+						:datasets="datasets"
+						label="Filter Parents"
+						v-on:add="addParent($event, 'FilterParents')"
+						v-on:remove="removeParent($event, 'FilterParents')"
 						>
 					</exec-node-parents>
 				</div>

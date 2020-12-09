@@ -2,9 +2,9 @@ Vue.component('m-train-keras', {
 	data: function() {
 		return {
 			params: {
-				archs: [],
-				inputs: [],
-				outputs: [],
+				archID: '',
+				inputDatasetIDs: [],
+				outputDatasets: [],
 			},
 			datasets: {},
 			archs: {},
@@ -28,48 +28,32 @@ Vue.component('m-train-keras', {
 
 		try {
 			let s = JSON.parse(this.node.Params);
-			if(s.InputDatasets) {
-				this.params.inputs = s.InputDatasets;
+			if(s.ArchID) {
+				this.params.archID = s.ArchID;
+			}
+			if(s.InputDatasetIDs) {
+				this.params.inputDatasetIDs = s.InputDatasetIDs;
 			}
 			if(s.OutputDatasets) {
-				this.params.outputs = s.OutputDatasets;
-			}
-			if(s.Archs) {
-				s.Archs.forEach((spec) => {
-					this.params.archs.push({
-						ID: spec.ID,
-						Inputs: spec.Inputs.join(','),
-						Outputs: spec.Outputs.join(','),
-					});
-				});
+				this.params.outputDatasets = s.OutputDatasets;
 			}
 		} catch(e) {}
 	},
 	methods: {
+		resetForm: function() {
+			this.addForms = {
+				inputID: '',
+			};
+		},
 		save: function() {
 			let params = {
-				Archs: this.params.archs.map((spec) => {
-					return {
-						ID: spec.ID,
-						Inputs: spec.Inputs.split(',').filter((part) => part != ''),
-						Outputs: spec.Outputs.split(',').filter((part) => part != ''),
-					};
-				}),
-				InputDatasets: this.params.inputs.map((s) => parseInt(s)),
-				OutputDatasets: this.params.outputs.map((s) => parseInt(s)),
+				ArchID: parseInt(this.archID),
+				InputDatasets: this.params.inputDatasetIDs,
+				OutputDatasets: this.params.outputDatasets,
 			};
 			myCall('POST', '/train-nodes/'+this.node.ID, JSON.stringify({
 				Params: JSON.stringify(params),
 			}));
-		},
-		resetForm: function() {
-			this.addForms = {
-				archID: '',
-				archInputs: '',
-				archOutputs: '',
-				inputID: '',
-				outputID: '',
-			};
 		},
 		addArch: function() {
 			this.params.archs.push({

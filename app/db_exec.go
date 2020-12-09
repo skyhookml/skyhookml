@@ -10,15 +10,16 @@ import (
 
 type DBExecNode struct {skyhook.ExecNode}
 
-const ExecNodeQuery = "SELECT id, name, op, params, parents, data_types, datasets FROM exec_nodes"
+const ExecNodeQuery = "SELECT id, name, op, params, parents, filter_parents, data_types, datasets FROM exec_nodes"
 
 func execNodeListHelper(rows *Rows) []*DBExecNode {
 	nodes := []*DBExecNode{}
 	for rows.Next() {
 		var node DBExecNode
-		var parentsRaw, typesRaw, datasetsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &typesRaw, &datasetsRaw)
+		var parentsRaw, filterParentsRaw, typesRaw, datasetsRaw string
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &filterParentsRaw, &typesRaw, &datasetsRaw)
 		node.Parents = skyhook.ParseExecParents(parentsRaw)
+		node.FilterParents = skyhook.ParseExecParents(filterParentsRaw)
 		node.DataTypes = skyhook.DecodeTypes(typesRaw)
 
 		node.DatasetIDs = make([]*int, len(node.DataTypes))
@@ -49,14 +50,10 @@ func GetExecNode(id int) *DBExecNode {
 	}
 }
 
-func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, dataTypes []skyhook.DataType) *DBExecNode {
-	var parentsStr []string
-	for _, parent := range parents {
-		parentsStr = append(parentsStr, parent.String())
-	}
+func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, filterParents []skyhook.ExecParent, dataTypes []skyhook.DataType) *DBExecNode {
 	res := db.Exec(
-		"INSERT INTO exec_nodes (name, op, params, parents, data_types, datasets) VALUES (?, ?, ?, ?, ?, '')",
-		name, op, params, strings.Join(parentsStr, ";"), skyhook.EncodeTypes(dataTypes),
+		"INSERT INTO exec_nodes (name, op, params, parents, filter_parents, data_types, datasets) VALUES (?, ?, ?, ?, ?, ?, '')",
+		name, op, params, skyhook.ExecParentsToString(parents), skyhook.ExecParentsToString(filterParents), skyhook.EncodeTypes(dataTypes),
 	)
 	return GetExecNode(res.LastInsertId())
 }
@@ -84,6 +81,7 @@ type ExecNodeUpdate struct {
 	Op *string
 	Params *string
 	Parents *[]skyhook.ExecParent
+	FilterParents *[]skyhook.ExecParent
 	DataTypes *[]skyhook.DataType
 }
 
@@ -98,12 +96,10 @@ func (node *DBExecNode) Update(req ExecNodeUpdate) {
 		db.Exec("UPDATE exec_nodes SET params = ? WHERE id = ?", *req.Params, node.ID)
 	}
 	if req.Parents != nil {
-		var parentsStr []string
-		for _, parent := range *req.Parents {
-			parentsStr = append(parentsStr, parent.String())
-		}
-		parentsRaw := strings.Join(parentsStr, ";")
-		db.Exec("UPDATE exec_nodes SET parents = ? WHERE id = ?", parentsRaw, node.ID)
+		db.Exec("UPDATE exec_nodes SET parents = ? WHERE id = ?", skyhook.ExecParentsToString(*req.Parents), node.ID)
+	}
+	if req.FilterParents != nil {
+		db.Exec("UPDATE exec_nodes SET filter_parents = ? WHERE id = ?", skyhook.ExecParentsToString(*req.FilterParents), node.ID)
 	}
 	if req.DataTypes != nil {
 		var typesStr []string

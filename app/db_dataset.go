@@ -184,9 +184,13 @@ func (ds *DBDataset) WriteItem(key string, data skyhook.Data) *DBItem {
 }
 
 func (ds *DBDataset) Delete() {
+	ds.Clear()
+	db.Exec("DELETE FROM datasets")
+}
+
+func (ds *DBDataset) Clear() {
 	ds.Dataset.Remove()
 	db.Exec("DELETE FROM items WHERE dataset_id = ?", ds.ID)
-	db.Exec("DELETE FROM datasets")
 }
 
 func (item *DBItem) Delete() {

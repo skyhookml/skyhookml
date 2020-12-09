@@ -6,7 +6,7 @@ Vue.component('exec-node-parents', {
 		};
 	},
 	props: [
-		'node', 'nodes', 'datasets', 'label',
+		'node', 'pkey', 'nodes', 'datasets', 'label',
 	],
 	created: function() {
 		for(let dsID in this.datasets) {
@@ -53,7 +53,7 @@ Vue.component('exec-node-parents', {
 		<tr><th colspan="2">{{ label }}</th></tr>
 	</thead>
 	<tbody>
-		<tr v-for="(parent, i) in node.Parents" :key="i">
+		<tr v-for="(parent, i) in node[pkey]" :key="i">
 			<template v-if="parent.Type == 'd'">
 				<td>Dataset: {{ datasets[parent.ID].Name }}</td>
 			</template>

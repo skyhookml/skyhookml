@@ -189,6 +189,11 @@ func init() {
 				return nil, fmt.Errorf("error getting parent dataset items: %v", err)
 			}
 
+			keys, err := exec_ops.GetKeys(url, node)
+			if err != nil {
+				return nil, fmt.Errorf("error getting keys: %v", err)
+			}
+
 			// only keep items that have length set, and at least params.Length
 			type Item struct {
 				Item skyhook.Item
@@ -197,6 +202,10 @@ func init() {
 			}
 			var items []Item
 			for _, item := range rawItems {
+				if !keys[item.Key] {
+					continue
+				}
+
 				var metadata skyhook.VideoMetadata
 				err := json.Unmarshal([]byte(item.Metadata), &metadata)
 				if err != nil {

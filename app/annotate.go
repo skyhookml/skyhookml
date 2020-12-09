@@ -144,6 +144,7 @@ func init() {
 			Key string
 			Data string
 			Format string
+			Metadata string
 		}
 		var request AnnotateRequest
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
@@ -153,7 +154,7 @@ func init() {
 		ds := &DBDataset{Dataset: annoset.Dataset}
 		item := ds.GetItem(request.Key)
 		buf := bytes.NewBuffer([]byte(request.Data))
-		data, err := skyhook.DecodeData(annoset.Dataset.DataType, request.Format, "", buf)
+		data, err := skyhook.DecodeData(annoset.Dataset.DataType, request.Format, request.Metadata, buf)
 		if err != nil {
 			panic(err)
 		}

@@ -1,0 +1,89 @@
+def M():
+	class SimpleClassifier(torch.nn.Module):
+		def __init__(self):
+			super(SimpleClassifier, self).__init__()
+			kernel = 4
+			input_channels = 3
+			padding = kernel//2
+			channels_list = [input_channels, 32, 64, 128, 128, 128, 128, 128]
+
+			self.pool = torch.nn.MaxPool2d(2, 2)
+			self.relu = torch.nn.ReLU()
+
+			convs = []
+			for i in range(len(channels_list)-1):
+				conv = torch.nn.Conv2d(channels_list[i], channels_list[i+1], kernel, padding=(padding, padding))
+				convs.append(conv)
+			self.convs = torch.nn.ModuleList(convs)
+
+			self.fc = torch.nn.Linear(128, 2)
+			self.ce = torch.nn.CrossEntropyLoss()
+
+		def forward(self, x, targets=None):
+			x = x.float()
+			for conv in self.convs:
+				x = self.pool(self.relu(conv(x)))
+			x = torch.mean(x, dim=[2, 3])
+			x = self.fc(x)
+
+			d = {
+				'pre_out': x,
+				'out': torch.argmax(x, 1),
+			}
+
+			if targets is not None:
+				d['loss'] = torch.mean(self.ce(x, targets[0]))
+
+			return d
+	return SimpleClassifier()
+
+{
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Components": [
+		{
+			"ID": 1,
+			"Inputs": [{
+				"Type": "dataset",
+				"DatasetIdx": 0,
+			}],
+			"Targets": [{
+				"Type": "dataset",
+				"DatasetIdx": 1,
+			}]
+		},
+	],
+	"Losses": [{
+		"ComponentIdx": 0,
+		"Layer": "loss",
+	}],
+}
+
+{
+	"ArchID": 1,
+	"InputDatasetIDs": [2, 3],
+	"OutputDatasets": [{
+		"ComponentIdx": 0,
+		"Layer": "out",
+		"DataType": "int"
+	}],
+}
+
+type PytorchNodeParams struct {
+	ArchID int
+
+	// IDs of other TrainNodes to load model from
+	// TODO: should probably specify some kind of names mapping
+	// (if arch has only one instance of each component, then mapping should
+	// be clear, but need mapping in case arch has multiple of the same component)
+	LoadFrom []int
+
+	// dataset IDs, length equals NumInputs+NumTargets
+	InputDatasetIDs []int
+
+	OutputDatasets []struct{
+		ComponentIdx int
+		Layer string
+		DataType DataType
+	}
+}

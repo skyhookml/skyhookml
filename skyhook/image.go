@@ -165,6 +165,12 @@ func (im Image) DrawRectangle(left, top, right, bottom int, width int, color [3]
 	im.FillRectangle(left, bottom-width, right, bottom+width, color)
 }
 
+func (im Image) DrawLine(sx, sy, ex, ey int, width int, color [3]uint8) {
+	for _, p := range DrawLineOnCells(sx, sy, ex, ey, im.Width, im.Height) {
+		im.FillRectangle(p[0]-width, p[1]-width, p[0]+width, p[1]+width, color)
+	}
+}
+
 func (im Image) DrawImage(left int, top int, other Image) {
 	for i := 0; i < other.Width; i++ {
 		for j := 0; j < other.Height; j++ {

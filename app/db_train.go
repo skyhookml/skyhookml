@@ -8,7 +8,8 @@ import (
 )
 
 type DBTrainNode struct {skyhook.TrainNode}
-type DBKerasArch struct {skyhook.KerasArch}
+type DBPytorchComponent struct {skyhook.PytorchComponent}
+type DBPytorchArch struct {skyhook.PytorchArch}
 
 const TrainNodeQuery = "SELECT id, name, op, params, parents, outputs, trained FROM train_nodes"
 
@@ -80,45 +81,60 @@ func (node *DBTrainNode) Update(req TrainNodeUpdate) {
 	}
 }
 
-/*const ModelQuery = "SELECT id, name, op, params, outputs FROM models"
+const PytorchComponentQuery = "SELECT id, name, params FROM pytorch_components"
 
-func modelListHelper(rows *Rows) []*DBModel {
-	models := []*DBModel{}
+func pytorchComponentListHelper(rows *Rows) []*DBPytorchComponent {
+	var comps []*DBPytorchComponent
 	for rows.Next() {
-		var model DBModel
-		var outputsRaw string
-		rows.Scan(&model.ID, &model.Name, &model.Op, &model.Params, &outputsRaw)
-		model.Outputs = make(map[string]skyhook.DataType)
-		for _, s := range strings.Split(outputsRaw, ",") {
-			parts := strings.Split(s, "=")
-			model.Outputs[parts[0]] = skyhook.DataType(parts[1])
-		}
-		models = append(models, &model)
+		var c DBPytorchComponent
+		var paramsRaw string
+		rows.Scan(&c.ID, &c.Name, &paramsRaw)
+		skyhook.JsonUnmarshal([]byte(paramsRaw), &c.Params)
+		comps = append(comps, &c)
 	}
-	return models
+	return comps
 }
 
-func ListModels() []*DBModel {
-	rows := db.Query(ModelQuery)
-	return modelListHelper(rows)
+func ListPytorchComponents() []*DBPytorchComponent {
+	rows := db.Query(PytorchComponentQuery)
+	return pytorchComponentListHelper(rows)
 }
 
-func GetModel(id int) *DBModel {
-	rows := db.Query(ModelQuery + " WHERE id = ?", id)
-	models := modelListHelper(rows)
-	if len(models) == 1 {
-		return models[0]
+func GetPytorchComponent(id int) *DBPytorchComponent {
+	rows := db.Query(PytorchComponentQuery + " WHERE id = ?", id)
+	comps := pytorchComponentListHelper(rows)
+	if len(comps) == 1 {
+		return comps[0]
 	} else {
 		return nil
 	}
-}*/
+}
 
-const KerasArchQuery = "SELECT id, name, params FROM keras_archs"
+func NewPytorchComponent(name string) *DBPytorchComponent {
+	res := db.Exec("INSERT INTO pytorch_components (name, params) VALUES (?, '{}')", name)
+	return GetPytorchComponent(res.LastInsertId())
+}
 
-func kerasArchListHelper(rows *Rows) []*DBKerasArch {
-	var archs []*DBKerasArch
+type PytorchComponentUpdate struct {
+	Name *string
+	Params *skyhook.PytorchComponentParams
+}
+
+func (c *DBPytorchComponent) Update(req PytorchComponentUpdate) {
+	if req.Name != nil {
+		db.Exec("UPDATE pytorch_components SET name = ? WHERE id = ?", *req.Name, c.ID)
+	}
+	if req.Params != nil {
+		db.Exec("UPDATE pytorch_components SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), c.ID)
+	}
+}
+
+const PytorchArchQuery = "SELECT id, name, params FROM pytorch_archs"
+
+func pytorchArchListHelper(rows *Rows) []*DBPytorchArch {
+	var archs []*DBPytorchArch
 	for rows.Next() {
-		var arch DBKerasArch
+		var arch DBPytorchArch
 		var paramsRaw string
 		rows.Scan(&arch.ID, &arch.Name, &paramsRaw)
 		skyhook.JsonUnmarshal([]byte(paramsRaw), &arch.Params)
@@ -127,14 +143,14 @@ func kerasArchListHelper(rows *Rows) []*DBKerasArch {
 	return archs
 }
 
-func ListKerasArchs() []*DBKerasArch {
-	rows := db.Query(KerasArchQuery)
-	return kerasArchListHelper(rows)
+func ListPytorchArchs() []*DBPytorchArch {
+	rows := db.Query(PytorchArchQuery)
+	return pytorchArchListHelper(rows)
 }
 
-func GetKerasArch(id int) *DBKerasArch {
-	rows := db.Query(KerasArchQuery + " WHERE id = ?", id)
-	archs := kerasArchListHelper(rows)
+func GetPytorchArch(id int) *DBPytorchArch {
+	rows := db.Query(PytorchArchQuery + " WHERE id = ?", id)
+	archs := pytorchArchListHelper(rows)
 	if len(archs) == 1 {
 		return archs[0]
 	} else {
@@ -142,21 +158,21 @@ func GetKerasArch(id int) *DBKerasArch {
 	}
 }
 
-func NewKerasArch(name string) *DBKerasArch {
-	res := db.Exec("INSERT INTO keras_archs (name, params) VALUES (?, '{}')", name)
-	return GetKerasArch(res.LastInsertId())
+func NewPytorchArch(name string) *DBPytorchArch {
+	res := db.Exec("INSERT INTO pytorch_archs (name, params) VALUES (?, '{}')", name)
+	return GetPytorchArch(res.LastInsertId())
 }
 
-type KerasArchUpdate struct {
+type PytorchArchUpdate struct {
 	Name *string
-	Params *skyhook.KerasArchParams
+	Params *skyhook.PytorchArchParams
 }
 
-func (arch *DBKerasArch) Update(req KerasArchUpdate) {
+func (arch *DBPytorchArch) Update(req PytorchArchUpdate) {
 	if req.Name != nil {
-		db.Exec("UPDATE keras_archs SET name = ? WHERE id = ?", *req.Name, arch.ID)
+		db.Exec("UPDATE pytorch_archs SET name = ? WHERE id = ?", *req.Name, arch.ID)
 	}
 	if req.Params != nil {
-		db.Exec("UPDATE keras_archs SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), arch.ID)
+		db.Exec("UPDATE pytorch_archs SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), arch.ID)
 	}
 }

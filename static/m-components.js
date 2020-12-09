@@ -1,9 +1,9 @@
-Vue.component('m-architectures', {
+Vue.component('m-components', {
 	data: function() {
 		return {
-			archs: [],
+			comps: [],
 			addForm: {},
-			selectedArch: null,
+			selectedComp: null,
 		};
 	},
 	props: ['mtab'],
@@ -13,11 +13,11 @@ Vue.component('m-architectures', {
 	},
 	methods: {
 		fetch: function(force) {
-			if(!force && this.mtab != '#m-architectures-panel') {
+			if(!force && this.mtab != '#m-components-panel') {
 				return;
 			}
-			myCall('GET', '/pytorch/archs', null, (data) => {
-				this.archs = data;
+			myCall('GET', '/pytorch/components', null, (data) => {
+				this.comps = data;
 			});
 		},
 		showAddModal: function() {
@@ -27,27 +27,27 @@ Vue.component('m-architectures', {
 			$(this.$refs.addModal).modal('show');
 		},
 		add: function() {
-			myCall('POST', '/pytorch/archs', this.addForm, () => {
+			myCall('POST', '/pytorch/components', this.addForm, () => {
 				$(this.$refs.addModal).modal('hide');
 				this.fetch(true);
 			});
 		},
-		deleteArch: function(archID) {
-			myCall('DELETE', '/pytorch/archs/'+archID, null, () => {
+		deleteComp: function(compID) {
+			myCall('DELETE', '/pytorch/components/'+compID, null, () => {
 				this.fetch(true);
 			});
 		},
-		selectArch: function(arch) {
-			this.selectedArch = arch;
+		selectComp: function(comp) {
+			this.selectedComp = comp;
 		},
 		back: function() {
 			this.fetch(true);
-			this.selectArch(null);
+			this.selectComp(null);
 		},
 	},
 	watch: {
 		tab: function() {
-			if(this.mtab != '#m-architectures-panel') {
+			if(this.mtab != '#m-components-panel') {
 				return;
 			}
 			this.fetch(true);
@@ -55,9 +55,9 @@ Vue.component('m-architectures', {
 	},
 	template: `
 <div>
-	<template v-if="selectedArch == null">
+	<template v-if="selectedComp == null">
 		<div class="my-1">
-			<button type="button" class="btn btn-primary" v-on:click="showAddModal">Add Architecture</button>
+			<button type="button" class="btn btn-primary" v-on:click="showAddModal">Add Component</button>
 			<div class="modal" tabindex="-1" role="dialog" ref="addModal">
 				<div class="modal-dialog" role="document">
 					<div class="modal-content">
@@ -71,7 +71,7 @@ Vue.component('m-architectures', {
 								</div>
 								<div class="form-group row">
 									<div class="col-sm-8">
-										<button type="submit" class="btn btn-primary">Add Architecture</button>
+										<button type="submit" class="btn btn-primary">Add Component</button>
 									</div>
 								</div>
 							</form>
@@ -88,11 +88,11 @@ Vue.component('m-architectures', {
 				</tr>
 			</thead>
 			<tbody>
-				<tr v-for="arch in archs">
-					<td>{{ arch.Name }}</td>
+				<tr v-for="comp in comps">
+					<td>{{ comp.Name }}</td>
 					<td>
-						<button v-on:click="selectArch(arch)" class="btn btn-primary">Manage</button>
-						<button v-on:click="deleteArch(arch.ID)" class="btn btn-danger">Delete</button>
+						<button v-on:click="selectComp(comp)" class="btn btn-primary">Manage</button>
+						<button v-on:click="deleteComp(comp.ID)" class="btn btn-danger">Delete</button>
 					</td>
 				</tr>
 			</tbody>
@@ -102,7 +102,7 @@ Vue.component('m-architectures', {
 		<div>
 			<button type="button" class="btn btn-primary" v-on:click="back">Back</button>
 		</div>
-		<m-architecture v-bind:arch="selectedArch"></m-architecture>
+		<m-component v-bind:comp="selectedComp"></m-component>
 	</template>
 </div>
 	`,

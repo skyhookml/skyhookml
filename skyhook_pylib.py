@@ -12,6 +12,62 @@ def eprint(s):
 	sys.stderr.write(str(s) + "\n")
 	sys.stderr.flush()
 
+def data_index(t, data, i):
+	if t == 'shape':
+		return {
+			'Shapes': data['Shapes'][i],
+			'Metadata': data['Metadata'],
+		}
+	if t == 'detection':
+		return {
+			'Detections': data['Detections'][i],
+			'Metadata': data['Metadata'],
+		}
+	else:
+		return data[i]
+
+# stack a bunch of individual data (like data_index output)
+def data_stack(t, datas):
+	if t == 'image' or t == 'video':
+		return numpy.stack(datas)
+	elif t == 'shape':
+		return {
+			'Shapes': [data['Shapes'] for data in datas],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
+	elif t == 'detection':
+		return {
+			'Detections': [data['Detections'] for data in datas],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
+	else:
+		return datas
+
+# stack a bunch of regular data
+def data_concat(t, datas):
+	if t == 'image' or t == 'video':
+		return numpy.concatenate(datas, axis=0)
+	elif t == 'shape':
+		return {
+			'Shapes': [shape_list for data in datas for shape_list in data['Shapes']],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
+	elif t == 'detection':
+		return {
+			'Detections': [detection_list for data in datas for detection_list in data['Detections']],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
+	else:
+		return [x for data in datas for x in data]
+
+def data_len(t, data):
+	if t == 'shape':
+		return len(data['Shapes'])
+	if t == 'detection':
+		return len(data['Detections'])
+	else:
+		return len(data)
+
 def per_frame_decorate(f):
 	def wrap(*args):
 		job_desc = args[0]
@@ -22,18 +78,17 @@ def per_frame_decorate(f):
 			return
 
 		args = args[1:]
+		input_len = data_len(meta['InputTypes'][0], args[0])
 		outputs = []
-		for i in range(len(args[0])):
-			inputs = [arg[i] for arg in args]
+		for i in range(input_len):
+			inputs = [data_index(meta['InputTypes'][ds_idx], arg, i) for ds_idx, arg in enumerate(args)]
 			output = f(*inputs)
 			if not isinstance(output, tuple):
 				output = (output,)
 			outputs.append(output)
 		stack_outputs = []
 		for i, t in enumerate(meta['OutputTypes']):
-			stacked = [output[i] for output in outputs]
-			if t == 'image' or t == 'video':
-				stacked = numpy.stack(stacked)
+			stacked = data_stack(t, [output[i] for output in outputs])
 			stack_outputs.append(stacked)
 		output_datas(job_desc['key'], job_desc['key'], len(outputs), stack_outputs)
 	return wrap
@@ -51,15 +106,12 @@ def all_decorate(f):
 					all_inputs[i].append(arg)
 			return all_inputs
 		elif job_desc['type'] == 'finish':
-			for i, l in enumerate(all_inputs):
-				if isinstance(l[0], list):
-					all_inputs[i] = [x for arg in l for x in arg]
-				else:
-					all_inputs[i] = numpy.concatenate(l, axis=0)
+			all_inputs = [data_concat(meta['InputTypes'][ds_idx], datas) for ds_idx, datas in enumerate(all_inputs)]
 			outputs = f(*all_inputs)
 			if not isinstance(outputs, tuple):
 				outputs = (outputs,)
-			output_datas(job_desc['key'], job_desc['key'], len(outputs[0]), outputs)
+			output_len = data_len(meta['OutputTypes'][0], outputs[0])
+			output_datas(job_desc['key'], job_desc['key'], output_len, outputs)
 			output_data_finish(job_desc['key'], job_desc['key'])
 	return wrap
 

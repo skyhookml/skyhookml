@@ -14,34 +14,48 @@ func (node *DBExecNode) Run() error {
 	// get parent datasets
 	// for ExecNode parents, get computed dataset
 	// in the future, we may need some recursive execution
-	parents := make([]*DBDataset, len(node.Parents))
-	for i, parent := range node.Parents {
+	var allParents []skyhook.ExecParent
+	allParents = append(allParents, node.Parents...)
+	allParents = append(allParents, node.FilterParents...)
+	datasets := make([]*DBDataset, len(allParents))
+	for i, parent := range allParents {
 		if parent.Type == "n" {
 			n := GetExecNode(parent.ID)
 			dsID := n.DatasetIDs[parent.Index]
 			if dsID == nil {
 				return fmt.Errorf("dataset for parent node %s is missing", n.Name)
 			}
-			parents[i] = GetDataset(*dsID)
+			datasets[i] = GetDataset(*dsID)
 		} else {
-			parents[i] = GetDataset(parent.ID)
+			datasets[i] = GetDataset(parent.ID)
 		}
 	}
 
 	// get all unique keys in parent datasets
 	keys := make(map[string][]skyhook.Item)
-	for _, ds := range parents {
+	for i, ds := range datasets {
 		curKeys := make(map[string]skyhook.Item)
 		for _, item := range ds.ListItems() {
 			curKeys[item.Key] = item.Item
 		}
-		for key, item := range curKeys {
-			keys[key] = append(keys[key], item)
+
+		// remove previous keys not in this dataset
+		for key := range keys {
+			if _, ok := curKeys[key]; !ok {
+				delete(keys, key)
+			}
 		}
-	}
-	for key := range keys {
-		if len(keys[key]) < len(parents) {
-			delete(keys, key)
+
+		// if not filter parent, add to the items
+		if i >= len(node.Parents) {
+			continue
+		}
+
+		for key, item := range curKeys {
+			if i > 0 && keys[key] == nil {
+				continue
+			}
+			keys[key] = append(keys[key], item)
 		}
 	}
 
@@ -52,6 +66,10 @@ func (node *DBExecNode) Run() error {
 	outputDatasets := make([]*DBDataset, len(node.DataTypes))
 	for i, id := range node.DatasetIDs {
 		outputDatasets[i] = GetDataset(*id)
+
+		// TODO: for now we clear the output datasets before running
+		// but in the future, ops may support incremental execution
+		outputDatasets[i].Clear()
 	}
 
 	// prepare op
@@ -91,7 +109,7 @@ func init() {
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
 			return
 		}
-		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.DataTypes)
+		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.FilterParents, request.DataTypes)
 		skyhook.JsonResponse(w, node)
 	}).Methods("POST")
 

@@ -161,6 +161,8 @@ func (e *PythonOp) readLoop() {
 	for _, pk := range e.pending {
 		pk.cond.Broadcast()
 	}
+	e.stdout.Close()
+	e.stdin.Close()
 	e.mu.Unlock()
 
 }
@@ -231,11 +233,16 @@ func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhoo
 	}, e.stdin)
 	e.writeLock.Unlock()
 
-	if err != nil {
+	e.mu.Lock()
+	// first check e.err because that may have caused the EncodeStream error
+	if e.err != nil {
+		e.mu.Unlock()
+		return nil, e.err
+	} else if err != nil {
+		e.mu.Unlock()
 		return nil, err
 	}
 
-	e.mu.Lock()
 	for !pk.done && e.err == nil {
 		pk.cond.Wait()
 	}

@@ -24,6 +24,14 @@ func (p ExecParent) String() string {
 	return strings.Join(parts, ",")
 }
 
+func ExecParentsToString(parents []ExecParent) string {
+	var strs []string
+	for _, parent := range parents {
+		strs = append(strs, parent.String())
+	}
+	return strings.Join(strs, ";")
+}
+
 func ParseExecParent(s string) ExecParent {
 	parts := strings.Split(s, ",")
 	p := ExecParent{
@@ -54,6 +62,7 @@ type ExecNode struct {
 	Op string
 	Params string
 	Parents []ExecParent
+	FilterParents []ExecParent
 	DataTypes []DataType
 	DatasetIDs []*int
 }
