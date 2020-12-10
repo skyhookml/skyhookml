@@ -1,4 +1,4 @@
-Vue.component('m-train-node-parents', {
+export default {
 	data: function() {
 		return {
 			selected: '',
@@ -41,4 +41,4 @@ Vue.component('m-train-node-parents', {
 	</tbody>
 </table>
 	`,
-});
+};

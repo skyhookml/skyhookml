@@ -1,10 +1,18 @@
-Vue.component('models-tab', {
+import MTraining from './m-training.js';
+import MComponents from './m-components.js';
+import MArchitectures from './m-architectures.js';
+
+const Models = {
+	components: {
+		'm-training': MTraining,
+		'm-components': MComponents,
+		'm-architectures': MArchitectures,
+	},
 	data: function() {
 		return {
 			mtab: '',
 		};
 	},
-	props: ['tab'],
 	mounted: function() {
 		this.mtab = $('#m-nav a[data-toggle="tab"].active').attr('href');
 		$('#m-nav a[data-toggle="tab"]').on('shown.bs.tab', (e) => {
@@ -38,4 +46,5 @@ Vue.component('models-tab', {
 	</div>
 </div>
 	`,
-});
+};
+export default Models;

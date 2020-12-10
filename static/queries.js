@@ -1,4 +1,12 @@
-Vue.component('queries-tab', {
+import utils from './utils.js';
+import ExecNodeParents from './exec-node-parents.js';
+import AddExecNode from './add-exec-node.js';
+
+const Queries = {
+	components: {
+		'exec-node-parents': ExecNodeParents,
+		'add-exec-node': AddExecNode,
+	},
 	data: function() {
 		return {
 			selectedDatasetID: null,
@@ -8,12 +16,10 @@ Vue.component('queries-tab', {
 			selectedNode: null,
 			showingNewNodeModal: false,
 			nodeRects: {},
-			editor: '',
 			prevStage: null,
 			resizeObserver: null,
 		};
 	},
-	props: ['tab'],
 	// don't want to render until after mounted
 	mounted: function() {
 		this.update();
@@ -21,22 +27,22 @@ Vue.component('queries-tab', {
 	methods: {
 		update: function() {
 			Promise.all([
-				myCall('GET', '/datasets', null, (data) => {
-					datasets = {};
+				utils.request(this, 'GET', '/datasets', null, (data) => {
+					let datasets = {};
 					data.forEach((ds) => {
 						datasets[ds.ID] = ds;
 					});
 					this.datasets = datasets;
 				}),
-				myCall('GET', '/kv/exec-nodes-meta', null, (meta) => {
+				utils.request(this, 'GET', '/kv/exec-nodes-meta', null, (meta) => {
 					if(meta) {
 						this.meta = JSON.parse(meta);
 					} else {
 						this.meta = {};
 					}
 				}, null, {dataType: 'text'}),
-				myCall('GET', '/exec-nodes', null, (data) => {
-					nodes = {};
+				utils.request(this, 'GET', '/exec-nodes', null, (data) => {
+					let nodes = {};
 					data.forEach((node) => {
 						nodes[node.ID] = node;
 					});
@@ -51,10 +57,6 @@ Vue.component('queries-tab', {
 					}
 				}),
 			]).then(() => {
-				if(this.editor != '') {
-					// don't render if this.$refs.view is not visible
-					return;
-				}
 				this.render();
 			});
 		},
@@ -109,7 +111,7 @@ Vue.component('queries-tab', {
 				for(let gid in groups) {
 					meta[gid] = [parseInt(groups[gid].x()), parseInt(groups[gid].y())];
 				}
-				myCall('POST', '/kv/exec-nodes-meta', {'val': JSON.stringify(meta)});
+				utils.request(this, 'POST', '/kv/exec-nodes-meta', {'val': JSON.stringify(meta)});
 				this.meta = meta;
 			};
 
@@ -337,25 +339,21 @@ Vue.component('queries-tab', {
 			}
 		},
 		editNode: function() {
-			this.editor = 'exec-edit-' + this.selectedNode.Op;
+			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.selectedNode.Op+'/'+this.selectedNode.ID);
 		},
 		runNode: function() {
-			myCall('POST', '/exec-nodes/'+this.selectedNode.ID+'/run');
+			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run');
 		},
 		/*removeNode: function() {
-			myCall('POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
+			utils.request(this, 'POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
 				this.update();
 			});
 		},*/
-		backFromEditing: function() {
-			this.editor = '';
-			this.update();
-		},
 		addParent: function(parent, key) {
 			let params = {};
 			params[key] = this.selectedNode[key].concat([parent]);
 			params = JSON.stringify(params);
-			myCall('POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
+			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
@@ -363,71 +361,54 @@ Vue.component('queries-tab', {
 			let params = {};
 			params[key] = this.selectedNode[key].filter((parent, i) => i != idx);
 			params = JSON.stringify(params);
-			myCall('POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
+			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
 	},
-	watch: {
-		tab: function() {
-			if(this.tab != '#queries-panel') {
-				return;
-			}
-			this.update();
-		},
-	},
 	template: `
-<div style="height:100%;">
-	<div v-if="editor == ''" class="graph-div">
-		<div class="graph-view" ref="view">
-			<div ref="layer"></div>
+<div style="height:100%;" class="graph-div">
+	<div class="graph-view" ref="view">
+		<div ref="layer"></div>
+	</div>
+	<div>
+		<div class="my-2">
+			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
+			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
+			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
 		</div>
-		<div>
-			<div class="my-2">
-				<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
-				<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
-				<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
+		<hr />
+		<div v-if="selectedNode != null" class="my-2">
+			<div>Node {{ selectedNode.Name }}</div>
+			<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
+			<div>
+				<exec-node-parents
+					:node="selectedNode"
+					pkey="Parents"
+					:nodes="nodes"
+					:datasets="datasets"
+					label="Parents"
+					v-on:add="addParent($event, 'Parents')"
+					v-on:remove="removeParent($event, 'Parents')"
+					>
+				</exec-node-parents>
 			</div>
-			<hr />
-			<div v-if="selectedNode != null" class="my-2">
-				<div>Node {{ selectedNode.Name }}</div>
-				<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
-				<div>
-					<exec-node-parents
-						:node="selectedNode"
-						pkey="Parents"
-						:nodes="nodes"
-						:datasets="datasets"
-						label="Parents"
-						v-on:add="addParent($event, 'Parents')"
-						v-on:remove="removeParent($event, 'Parents')"
-						>
-					</exec-node-parents>
-				</div>
-				<div>
-					<exec-node-parents
-						:node="selectedNode"
-						pkey="FilterParents"
-						:nodes="nodes"
-						:datasets="datasets"
-						label="Filter Parents"
-						v-on:add="addParent($event, 'FilterParents')"
-						v-on:remove="removeParent($event, 'FilterParents')"
-						>
-					</exec-node-parents>
-				</div>
+			<div>
+				<exec-node-parents
+					:node="selectedNode"
+					pkey="FilterParents"
+					:nodes="nodes"
+					:datasets="datasets"
+					label="Filter Parents"
+					v-on:add="addParent($event, 'FilterParents')"
+					v-on:remove="removeParent($event, 'FilterParents')"
+					>
+				</exec-node-parents>
 			</div>
 		</div>
-		<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>
 	</div>
-	<div v-else class="graph-edit-container">
-		<div>
-			<button type="button" class="btn btn-primary" v-on:click="backFromEditing">Back</button>
-		</div>
-		<div class="graph-edit-div">
-			<component v-bind:is="editor" v-bind:node="selectedNode"></component>
-		</div>
-	</div>
+	<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>
 </div>
 	`,
-});
+};
+export default Queries;

@@ -1,4 +1,6 @@
-Vue.component('import-modal', {
+import utils from './utils.js';
+
+export default {
 	data: function() {
 		return {
 			path: '',
@@ -23,7 +25,7 @@ Vue.component('import-modal', {
 			this.file = event.target.files[0];
 		},
 		submitLocal: function() {
-			myCall('POST', '/datasets/'+this.dataset.ID+'/import-local', {path: this.path});
+			utils.request(this, 'POST', '/datasets/'+this.dataset.ID+'/import-local', {path: this.path});
 			$(this.$refs.modal).modal('hide');
 		},
 		submitUpload: function() {
@@ -115,4 +117,4 @@ Vue.component('import-modal', {
 	</div>
 </span>
 	`,
-});
+};

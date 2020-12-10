@@ -9,24 +9,37 @@
 	</head>
 	<body>
 		<div id="app" class="flex-container">
-			<ul id="myTab" class="nav nav-tabs" role="tablist">
+			<div>
+				<form v-on:submit.prevent="changedWorkspace" class="form-inline my-2 float-left">
+					<label class="ml-1">Workspace:</label>
+					<select v-model="selectedWorkspace" @change="changedWorkspace" class="form-control ml-1">
+						<option v-for="ws in workspaces" :key="ws.Name" :value="ws.Name">{{ ws.Name }}</option>
+					</select>
+					<button type="button" class="btn btn-danger ml-1">Remove</button>
+				</form>
+				<form v-on:submit.prevent="createWorkspace" class="form-inline my-2 float-left">
+					<input v-model="addForms.workspace.name" type="form-control" placeholder="Name" class="ml-4" />
+					<button type="submit" class="btn btn-primary ml-1">New Workspace</button>
+				</form>
+			</div>
+			<ul class="nav nav-pills" role="tablist">
 				<li class="nav-item">
-					<a class="nav-link" id="datasets-tab" data-toggle="tab" href="#datasets-panel" role="tab" aria-controls="datasets-panel" aria-selected="true">Datasets</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('datasets')">Datasets</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" id="annotate-tab" data-toggle="tab" href="#annotate-panel" role="tab" aria-controls="annotate-panel" aria-selected="true">Annotate</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('annotate')">Annotate</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" id="models-tab" data-toggle="tab" href="#models-panel" role="tab" aria-controls="models-panel" aria-selected="true">Models</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('models')">Models</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" id="queries-tab" data-toggle="tab" href="#queries-panel" role="tab" aria-controls="queries-panel" aria-selected="true">Queries</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('queries')">Queries</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" id="explore-tab" data-toggle="tab" href="#explore-panel" role="tab" aria-controls="explore-panel" aria-selected="true">Explore</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('explore')">Explore</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" id="jobs-tab" data-toggle="tab" href="#jobs-panel" role="tab" aria-controls="jobs-panel" aria-selected="true">Jobs</a>
+					<a class="nav-link" data-toggle="tab" href="#" role="tab" v-on:click.prevent="setPage('jobs')">Jobs</a>
 				</li>
 			</ul>
 			<div v-if="error != ''" class="alert alert-danger alert-dismissible" role="alert">
@@ -36,56 +49,18 @@
 					<span>&times;</span>
 				</button>
 			</div>
-			<div class="tab-content mx-1 flex-content" id="content">
-				<div class="tab-pane fade show active" id="datasets-panel" role="tabpanel" aria-labelledby="datasets-tab">
-					<datasets-tab :tab="tab"></datasets-tab>
-				</div>
-				<div class="tab-pane fade" id="annotate-panel" role="tabpanel" aria-labelledby="annotate-tab">
-					<annotate-tab :tab="tab"></annotate-tab>
-				</div>
-				<div class="tab-pane fade" id="models-panel" role="tabpanel" aria-labelledby="models-tab">
-					<models-tab :tab="tab"></models-tab>
-				</div>
-				<div class="tab-pane fade el-high" id="queries-panel" role="tabpanel" aria-labelledby="queries-tab">
-					<queries-tab :tab="tab"></queries-tab>
-				</div>
-				<div class="tab-pane fade" id="explore-panel" role="tabpanel" aria-labelledby="explore-tab">
-					<!--<explore-tab :tab="tab"></explore-tab>-->
-				</div>
-				<div class="tab-pane fade" id="jobs-panel" role="tabpanel" aria-labelledby="jobs-tab">
-					<!--<jobs-tab :tab="tab"></jobs-tab>-->
-				</div>
+			<div class="flex-content">
+				<router-view @error="setError($event)"></router-view>
 			</div>
 		</div>
 		<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 		<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-		<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+		<script src="https://unpkg.com/vue/dist/vue.js"></script>
+		<script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
 		<script src="https://unpkg.com/konva@6.0.0/konva.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.8/socket.io.min.js" integrity="sha256-iItBu0k/grx4e1B97uNd+Kncoy2fWeXkQ0M0uwSqHhc=" crossorigin="anonymous"></script>
 
-		<script src="static/datasets.js"></script>
-		<script src="static/dataset.js"></script>
-		<script src="static/import-modal.js"></script>
-		<script src="static/annotate.js"></script>
-		<script src="static/annotate-int.js"></script>
-		<script src="static/annotate-shape.js"></script>
-		<script src="static/models.js"></script>
-		<script src="static/m-architectures.js"></script>
-		<script src="static/m-architecture.js"></script>
-		<script src="static/m-components.js"></script>
-		<script src="static/m-component.js"></script>
-		<script src="static/m-training.js"></script>
-		<script src="static/m-train-node-parents.js"></script>
-		<script src="static/m-add-train-node.js"></script>
-		<script src="static/m-train-pytorch.js"></script>
-		<script src="static/m-train-yolov3.js"></script>
-		<script src="static/queries.js"></script>
-		<script src="static/add-exec-node.js"></script>
-		<script src="static/exec-node-parents.js"></script>
-		<script src="static/exec-edit-model.js"></script>
-		<script src="static/exec-edit-python.js"></script>
-		<script src="static/exec-edit-video_sample.js"></script>
-		<script src="static/index.js"></script>
+		<script type="module" src="static/index.js"></script>
 	</body>
 </html>

@@ -1,6 +1,9 @@
-Vue.component('annotate-shape', {
+import utils from './utils.js';
+
+export default {
 	data: function() {
 		return {
+			annoset: null,
 			params: null,
 			url: '',
 
@@ -13,21 +16,24 @@ Vue.component('annotate-shape', {
 			curIndex: 0,
 		};
 	},
-	props: ['annoset'],
 	created: function() {
-		this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
-		let params;
-		try {
-			params = JSON.parse(this.annoset.Params);
-		} catch(e) {}
-		if(!params) {
-			params = {};
-		}
-		if(!params.Mode) {
-			params.Mode = 'box';
-		}
-		this.params = params;
-		myCall('GET', this.url, null, this.update);
+		const setID = this.$route.params.setid;
+		utils.request(this, 'GET', '/annotate-datasets/'+setID, null, (annoset) => {
+			this.annoset = annoset;
+			this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
+			let params;
+			try {
+				params = JSON.parse(this.annoset.Params);
+			} catch(e) {}
+			if(!params) {
+				params = {};
+			}
+			if(!params.Mode) {
+				params.Mode = 'box';
+			}
+			this.params = params;
+			utils.request(this, 'GET', this.url, null, this.update);
+		});
 	},
 	methods: {
 		update: function(response) {
@@ -43,7 +49,7 @@ Vue.component('annotate-shape', {
 						format: 'json',
 						t: new Date().getTime(),
 					};
-					myCall('GET', '/items/'+this.response.ID+'/get', params, (data) => {
+					utils.request(this, 'GET', '/items/'+this.response.ID+'/get', params, (data) => {
 						if(data.length == 0) {
 							return;
 						}
@@ -69,11 +75,11 @@ Vue.component('annotate-shape', {
 		getNew: function() {
 			this.keyList = null;
 			this.curIndex = 0;
-			myCall('GET', this.url, null, this.update);
+			utils.request(this, 'GET', this.url, null, this.update);
 		},
 		getOld: function(i) {
 			if(!this.keyList) {
-				myCall('GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
+				utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
 					if(!items || items.length == 0) {
 						return;
 					}
@@ -84,7 +90,7 @@ Vue.component('annotate-shape', {
 			}
 
 			this.curIndex = (i + this.keyList.length) % this.keyList.length;
-			myCall('GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
+			utils.request(this, 'GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
 		},
 		annotate: function() {
 			var request = {
@@ -95,7 +101,7 @@ Vue.component('annotate-shape', {
 					CanvasDims: [this.imageMeta.Width, this.imageMeta.Height],
 				}),
 			};
-			myCall('POST', this.url, JSON.stringify(request), () => {
+			utils.request(this, 'POST', this.url, JSON.stringify(request), () => {
 				if(this.keyList == null) {
 					this.getNew();
 				} else {
@@ -104,7 +110,7 @@ Vue.component('annotate-shape', {
 			});
 		},
 		saveParams: function() {
-			myCall('POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
+			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
 		},
 		render: function() {
 			let stage = new Konva.Stage({
@@ -282,53 +288,55 @@ Vue.component('annotate-shape', {
 	},
 	template: `
 <div>
-	<div>
-		<form class="form-inline" v-on:submit.prevent="saveParams">
-			<label class="my-1 mx-1">Mode</label>
-			<select class="form-control my-1 mx-1" v-model="params.Mode" @change="render">
-				<option value="box">Box</option>
-				<option value="point">Point</option>
-				<option value="line">Line</option>
-				<option value="polygon">Polygon</option>
-			</select>
+	<template v-if="annoset != null">
+		<div>
+			<form class="form-inline" v-on:submit.prevent="saveParams">
+				<label class="my-1 mx-1">Mode</label>
+				<select class="form-control my-1 mx-1" v-model="params.Mode" @change="render">
+					<option value="box">Box</option>
+					<option value="point">Point</option>
+					<option value="line">Line</option>
+					<option value="polygon">Polygon</option>
+				</select>
 
-			<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
-		</form>
-	</div>
-	<div class="canvas-container">
-		<img v-if="response != null" :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
-		<div
-			v-if="imageMeta != null"
-			class="conva"
-			ref="layer"
-			:style="{
-				width: imageMeta.Width+'px',
-				height: imageMeta.Height+'px',
-			}"
-			>
+				<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
+			</form>
 		</div>
-	</div>
+		<div class="canvas-container">
+			<img v-if="response != null" :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
+			<div
+				v-if="imageMeta != null"
+				class="conva"
+				ref="layer"
+				:style="{
+					width: imageMeta.Width+'px',
+					height: imageMeta.Height+'px',
+				}"
+				>
+			</div>
+		</div>
 
-	<div class="form-row align-items-center">
-		<div class="col-auto">
-			<button v-on:click="getOld(curIndex-1)" type="button" class="btn btn-primary">Prev</button>
+		<div class="form-row align-items-center">
+			<div class="col-auto">
+				<button v-on:click="getOld(curIndex-1)" type="button" class="btn btn-primary">Prev</button>
+			</div>
+			<div class="col-auto">
+				<template v-if="response != null">
+					<span>{{ response.key }}</span>
+					<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
+				</template>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getOld(curIndex+1)" type="button" class="btn btn-primary">Next</button>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getNew" type="button" class="btn btn-primary">New</button>
+			</div>
+			<div class="col-auto" v-if="response != null">
+				<button type="button" class="btn btn-primary" v-on:click="annotate">Done</button>
+			</div>
 		</div>
-		<div class="col-auto">
-			<template v-if="response != null">
-				<span>{{ response.key }}</span>
-				<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
-			</template>
-		</div>
-		<div class="col-auto">
-			<button v-on:click="getOld(curIndex+1)" type="button" class="btn btn-primary">Next</button>
-		</div>
-		<div class="col-auto">
-			<button v-on:click="getNew" type="button" class="btn btn-primary">New</button>
-		</div>
-		<div class="col-auto" v-if="response != null">
-			<button type="button" class="btn btn-primary" v-on:click="annotate">Done</button>
-		</div>
-	</div>
+	</template>
 </div>
 	`,
-});
+};

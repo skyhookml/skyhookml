@@ -1,6 +1,9 @@
-Vue.component('annotate-int', {
+import utils from './utils.js';
+
+const AnnotateInt = {
 	data: function() {
 		return {
+			annoset: null,
 			params: null,
 			url: '',
 
@@ -12,21 +15,24 @@ Vue.component('annotate-int', {
 			curIndex: 0,
 		};
 	},
-	props: ['annoset'],
 	created: function() {
-		this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
-		let params;
-		try {
-			params = JSON.parse(this.annoset.Params);
-		} catch(e) {}
-		if(!params) {
-			params = {};
-		}
-		if(!params.Range) {
-			params.Range = 2;
-		}
-		this.params = params;
-		myCall('GET', this.url, null, this.update);
+		const setID = this.$route.params.setid;
+		utils.request(this, 'GET', '/annotate-datasets/'+setID, null, (annoset) => {
+			this.annoset = annoset;
+			this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
+			let params;
+			try {
+				params = JSON.parse(this.annoset.Params);
+			} catch(e) {}
+			if(!params) {
+				params = {};
+			}
+			if(!params.Range) {
+				params.Range = 2;
+			}
+			this.params = params;
+			utils.request(this, 'GET', this.url, null, this.update);
+		});
 	},
 	mounted: function() {
 		this.keypressHandler = (e) => {
@@ -41,10 +47,10 @@ Vue.component('annotate-int', {
 			var label = parseInt(e.keyCode) - 48;
 			this.annotate(label);
 		};
-		app.$on('keypress', this.keypressHandler);
+		this.$parent.$on('keypress', this.keypressHandler);
 	},
 	unmounted: function() {
-		app.$off('keypress', this.keypressHandler);
+		this.$parent.$off('keypress', this.keypressHandler);
 		this.keypressHandler = null;
 	},
 	methods: {
@@ -52,7 +58,7 @@ Vue.component('annotate-int', {
 			this.response = response;
 			this.inputVal = '';
 			if(this.response.ID !== null) {
-				myCall('GET', '/items/'+this.response.ID+'/get', {format: 'json'}, (data) => {
+				utils.request(this, 'GET', '/items/'+this.response.ID+'/get', {format: 'json'}, (data) => {
 					this.inputVal = data.toString();
 				});
 			}
@@ -60,11 +66,11 @@ Vue.component('annotate-int', {
 		getNew: function() {
 			this.keyList = null;
 			this.curIndex = 0;
-			myCall('GET', this.url, null, this.update);
+			utils.request(this, 'GET', this.url, null, this.update);
 		},
 		getOld: function(i) {
 			if(!this.keyList) {
-				myCall('GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
+				utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
 					this.keyList = items.map((item) => item.Key);
 					this.getOld(0);
 				});
@@ -72,7 +78,7 @@ Vue.component('annotate-int', {
 			}
 
 			this.curIndex = (i + this.keyList.length) % this.keyList.length;
-			myCall('GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
+			utils.request(this, 'GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
 		},
 		annotate: function(val) {
 			var request = {
@@ -80,7 +86,7 @@ Vue.component('annotate-int', {
 				Data: JSON.stringify([val]),
 				Format: 'json',
 			};
-			myCall('POST', this.url, JSON.stringify(request), () => {
+			utils.request(this, 'POST', this.url, JSON.stringify(request), () => {
 				if(this.keyList == null) {
 					this.getNew();
 				} else {
@@ -92,57 +98,60 @@ Vue.component('annotate-int', {
 			this.annotate(parseInt(this.inputVal));
 		},
 		saveParams: function() {
-			myCall('POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
+			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
 		},
 	},
 	template: `
 <div>
-	<div>
-		<form class="form-inline" v-on:submit.prevent="saveParams">
-			<label class="my-1 mx-1">Range</label>
-			<input type="text" class="form-control my-1 mx-1" v-model="params.Range" />
+	<template v-if="annoset != null">
+		<div>
+			<form class="form-inline" v-on:submit.prevent="saveParams">
+				<label class="my-1 mx-1">Range</label>
+				<input type="text" class="form-control my-1 mx-1" v-model="params.Range" />
 
-			<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
-		</form>
-	</div>
-	<div>
-		<template v-if="response != null">
-			<img :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" />
-		</template>
-	</div>
-	<div class="form-row align-items-center">
-		<div class="col-auto">
-			<button v-on:click="getOld(curIndex-1)" type="button" class="btn btn-primary">Prev</button>
+				<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
+			</form>
 		</div>
-		<div class="col-auto">
+		<div>
 			<template v-if="response != null">
-				<span>{{ response.key }}</span>
-				<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
-				<template v-if="inputVal">
-					<span>(Value: {{ inputVal }})</span>
-				</template>
+				<img :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" />
 			</template>
 		</div>
-		<div class="col-auto">
-			<button v-on:click="getOld(curIndex+1)" type="button" class="btn btn-primary">Next</button>
-		</div>
-		<div class="col-auto">
-			<button v-on:click="getNew" type="button" class="btn btn-primary">New</button>
-		</div>
-		<template v-if="parseInt(params.Range) > 0">
-			<div v-for="i in parseInt(params.Range)">
-				<button v-on:click="annotate(i-1)" type="button" class="btn btn-primary">{{ i-1 }}</button>
-			</div>
-		</template>
-		<template v-else>
+		<div class="form-row align-items-center">
 			<div class="col-auto">
-				<form class="form-inline" v-on:submit.prevent="annotateInput">
-					<input type="text" class="form-control" v-model="inputVal" />
-					<button type="submit" class="btn btn-primary">Label</button>
-				</form>
+				<button v-on:click="getOld(curIndex-1)" type="button" class="btn btn-primary">Prev</button>
 			</div>
-		</template>
-	</div>
+			<div class="col-auto">
+				<template v-if="response != null">
+					<span>{{ response.key }}</span>
+					<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
+					<template v-if="inputVal">
+						<span>(Value: {{ inputVal }})</span>
+					</template>
+				</template>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getOld(curIndex+1)" type="button" class="btn btn-primary">Next</button>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getNew" type="button" class="btn btn-primary">New</button>
+			</div>
+			<template v-if="parseInt(params.Range) > 0">
+				<div v-for="i in parseInt(params.Range)">
+					<button v-on:click="annotate(i-1)" type="button" class="btn btn-primary">{{ i-1 }}</button>
+				</div>
+			</template>
+			<template v-else>
+				<div class="col-auto">
+					<form class="form-inline" v-on:submit.prevent="annotateInput">
+						<input type="text" class="form-control" v-model="inputVal" />
+						<button type="submit" class="btn btn-primary">Label</button>
+					</form>
+				</div>
+			</template>
+		</div>
+	</template>
 </div>
 	`,
-});
+};
+export default AnnotateInt;

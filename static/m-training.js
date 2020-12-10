@@ -1,4 +1,11 @@
-Vue.component('m-training', {
+import utils from './utils.js';
+
+import TrainNodeParents from './m-train-node-parents.js';
+
+export default {
+	components: {
+		'm-train-node-parents': TrainNodeParents,
+	},
 	data: function() {
 		return {
 			meta: {},
@@ -6,7 +13,6 @@ Vue.component('m-training', {
 			selectedNode: null,
 			showingNewNodeModal: false,
 			nodeRects: {},
-			editor: '',
 			prevStage: null,
 			resizeObserver: null,
 		};
@@ -19,14 +25,14 @@ Vue.component('m-training', {
 	methods: {
 		update: function() {
 			Promise.all([
-				myCall('GET', '/kv/train-nodes-meta', null, (meta) => {
+				utils.request(this, 'GET', '/kv/train-nodes-meta', null, (meta) => {
 					if(meta) {
 						this.meta = JSON.parse(meta);
 					} else {
 						this.meta = {};
 					}
 				}, null, {dataType: 'text'}),
-				myCall('GET', '/train-nodes', null, (nodes) => {
+				utils.request(this, 'GET', '/train-nodes', null, (nodes) => {
 					this.nodes = {};
 					nodes.forEach((node) => {
 						this.nodes[node.ID] = node;
@@ -41,10 +47,6 @@ Vue.component('m-training', {
 					}
 				}),
 			]).then(() => {
-				if(this.editor != '') {
-					// don't render if this.$refs.view is not visible
-					return;
-				}
 				this.render();
 			});
 		},
@@ -99,7 +101,7 @@ Vue.component('m-training', {
 				for(let gid in groups) {
 					meta[gid] = [parseInt(groups[gid].x()), parseInt(groups[gid].y())];
 				}
-				myCall('POST', '/kv/train-nodes-meta', {'val': JSON.stringify(meta)});
+				utils.request(this, 'POST', '/kv/train-nodes-meta', {'val': JSON.stringify(meta)});
 				this.meta = meta;
 			};
 
@@ -287,20 +289,16 @@ Vue.component('m-training', {
 			this.selectedNode = node;
 		},
 		editNode: function() {
-			this.editor = 'm-train-' + this.selectedNode.Op;
+			this.$router.push('/ws/'+this.$route.params.ws+'/train/'+this.selectedNode.Op+'/'+this.selectedNode.ID);
 		},
 		runNode: function() {
-			myCall('POST', '/train-nodes/'+this.selectedNode.ID+'/run');
+			utils.request(this, 'POST', '/train-nodes/'+this.selectedNode.ID+'/run');
 		},
 		/*removeNode: function() {
-			myCall('POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
+			utils.request(this, 'POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
 				this.update();
 			});
 		},*/
-		backFromEditing: function() {
-			this.editor = '';
-			this.update();
-		},
 		addParent: function(parentID) {
 			let parentIDs;
 			if(this.selectedNode.ParentIDs) {
@@ -309,14 +307,14 @@ Vue.component('m-training', {
 				parentIDs = [parentID];
 			}
 			let params = JSON.stringify({ParentIDs: parentIDs});
-			myCall('POST', '/train-nodes/' + this.selectedNode.ID, params, () => {
+			utils.request(this, 'POST', '/train-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
 		removeParent: function(idx) {
 			let parentIDs = this.selectedNode.ParentIDs.filter((parentID, i) => i != idx);
 			let params = JSON.stringify({ParentIDs: parentIDs});
-			myCall('POST', '/train-nodes/' + this.selectedNode.ID, params, () => {
+			utils.request(this, 'POST', '/train-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
@@ -330,43 +328,33 @@ Vue.component('m-training', {
 		},
 	},
 	template: `
-<div style="height:100%;">
-	<div v-if="editor == ''" class="graph-div">
-		<div ref="view" class="graph-view">
-			<div ref="layer"></div>
+<div style="height:100%" class="graph-div">
+	<div ref="view" class="graph-view">
+		<div ref="layer"></div>
+	</div>
+	<div>
+		<div class="my-2">
+			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
+			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
+			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
 		</div>
-		<div>
-			<div class="my-2">
-				<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
-				<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
-				<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
-			</div>
-			<hr />
-			<div v-if="selectedNode != null" class="my-2">
-				<div>Node {{ selectedNode.Name }}</div>
-				<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
-				<div>
-					<m-train-node-parents
-						:node="selectedNode"
-						:nodes="nodes"
-						label="Parents"
-						v-on:add="addParent($event)"
-						v-on:remove="removeParent($event)"
-						>
-					</m-train-node-parents>
-				</div>
+		<hr />
+		<div v-if="selectedNode != null" class="my-2">
+			<div>Node {{ selectedNode.Name }}</div>
+			<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
+			<div>
+				<m-train-node-parents
+					:node="selectedNode"
+					:nodes="nodes"
+					label="Parents"
+					v-on:add="addParent($event)"
+					v-on:remove="removeParent($event)"
+					>
+				</m-train-node-parents>
 			</div>
 		</div>
-		<m-add-train-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></m-add-train-node>
 	</div>
-	<div v-else class="graph-edit-container">
-		<div>
-			<button type="button" class="btn btn-primary" v-on:click="backFromEditing">Back</button>
-		</div>
-		<div class="graph-edit-div">
-			<component v-bind:is="editor" v-bind:node="selectedNode"></component>
-		</div>
-	</div>
+	<m-add-train-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></m-add-train-node>
 </div>
 	`,
-});
+};

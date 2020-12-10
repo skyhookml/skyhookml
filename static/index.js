@@ -1,55 +1,91 @@
-$(document).ready(function() {
-	$('#myTab a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-		var target = $(e.target).attr('href');
-		app.tab = target;
-	});
+import Datasets from './datasets.js';
+import Dataset from './dataset.js';
 
+import Annotate from './annotate.js';
+import AnnotateInt from './annotate-int.js';
+import AnnotateShape from './annotate-shape.js';
+
+import Models from './models.js';
+import MArch from './m-architecture.js';
+import MComp from './m-component.js';
+import TrainPytorch from './m-train-pytorch.js';
+import TrainYolov3 from './m-train-yolov3.js';
+
+import Queries from './queries.js';
+import ExecModel from './exec-edit-model.js';
+import ExecPython from './exec-edit-python.js';
+import ExecVideoSample from './exec-edit-video_sample.js';
+
+$(document).ready(function() {
 	$('body').keypress(function(e) {
 		app.$emit('keypress', e);
 	});
 });
 
-function myCall(method, endpoint, params, successFunc, completeFunc, opts) {
-	var args = {
-		type: method,
-		url: endpoint,
-		error: function(req, status, errorMsg) {
-			app.setError(errorMsg);
-		},
-	};
-	if(params) {
-		args.data = params;
-		if(typeof(args.data) === 'string') {
-			args.processData = false;
-		}
-	}
-	if(successFunc) {
-		args.success = successFunc;
-	}
-	if(completeFunc) {
-		args.complete = completeFunc;
-	}
-	if(opts) {
-		if(opts.dataType) {
-			args.dataType = opts.dataType;
-		}
-	}
-	return $.ajax(args);
-}
+const router = new VueRouter({
+	routes: [
+		{path: '/ws/:ws', component: Datasets},
 
-var app = new Vue({
+		{path: '/ws/:ws/datasets', component: Datasets},
+		{path: '/ws/:ws/datasets/:dsid', component: Dataset},
+
+		{path: '/ws/:ws/annotate', component: Annotate},
+		{path: '/ws/:ws/annotate/int/:setid', component: AnnotateInt},
+		{path: '/ws/:ws/annotate/shape/:setid', component: AnnotateShape},
+
+		{path: '/ws/:ws/models', component: Models},
+		{path: '/ws/:ws/models/arch/:archid', component: MArch},
+		{path: '/ws/:ws/models/comp/:compid', component: MComp},
+		{path: '/ws/:ws/train/pytorch/:nodeid', component: TrainPytorch},
+		{path: '/ws/:ws/train/yolov3/:nodeid', component: TrainYolov3},
+
+		{path: '/ws/:ws/queries', component: Queries},
+		{path: '/ws/:ws/exec/model/:nodeid', component: ExecModel},
+		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
+		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
+	],
+});
+
+const app = new Vue({
 	el: '#app',
 	data: {
-		tab: $('#myTab a[data-toggle="tab"].active').attr('href'),
 		error: '',
+		selectedWorkspace: '',
+		workspaces: [],
+		addForms: null,
+	},
+	created: function() {
+		/*myCall('GET', '/workspaces', null, (data) => {
+			this.workspaces = data;
+		});*/
+		this.workspaces = [{Name: 'one'}, {Name: 'two'}];
+		this.resetForm();
+
+		if(this.$route.params.ws) {
+			this.selectedWorkspace = this.$route.params.ws;
+		}
 	},
 	methods: {
-		changeTab: function(tab) {
-			$('#myTab a[href="'+tab+'"]').tab('show');
-			this.tab = tab;
+		resetForm: function() {
+			this.addForms = {
+				workspace: {
+					name: '',
+				},
+			};
+		},
+		setPage: function(name) {
+			if(!this.$route.params.ws) {
+				return;
+			}
+			this.$router.push('/ws/'+this.$route.params.ws+'/'+name);
+			this.setError('');
+		},
+		changedWorkspace: function() {
+			this.$router.push('/ws/'+this.selectedWorkspace);
 		},
 		setError: function(error) {
 			this.error = error;
 		},
 	},
+	router: router,
 });

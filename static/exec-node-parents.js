@@ -1,4 +1,6 @@
-Vue.component('exec-node-parents', {
+import utils from './utils.js';
+
+export default {
 	data: function() {
 		return {
 			selected: '',
@@ -75,4 +77,4 @@ Vue.component('exec-node-parents', {
 	</tbody>
 </table>
 	`,
-});
+};

@@ -1,4 +1,6 @@
-Vue.component('add-exec-node', {
+import utils from './utils.js';
+
+export default {
 	data: function() {
 		return {
 			name: '',
@@ -75,7 +77,7 @@ Vue.component('add-exec-node', {
 				Parents: null,
 				DataTypes: this.dataTypes,
 			};
-			myCall('POST', '/exec-nodes', JSON.stringify(params), () => {
+			utils.request(this, 'POST', '/exec-nodes', JSON.stringify(params), () => {
 				$(this.$refs.modal).modal('hide');
 				this.$emit('closed');
 			});
@@ -195,4 +197,4 @@ Vue.component('add-exec-node', {
 	</div>
 </div>
 	`,
-});
+};

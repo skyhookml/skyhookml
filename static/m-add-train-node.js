@@ -1,4 +1,6 @@
-Vue.component('m-add-train-node', {
+import utils from './utils.js';
+
+export default {
 	data: function() {
 		return {
 			name: '',
@@ -37,7 +39,7 @@ Vue.component('m-add-train-node', {
 				name: this.name,
 				op: this.op,
 			};
-			myCall('POST', '/train-nodes', params, () => {
+			utils.request(this, 'POST', '/train-nodes', params, () => {
 				$(this.$refs.modal).modal('hide');
 				this.$emit('closed');
 			});
@@ -108,4 +110,4 @@ Vue.component('m-add-train-node', {
 	</div>
 </div>
 	`,
-});
+};
