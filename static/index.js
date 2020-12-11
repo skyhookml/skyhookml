@@ -1,3 +1,5 @@
+import utils from './utils.js';
+
 import Datasets from './datasets.js';
 import Dataset from './dataset.js';
 
@@ -55,10 +57,7 @@ const app = new Vue({
 		addForms: null,
 	},
 	created: function() {
-		/*myCall('GET', '/workspaces', null, (data) => {
-			this.workspaces = data;
-		});*/
-		this.workspaces = [{Name: 'one'}, {Name: 'two'}];
+		this.fetch();
 		this.resetForm();
 
 		if(this.$route.params.ws) {
@@ -66,6 +65,11 @@ const app = new Vue({
 		}
 	},
 	methods: {
+		fetch: function() {
+			utils.request(this, 'GET', '/workspaces', null, (data) => {
+				this.workspaces = data;
+			});
+		},
 		resetForm: function() {
 			this.addForms = {
 				workspace: {
@@ -82,6 +86,13 @@ const app = new Vue({
 		},
 		changedWorkspace: function() {
 			this.$router.push('/ws/'+this.selectedWorkspace);
+			this.resetForm();
+		},
+		createWorkspace: function() {
+			utils.request(this, 'POST', '/workspaces', {name: this.addForms.workspace.name}, () => {
+				this.resetForm();
+				this.fetch();
+			});
 		},
 		setError: function(error) {
 			this.error = error;

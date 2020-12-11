@@ -41,7 +41,7 @@ const Queries = {
 						this.meta = {};
 					}
 				}, null, {dataType: 'text'}),
-				utils.request(this, 'GET', '/exec-nodes', null, (data) => {
+				utils.request(this, 'GET', '/exec-nodes?ws='+this.$route.params.ws, null, (data) => {
 					let nodes = {};
 					data.forEach((node) => {
 						nodes[node.ID] = node;

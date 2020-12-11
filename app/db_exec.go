@@ -8,16 +8,19 @@ import (
 	"strings"
 )
 
-type DBExecNode struct {skyhook.ExecNode}
+type DBExecNode struct {
+	skyhook.ExecNode
+	Workspace string
+}
 
-const ExecNodeQuery = "SELECT id, name, op, params, parents, filter_parents, data_types, datasets FROM exec_nodes"
+const ExecNodeQuery = "SELECT id, name, op, params, parents, filter_parents, data_types, datasets, workspace FROM exec_nodes"
 
 func execNodeListHelper(rows *Rows) []*DBExecNode {
 	nodes := []*DBExecNode{}
 	for rows.Next() {
 		var node DBExecNode
 		var parentsRaw, filterParentsRaw, typesRaw, datasetsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &filterParentsRaw, &typesRaw, &datasetsRaw)
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &filterParentsRaw, &typesRaw, &datasetsRaw, &node.Workspace)
 		node.Parents = skyhook.ParseExecParents(parentsRaw)
 		node.FilterParents = skyhook.ParseExecParents(filterParentsRaw)
 		node.DataTypes = skyhook.DecodeTypes(typesRaw)
@@ -40,6 +43,11 @@ func ListExecNodes() []*DBExecNode {
 	return execNodeListHelper(rows)
 }
 
+func (ws DBWorkspace) ListExecNodes() []*DBExecNode {
+	rows := db.Query(ExecNodeQuery + " WHERE workspace = ?", ws)
+	return execNodeListHelper(rows)
+}
+
 func GetExecNode(id int) *DBExecNode {
 	rows := db.Query(ExecNodeQuery + " WHERE id = ?", id)
 	nodes := execNodeListHelper(rows)
@@ -50,10 +58,10 @@ func GetExecNode(id int) *DBExecNode {
 	}
 }
 
-func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, filterParents []skyhook.ExecParent, dataTypes []skyhook.DataType) *DBExecNode {
+func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, filterParents []skyhook.ExecParent, dataTypes []skyhook.DataType, workspace string) *DBExecNode {
 	res := db.Exec(
-		"INSERT INTO exec_nodes (name, op, params, parents, filter_parents, data_types, datasets) VALUES (?, ?, ?, ?, ?, ?, '')",
-		name, op, params, skyhook.ExecParentsToString(parents), skyhook.ExecParentsToString(filterParents), skyhook.EncodeTypes(dataTypes),
+		"INSERT INTO exec_nodes (name, op, params, parents, filter_parents, data_types, datasets, workspace) VALUES (?, ?, ?, ?, ?, ?, '', ?)",
+		name, op, params, skyhook.ExecParentsToString(parents), skyhook.ExecParentsToString(filterParents), skyhook.EncodeTypes(dataTypes), workspace,
 	)
 	return GetExecNode(res.LastInsertId())
 }

@@ -76,7 +76,7 @@ func init() {
 		parents TEXT,
 		outputs TEXT,
 		trained INTEGER,
-		workspace_id INTEGER
+		workspace TEXT
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS exec_nodes (
 		id INTEGER PRIMARY KEY ASC,
@@ -87,16 +87,15 @@ func init() {
 		filter_parents TEXT,
 		data_types TEXT,
 		datasets TEXT,
-		workspace_id INTEGER
+		workspace TEXT
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS workspaces (
-		id INTEGER PRIMARY KEY ASC,
-		name TEXT
+		name TEXT PRIMARY KEY
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS ws_datasets (
 		dataset_id INTEGER,
-		workspace_id INTEGER,
-		UNIQUE(dataset_id, workspace_id)
+		workspace TEXT,
+		UNIQUE(dataset_id, workspace)
 	)`)
 }
 

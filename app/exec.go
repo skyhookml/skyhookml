@@ -101,15 +101,22 @@ func (node *DBExecNode) Run() error {
 
 func init() {
 	Router.HandleFunc("/exec-nodes", func(w http.ResponseWriter, r *http.Request) {
-		skyhook.JsonResponse(w, ListExecNodes())
+		r.ParseForm()
+		wsName := r.Form.Get("ws")
+		if wsName == "" {
+			skyhook.JsonResponse(w, ListExecNodes())
+		} else {
+			ws := GetWorkspace(wsName)
+			skyhook.JsonResponse(w, ws.ListExecNodes())
+		}
 	}).Methods("GET")
 
 	Router.HandleFunc("/exec-nodes", func(w http.ResponseWriter, r *http.Request) {
-		var request skyhook.ExecNode
+		var request DBExecNode
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
 			return
 		}
-		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.FilterParents, request.DataTypes)
+		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.FilterParents, request.DataTypes, request.Workspace)
 		skyhook.JsonResponse(w, node)
 	}).Methods("POST")
 

@@ -7,18 +7,21 @@ import (
 	"strings"
 )
 
-type DBTrainNode struct {skyhook.TrainNode}
+type DBTrainNode struct {
+	skyhook.TrainNode
+	Workspace string
+}
 type DBPytorchComponent struct {skyhook.PytorchComponent}
 type DBPytorchArch struct {skyhook.PytorchArch}
 
-const TrainNodeQuery = "SELECT id, name, op, params, parents, outputs, trained FROM train_nodes"
+const TrainNodeQuery = "SELECT id, name, op, params, parents, outputs, trained, workspace FROM train_nodes"
 
 func trainNodeListHelper(rows *Rows) []*DBTrainNode {
 	nodes := []*DBTrainNode{}
 	for rows.Next() {
 		var node DBTrainNode
 		var parentsStr, outputsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsStr, &outputsRaw, &node.Trained)
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsStr, &outputsRaw, &node.Trained, &node.Workspace)
 		for _, s := range strings.Split(parentsStr, ",") {
 			if s == "" {
 				continue
@@ -36,6 +39,11 @@ func ListTrainNodes() []*DBTrainNode {
 	return trainNodeListHelper(rows)
 }
 
+func (ws DBWorkspace) ListTrainNodes() []*DBTrainNode {
+	rows := db.Query(TrainNodeQuery + " WHERE workspace = ?", ws)
+	return trainNodeListHelper(rows)
+}
+
 func GetTrainNode(id int) *DBTrainNode {
 	rows := db.Query(TrainNodeQuery + " WHERE id = ?", id)
 	nodes := trainNodeListHelper(rows)
@@ -46,8 +54,8 @@ func GetTrainNode(id int) *DBTrainNode {
 	}
 }
 
-func NewTrainNode(name string, op string) *DBTrainNode {
-	res := db.Exec("INSERT INTO train_nodes (name, op, params, parents, outputs, trained) VALUES (?, ?, '', '', '', 0)", name, op)
+func NewTrainNode(name string, op string, workspace string) *DBTrainNode {
+	res := db.Exec("INSERT INTO train_nodes (name, op, params, parents, outputs, trained, workspace) VALUES (?, ?, '', '', '', 0, ?)", name, op, workspace)
 	return GetTrainNode(res.LastInsertId())
 }
 

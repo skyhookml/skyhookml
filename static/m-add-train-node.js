@@ -38,6 +38,7 @@ export default {
 			var params = {
 				name: this.name,
 				op: this.op,
+				ws: this.$route.params.ws,
 			};
 			utils.request(this, 'POST', '/train-nodes', params, () => {
 				$(this.$refs.modal).modal('hide');

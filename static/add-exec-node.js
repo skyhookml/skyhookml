@@ -76,6 +76,7 @@ export default {
 				Params: '',
 				Parents: null,
 				DataTypes: this.dataTypes,
+				Workspace: this.$route.params.ws,
 			};
 			utils.request(this, 'POST', '/exec-nodes', JSON.stringify(params), () => {
 				$(this.$refs.modal).modal('hide');

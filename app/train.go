@@ -21,14 +21,22 @@ func (node *DBTrainNode) Run() error {
 
 func init() {
 	Router.HandleFunc("/train-nodes", func(w http.ResponseWriter, r *http.Request) {
-		skyhook.JsonResponse(w, ListTrainNodes())
+		r.ParseForm()
+		wsName := r.Form.Get("ws")
+		if wsName == "" {
+			skyhook.JsonResponse(w, ListTrainNodes())
+		} else {
+			ws := GetWorkspace(wsName)
+			skyhook.JsonResponse(w, ws.ListTrainNodes())
+		}
 	}).Methods("GET")
 
 	Router.HandleFunc("/train-nodes", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		name := r.PostForm.Get("name")
 		op := r.PostForm.Get("op")
-		node := NewTrainNode(name, op)
+		wsName := r.PostForm.Get("ws")
+		node := NewTrainNode(name, op, wsName)
 		skyhook.JsonResponse(w, node)
 	}).Methods("POST")
 

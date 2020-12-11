@@ -13,7 +13,7 @@
 				<form v-on:submit.prevent="changedWorkspace" class="form-inline my-2 float-left">
 					<label class="ml-1">Workspace:</label>
 					<select v-model="selectedWorkspace" @change="changedWorkspace" class="form-control ml-1">
-						<option v-for="ws in workspaces" :key="ws.Name" :value="ws.Name">{{ ws.Name }}</option>
+						<option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
 					</select>
 					<button type="button" class="btn btn-danger ml-1">Remove</button>
 				</form>

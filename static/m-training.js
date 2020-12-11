@@ -32,7 +32,7 @@ export default {
 						this.meta = {};
 					}
 				}, null, {dataType: 'text'}),
-				utils.request(this, 'GET', '/train-nodes', null, (nodes) => {
+				utils.request(this, 'GET', '/train-nodes?ws='+this.$route.params.ws, null, (nodes) => {
 					this.nodes = {};
 					nodes.forEach((node) => {
 						this.nodes[node.ID] = node;
