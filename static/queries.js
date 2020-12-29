@@ -210,16 +210,18 @@ const Queries = {
 				})
 				group.on('click', (e) => {
 					e.cancelBubble = true;
-					this.selectNode(node);
-					resetColors();
+					this.selectNode(node, function() {
+						resetColors();
+					});
 				});
 			}
 
 			resetColors();
 
 			stage.on('click', (e) => {
-				this.selectNode(null);
-				resetColors();
+				this.selectNode(null, function() {
+					resetColors();
+				});
 			});
 
 			// (3) render the arrows
@@ -328,14 +330,19 @@ const Queries = {
 			this.showingNewNodeModal = false;
 			this.update();
 		},
-		selectNode: function(node) {
+		selectNode: function(node, cb) {
+			if(!cb) {
+				cb = function() {};
+			}
 			if(this.selectedNode) {
 				this.selectedNode = null;
 				Vue.nextTick(() => {
 					this.selectedNode = node;
+					cb();
 				});
 			} else {
 				this.selectedNode = node;
+				cb();
 			}
 		},
 		editNode: function() {
