@@ -17,6 +17,7 @@ import Queries from './queries.js';
 import ExecModel from './exec-edit-model.js';
 import ExecPython from './exec-edit-python.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
+import Compare from './compare.js';
 
 $(document).ready(function() {
 	$('body').keypress(function(e) {
@@ -45,6 +46,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/exec/model/:nodeid', component: ExecModel},
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
 		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
+		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
 	],
 });
 
@@ -89,9 +91,28 @@ const app = new Vue({
 			this.resetForm();
 		},
 		createWorkspace: function() {
-			utils.request(this, 'POST', '/workspaces', {name: this.addForms.workspace.name}, () => {
+			let name = this.addForms.workspace.name;
+			utils.request(this, 'POST', '/workspaces', {name: name}, () => {
 				this.resetForm();
 				this.fetch();
+				this.$router.push('/ws/'+name);
+			});
+		},
+		cloneWorkspace: function() {
+			let url = '/workspaces/'+this.$route.params.ws+'/clone';
+			var params = {
+				name: this.addForms.workspace.name,
+			};
+			utils.request(this, 'POST', url, params, () => {
+				this.resetForm();
+				this.fetch();
+				this.$router.push('/ws/'+params.name);
+			});
+		},
+		deleteWorkspace: function() {
+			utils.request(this, 'DELETE', '/workspaces/'+this.selectedWorkspace, null, () => {
+				this.fetch();
+				this.$router.push('/');
 			});
 		},
 		setError: function(error) {

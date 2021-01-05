@@ -15,11 +15,12 @@
 					<select v-model="selectedWorkspace" @change="changedWorkspace" class="form-control ml-1">
 						<option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
 					</select>
-					<button type="button" class="btn btn-danger ml-1">Remove</button>
+					<button type="button" class="btn btn-danger ml-1" v-on:click="deleteWorkspace">Remove</button>
 				</form>
 				<form v-on:submit.prevent="createWorkspace" class="form-inline my-2 float-left">
 					<input v-model="addForms.workspace.name" type="form-control" placeholder="Name" class="ml-4" />
 					<button type="submit" class="btn btn-primary ml-1">New Workspace</button>
+					<button type="button" class="btn btn-primary ml-1" v-on:click="cloneWorkspace">Clone</button>
 				</form>
 			</div>
 			<ul class="nav nav-pills" role="tablist">

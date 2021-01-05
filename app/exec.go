@@ -10,30 +10,43 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func (node *DBExecNode) Run() error {
+// Run this node.
+// If force, we run even if outputs were already available.
+func (node *DBExecNode) Run(force bool) error {
+	// create datasets for this op if needed
+	outputDatasets, outputsOK := node.GetDatasets(true)
+	if outputsOK && !force {
+		return nil
+	}
+	for _, ds := range outputDatasets {
+		// TODO: for now we clear the output datasets before running
+		// but in the future, ops may support incremental execution
+		ds.Clear()
+	}
+
 	// get parent datasets
 	// for ExecNode parents, get computed dataset
 	// in the future, we may need some recursive execution
 	var allParents []skyhook.ExecParent
 	allParents = append(allParents, node.Parents...)
 	allParents = append(allParents, node.FilterParents...)
-	datasets := make([]*DBDataset, len(allParents))
+	parentDatasets := make([]*DBDataset, len(allParents))
 	for i, parent := range allParents {
 		if parent.Type == "n" {
 			n := GetExecNode(parent.ID)
-			dsID := n.DatasetIDs[parent.Index]
-			if dsID == nil {
-				return fmt.Errorf("dataset for parent node %s is missing", n.Name)
+			dsList, _ := n.GetDatasets(false)
+			if dsList[parent.Index] == nil {
+				return fmt.Errorf("dataset for parent node %s[%d] is missing", n.Name, parent.Index)
 			}
-			datasets[i] = GetDataset(*dsID)
+			parentDatasets[i] = dsList[parent.Index]
 		} else {
-			datasets[i] = GetDataset(parent.ID)
+			parentDatasets[i] = GetDataset(parent.ID)
 		}
 	}
 
 	// get all unique keys in parent datasets
 	keys := make(map[string][]skyhook.Item)
-	for i, ds := range datasets {
+	for i, ds := range parentDatasets {
 		curKeys := make(map[string]skyhook.Item)
 		for _, item := range ds.ListItems() {
 			curKeys[item.Key] = item.Item
@@ -60,17 +73,6 @@ func (node *DBExecNode) Run() error {
 	}
 
 	log.Printf("[exec-node %s] [run] got %d unique keys from parents", node.Name, len(keys))
-
-	// create datasets for this op if needed
-	node.EnsureDatasets()
-	outputDatasets := make([]*DBDataset, len(node.DataTypes))
-	for i, id := range node.DatasetIDs {
-		outputDatasets[i] = GetDataset(*id)
-
-		// TODO: for now we clear the output datasets before running
-		// but in the future, ops may support incremental execution
-		outputDatasets[i].Clear()
-	}
 
 	// prepare op
 	opImpl := skyhook.GetExecOpImpl(node.Op)
@@ -146,6 +148,27 @@ func init() {
 		node.Update(request)
 	}).Methods("POST")
 
+	Router.HandleFunc("/exec-nodes/{node_id}", func(w http.ResponseWriter, r *http.Request) {
+		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
+		node := GetExecNode(nodeID)
+		if node == nil {
+			http.Error(w, "no such exec node", 404)
+			return
+		}
+		node.Delete()
+	}).Methods("DELETE")
+
+	Router.HandleFunc("/exec-nodes/{node_id}/datasets", func(w http.ResponseWriter, r *http.Request) {
+		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
+		node := GetExecNode(nodeID)
+		if node == nil {
+			http.Error(w, "no such exec node", 404)
+			return
+		}
+		datasets, _ := node.GetDatasets(false)
+		skyhook.JsonResponse(w, datasets)
+	}).Methods("GET")
+
 	Router.HandleFunc("/exec-nodes/{node_id}/run", func(w http.ResponseWriter, r *http.Request) {
 		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
 		node := GetExecNode(nodeID)
@@ -154,7 +177,7 @@ func init() {
 			return
 		}
 		go func() {
-			err := node.Run()
+			err := node.Run(true)
 			if err != nil {
 				log.Printf("[exec node %s] run error: %v", node.Name, err)
 			}

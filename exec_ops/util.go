@@ -10,22 +10,15 @@ func ParentsToDatasets(url string, parents []skyhook.ExecParent) ([]skyhook.Data
 	datasets := make([]skyhook.Dataset, len(parents))
 	for i, parent := range parents {
 		if parent.Type == "n" {
-			var parentNode skyhook.ExecNode
-			err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d", parent.ID), &parentNode)
+			var parentDatasets []*skyhook.Dataset
+			err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d/datasets", parent.ID), &parentDatasets)
 			if err != nil {
-				return nil, fmt.Errorf("error getting parent node %d: %v", parent.ID, err)
+				return nil, fmt.Errorf("error getting datasets of parent node %d: %v", parent.ID, err)
 			}
-			dsID := parentNode.DatasetIDs[parent.Index]
-			if dsID == nil {
-				return nil, fmt.Errorf("parent %s missing dataset at index %d", parentNode.Name, parent.Index)
+			if parentDatasets[parent.Index] == nil {
+				return nil, fmt.Errorf("parent node %d missing dataset at index %d", parent.ID, parent.Index)
 			}
-
-			var dataset skyhook.Dataset
-			err = skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d", *dsID), &dataset)
-			if err != nil {
-				return nil, fmt.Errorf("error getting dataset for parent node %s: %v", parentNode.Name, err)
-			}
-			datasets[i] = dataset
+			datasets[i] = *parentDatasets[parent.Index]
 		} else if parent.Type == "d" {
 			var dataset skyhook.Dataset
 			err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d", parent.ID), &dataset)

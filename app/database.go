@@ -40,7 +40,9 @@ func init() {
 		name TEXT,
 		-- 'data' or 'computed'
 		type TEXT,
-		data_type TEXT
+		data_type TEXT,
+		-- only set if computed
+		hash TEXT
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS items (
 		id INTEGER PRIMARY KEY ASC,
@@ -68,6 +70,10 @@ func init() {
 		name TEXT,
 		params TEXT
 	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS models (
+		id INTEGER PRIMARY KEY ASC,
+		hash TEXT
+	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS train_nodes (
 		id INTEGER PRIMARY KEY ASC,
 		name TEXT,
@@ -75,8 +81,8 @@ func init() {
 		params TEXT,
 		parents TEXT,
 		outputs TEXT,
-		trained INTEGER,
-		workspace TEXT
+		workspace TEXT,
+		model_id INTEGER
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS exec_nodes (
 		id INTEGER PRIMARY KEY ASC,
@@ -86,8 +92,12 @@ func init() {
 		parents TEXT,
 		filter_parents TEXT,
 		data_types TEXT,
-		datasets TEXT,
 		workspace TEXT
+	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS exec_ds_refs (
+		node_id INTEGER,
+		dataset_id INTEGER,
+		UNIQUE(node_id, dataset_id)
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS workspaces (
 		name TEXT PRIMARY KEY

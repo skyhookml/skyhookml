@@ -1,6 +1,7 @@
 package skyhook
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 )
@@ -13,6 +14,9 @@ type Dataset struct {
 	Type string
 
 	DataType DataType
+
+	// nil unless Type=computed
+	Hash *string
 }
 
 type Item struct {
@@ -53,4 +57,10 @@ func (ds Dataset) Remove() {
 
 func (item Item) Remove() {
 	os.Remove(item.Fname())
+}
+
+func (ds Dataset) LocalHash() []byte {
+	h := sha256.New()
+	h.Write([]byte(fmt.Sprintf("name=%s\n", ds.Name)))
+	return h.Sum(nil)
 }

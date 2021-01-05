@@ -48,7 +48,7 @@ func init() {
 		r.ParseForm()
 		name := r.PostForm.Get("name")
 		dataType := r.PostForm.Get("data_type")
-		ds := NewDataset(name, "data", skyhook.DataType(dataType))
+		ds := NewDataset(name, "data", skyhook.DataType(dataType), nil)
 		skyhook.JsonResponse(w, ds)
 	}).Methods("POST")
 

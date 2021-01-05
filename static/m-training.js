@@ -1,10 +1,12 @@
 import utils from './utils.js';
 
 import TrainNodeParents from './m-train-node-parents.js';
+import AddTrainNode from './m-add-train-node.js';
 
 export default {
 	components: {
 		'm-train-node-parents': TrainNodeParents,
+		'm-add-train-node': AddTrainNode,
 	},
 	data: function() {
 		return {
@@ -294,11 +296,11 @@ export default {
 		runNode: function() {
 			utils.request(this, 'POST', '/train-nodes/'+this.selectedNode.ID+'/run');
 		},
-		/*removeNode: function() {
-			utils.request(this, 'POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
+		deleteNode: function() {
+			utils.request(this, 'DELETE', '/train-nodes/'+this.selectedNode.ID, null, () => {
 				this.update();
 			});
-		},*/
+		},
 		addParent: function(parentID) {
 			let parentIDs;
 			if(this.selectedNode.ParentIDs) {
@@ -337,11 +339,11 @@ export default {
 			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
+			<button type="button" class="btn btn-danger" :disabled="selectedNode == null" v-on:click="deleteNode">Delete Node</button>
 		</div>
 		<hr />
 		<div v-if="selectedNode != null" class="my-2">
 			<div>Node {{ selectedNode.Name }}</div>
-			<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
 			<div>
 				<m-train-node-parents
 					:node="selectedNode"

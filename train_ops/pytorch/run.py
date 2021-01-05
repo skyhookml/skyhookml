@@ -70,7 +70,7 @@ def callback_func(*inputs):
 	for i, t in enumerate(meta['OutputTypes']):
 		cur = y[i][0]
 		if t in ['image', 'video']:
-			y_.append(cur.numpy())
+			y_.append(cur.cpu().numpy().transpose(1, 2, 0))
 		elif t == 'detection':
 			detections = []
 			for box in cur.tolist():
@@ -83,7 +83,12 @@ def callback_func(*inputs):
 					'Right': int(right*1280//320),
 					'Bottom': int(bottom*720/192),
 				})
-			y_.append(detections)
+			y_.append({
+				'Detections': detections,
+				'Metadata': {
+					'CanvasDims': [1280, 720],
+				},
+			})
 		else:
 			y_.append(cur.tolist())
 	return tuple(y_)

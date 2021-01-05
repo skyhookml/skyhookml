@@ -131,7 +131,7 @@ stop_count = 0
 epoch = 0
 
 best_loss = None
-while stop_count < 50:
+while stop_count < 20:
 	net.train()
 	for inputs in train_loader:
 		util.inputs_to_device(inputs, device)
@@ -160,7 +160,7 @@ while stop_count < 50:
 		torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
 	else:
 		stop_count += 1
-		if not updated_lr and stop_count > 10 and False:
+		if not updated_lr and stop_count > 10:
 			print('set learning rate lower')
 			optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 			updated_lr = True

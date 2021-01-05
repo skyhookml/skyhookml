@@ -10,18 +10,20 @@ import (
 type DBTrainNode struct {
 	skyhook.TrainNode
 	Workspace string
+	ModelID *int
 }
 type DBPytorchComponent struct {skyhook.PytorchComponent}
 type DBPytorchArch struct {skyhook.PytorchArch}
+type DBModel struct {skyhook.Model}
 
-const TrainNodeQuery = "SELECT id, name, op, params, parents, outputs, trained, workspace FROM train_nodes"
+const TrainNodeQuery = "SELECT id, name, op, params, parents, outputs, workspace, model_id FROM train_nodes"
 
 func trainNodeListHelper(rows *Rows) []*DBTrainNode {
 	nodes := []*DBTrainNode{}
 	for rows.Next() {
 		var node DBTrainNode
 		var parentsStr, outputsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsStr, &outputsRaw, &node.Trained, &node.Workspace)
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsStr, &outputsRaw, &node.Workspace, &node.ModelID)
 		for _, s := range strings.Split(parentsStr, ",") {
 			if s == "" {
 				continue
@@ -87,6 +89,19 @@ func (node *DBTrainNode) Update(req TrainNodeUpdate) {
 	if req.Outputs != nil {
 		db.Exec("UPDATE train_nodes SET outputs = ? WHERE id = ?", skyhook.EncodeTypes(*req.Outputs), node.ID)
 	}
+}
+
+func (node *DBTrainNode) Delete() {
+	if node.ModelID != nil {
+		model := GetModel(*node.ModelID)
+		node.ModelID = nil
+		db.Exec("UPDATE train_nodes SET model_id = NULL WHERE id = ?", node.ID)
+		model.CheckRefs()
+	}
+
+	// TODO: check for other train nodes that reference this node as a parent
+
+	db.Exec("DELETE FROM train_nodes WHERE id = ?", node.ID)
 }
 
 const PytorchComponentQuery = "SELECT id, name, params FROM pytorch_components"
@@ -183,4 +198,56 @@ func (arch *DBPytorchArch) Update(req PytorchArchUpdate) {
 	if req.Params != nil {
 		db.Exec("UPDATE pytorch_archs SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), arch.ID)
 	}
+}
+
+const ModelQuery = "SELECT id, hash FROM models"
+
+func modelListHelper(rows *Rows) []*DBModel {
+	models := []*DBModel{}
+	for rows.Next() {
+		var m DBModel
+		rows.Scan(&m.ID, &m.Hash)
+		models = append(models, &m)
+	}
+	return models
+}
+
+func ListModels() []*DBModel {
+	rows := db.Query(ModelQuery)
+	return modelListHelper(rows)
+}
+
+func GetModel(id int) *DBModel {
+	rows := db.Query(ModelQuery + " WHERE id = ?", id)
+	models := modelListHelper(rows)
+	if len(models) == 1 {
+		return models[0]
+	} else {
+		return nil
+	}
+}
+
+func FindModel(hash string) *DBModel {
+	rows := db.Query(ModelQuery + " WHERE hash = ?", hash)
+	models := modelListHelper(rows)
+	if len(models) == 1 {
+		return models[0]
+	} else {
+		return nil
+	}
+}
+
+// Delete if no more refs. Called after a TrainNode updates its model_id.
+func (m *DBModel) CheckRefs() {
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM train_nodes WHERE model_id = ?", m.ID).Scan(&count)
+	if count > 0 {
+		return
+	}
+	m.Delete()
+}
+
+func (m *DBModel) Delete() {
+	// TODO: delete from disk
+	db.Exec("DELETE FROM models WHERE id = ?", m.ID)
 }

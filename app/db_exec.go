@@ -4,7 +4,6 @@ import (
 	"../skyhook"
 
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -13,26 +12,17 @@ type DBExecNode struct {
 	Workspace string
 }
 
-const ExecNodeQuery = "SELECT id, name, op, params, parents, filter_parents, data_types, datasets, workspace FROM exec_nodes"
+const ExecNodeQuery = "SELECT id, name, op, params, parents, filter_parents, data_types, workspace FROM exec_nodes"
 
 func execNodeListHelper(rows *Rows) []*DBExecNode {
 	nodes := []*DBExecNode{}
 	for rows.Next() {
 		var node DBExecNode
-		var parentsRaw, filterParentsRaw, typesRaw, datasetsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &filterParentsRaw, &typesRaw, &datasetsRaw, &node.Workspace)
+		var parentsRaw, filterParentsRaw, typesRaw string
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &filterParentsRaw, &typesRaw, &node.Workspace)
 		node.Parents = skyhook.ParseExecParents(parentsRaw)
 		node.FilterParents = skyhook.ParseExecParents(filterParentsRaw)
 		node.DataTypes = skyhook.DecodeTypes(typesRaw)
-
-		node.DatasetIDs = make([]*int, len(node.DataTypes))
-		for i, part := range strings.Split(datasetsRaw, ",") {
-			if part == "" {
-				continue
-			}
-			id := skyhook.ParseInt(part)
-			node.DatasetIDs[i] = &id
-		}
 		nodes = append(nodes, &node)
 	}
 	return nodes
@@ -60,28 +50,63 @@ func GetExecNode(id int) *DBExecNode {
 
 func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, filterParents []skyhook.ExecParent, dataTypes []skyhook.DataType, workspace string) *DBExecNode {
 	res := db.Exec(
-		"INSERT INTO exec_nodes (name, op, params, parents, filter_parents, data_types, datasets, workspace) VALUES (?, ?, ?, ?, ?, ?, '', ?)",
+		"INSERT INTO exec_nodes (name, op, params, parents, filter_parents, data_types, workspace) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		name, op, params, skyhook.ExecParentsToString(parents), skyhook.ExecParentsToString(filterParents), skyhook.EncodeTypes(dataTypes), workspace,
 	)
 	return GetExecNode(res.LastInsertId())
 }
 
-// Create datasets for each output of this node.
-func (node *DBExecNode) EnsureDatasets() {
-	for i := range node.DatasetIDs {
-		if node.DatasetIDs[i] != nil {
+func (node *DBExecNode) DatasetRefs() []int {
+	var ds []int
+	rows := db.Query("SELECT dataset_id FROM exec_ds_refs WHERE node_id = ?", node.ID)
+	for rows.Next() {
+		var id int
+		rows.Scan(&id)
+		ds = append(ds, id)
+	}
+	return ds
+}
+
+// Get datasets for each output of this node.
+// If create=true, creates new datasets to cover missing ones.
+// Also returns true if all datasets already existed.
+func (node *DBExecNode) GetDatasets(create bool) ([]*DBDataset, bool) {
+	// get the old exec-dataset references
+	// we'll need to update datasets that are no longer referenced
+	existingDS := node.DatasetRefs()
+
+	// find datasets that match current hash
+	nodeHash := node.Hash()
+	datasets := make([]*DBDataset, len(node.DataTypes))
+	dsIDSet := make(map[int]bool)
+	ok := true
+	for i := range datasets {
+		dsName := fmt.Sprintf("%s[%d]", node.Name, i)
+		curHash := fmt.Sprintf("%s[%d]", nodeHash, i)
+		ds := FindDataset(curHash)
+		if ds == nil {
+			ok = false
+			if create {
+				ds = NewDataset(dsName, "computed", node.DataTypes[i], &curHash)
+			}
+		}
+
+		if ds != nil {
+			ds.AddExecRef(node.ID)
+			datasets[i] = ds
+			dsIDSet[ds.ID] = true
+		}
+	}
+
+	// remove references
+	for _, id := range existingDS {
+		if dsIDSet[id] {
 			continue
 		}
-		dsName := fmt.Sprintf("%s[%d]", node.Name, i)
-		ds := NewDataset(dsName, "computed", node.DataTypes[i])
-		id := ds.ID
-		node.DatasetIDs[i] = &id
+		GetDataset(id).DeleteExecRef(node.ID)
 	}
-	var idsStr []string
-	for _, id := range node.DatasetIDs {
-		idsStr = append(idsStr, strconv.Itoa(*id))
-	}
-	db.Exec("UPDATE exec_nodes SET datasets = ? WHERE id = ?", strings.Join(idsStr, ","), node.ID)
+
+	return datasets, ok
 }
 
 type ExecNodeUpdate struct {
@@ -117,4 +142,15 @@ func (node *DBExecNode) Update(req ExecNodeUpdate) {
 		typesRaw := strings.Join(typesStr, ",")
 		db.Exec("UPDATE exec_nodes SET data_types = ? WHERE id = ?", typesRaw, node.ID)
 	}
+}
+
+func (node *DBExecNode) Delete() {
+	dsIDs := node.DatasetRefs()
+	for _, id := range dsIDs {
+		GetDataset(id).DeleteExecRef(node.ID)
+	}
+
+	// TODO: check for other exec nodes that reference this node as a parent
+
+	db.Exec("DELETE FROM exec_nodes WHERE id = ?", node.ID)
 }

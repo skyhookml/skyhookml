@@ -18,6 +18,14 @@ const Queries = {
 			nodeRects: {},
 			prevStage: null,
 			resizeObserver: null,
+
+			// for comparing
+			workspaces: [],
+			wsNodes: [],
+			compareForm: {
+				workspace: null,
+				nodeID: null,
+			}
 		};
 	},
 	// don't want to render until after mounted
@@ -34,7 +42,7 @@ const Queries = {
 					});
 					this.datasets = datasets;
 				}),
-				utils.request(this, 'GET', '/kv/exec-nodes-meta', null, (meta) => {
+				utils.request(this, 'GET', '/kv/exec-nodes-meta-'+this.$route.params.ws, null, (meta) => {
 					if(meta) {
 						this.meta = JSON.parse(meta);
 					} else {
@@ -58,6 +66,10 @@ const Queries = {
 				}),
 			]).then(() => {
 				this.render();
+			});
+
+			utils.request(this, 'GET', '/workspaces', null, (data) => {
+				this.workspaces = data;
 			});
 		},
 		render: function() {
@@ -111,7 +123,7 @@ const Queries = {
 				for(let gid in groups) {
 					meta[gid] = [parseInt(groups[gid].x()), parseInt(groups[gid].y())];
 				}
-				utils.request(this, 'POST', '/kv/exec-nodes-meta', {'val': JSON.stringify(meta)});
+				utils.request(this, 'POST', '/kv/exec-nodes-meta-'+this.$route.params.ws, {'val': JSON.stringify(meta)});
 				this.meta = meta;
 			};
 
@@ -351,11 +363,11 @@ const Queries = {
 		runNode: function() {
 			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run');
 		},
-		/*removeNode: function() {
-			utils.request(this, 'POST', '/queries/node/remove', {id: this.selectedNode.ID}, () => {
+		deleteNode: function() {
+			utils.request(this, 'DELETE', '/exec-nodes/'+this.selectedNode.ID, null, () => {
 				this.update();
 			});
-		},*/
+		},
 		addParent: function(parent, key) {
 			let params = {};
 			params[key] = this.selectedNode[key].concat([parent]);
@@ -372,6 +384,16 @@ const Queries = {
 				this.update();
 			});
 		},
+		selectCompareWorkspace: function() {
+			this.compareForm.nodeID = null;
+			this.wsNodes = null;
+			utils.request(this, 'GET', '/exec-nodes?ws='+this.compareForm.workspace, null, (data) => {
+				this.wsNodes = data;
+			});
+		},
+		compareTo: function() {
+			this.$router.push('/ws/'+this.$route.params.ws+'/compare/'+this.selectedNode.ID+'/'+this.compareForm.workspace+'/'+this.compareForm.nodeID);
+		},
 	},
 	template: `
 <div style="height:100%;" class="graph-div">
@@ -383,11 +405,11 @@ const Queries = {
 			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
+			<button type="button" class="btn btn-danger" :disabled="selectedNode == null" v-on:click="deleteNode">Delete Node</button>
 		</div>
 		<hr />
 		<div v-if="selectedNode != null" class="my-2">
 			<div>Node {{ selectedNode.Name }}</div>
-			<!--<div><button type="button" class="btn btn-danger" v-on:click="removeNode">Remove Node</button></div>-->
 			<div>
 				<exec-node-parents
 					:node="selectedNode"
@@ -411,6 +433,18 @@ const Queries = {
 					v-on:remove="removeParent($event, 'FilterParents')"
 					>
 				</exec-node-parents>
+			</div>
+			<div>
+				<form v-on:submit.prevent="compareTo" class="form-inline my-2">
+					<label class="ml-1">Compare to:</label>
+					<select v-model="compareForm.workspace" @change="selectCompareWorkspace" class="form-control ml-1">
+						<option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
+					</select>
+					<select v-model="compareForm.nodeID" class="form-control ml-1">
+						<option v-for="node in wsNodes" :key="node.ID" :value="node.ID">{{ node.Name }}</option>
+					</select>
+					<button type="submit" class="btn btn-primary ml-1">Go</button>
+				</form>
 			</div>
 		</div>
 	</div>

@@ -29,8 +29,9 @@ def read_input(t, path, metadata, format):
 
 def prepare_input(t, data, opt):
 	if t == 'image' or t == 'video':
+		im = data
 		if 'Width' in opt and 'Height' in opt:
-			im = skimage.transform.resize(data, [opt['Height'], opt['Width']], preserve_range=True).astype('uint8')
+			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype('uint8')
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
 		return data

@@ -1,6 +1,8 @@
 package skyhook
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -64,5 +66,12 @@ type ExecNode struct {
 	Parents []ExecParent
 	FilterParents []ExecParent
 	DataTypes []DataType
-	DatasetIDs []*int
+}
+
+func (node ExecNode) LocalHash() []byte {
+	h := sha256.New()
+	h.Write([]byte(fmt.Sprintf("op=%s\n", node.Op)))
+	h.Write([]byte(fmt.Sprintf("params=%s\n", node.Params)))
+	h.Write([]byte(fmt.Sprintf("datatypes=%s\n", EncodeTypes(node.DataTypes))))
+	return h.Sum(nil)
 }

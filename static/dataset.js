@@ -1,9 +1,11 @@
 import utils from './utils.js';
 import ImportModal from './import-modal.js';
+import RenderItem from './render-item.js';
 
 export default {
 	components: {
 		'import-modal': ImportModal,
+		'render-item': RenderItem,
 	},
 	data: function() {
 		return {
@@ -49,14 +51,7 @@ export default {
 			</table>
 		</template>
 		<template v-else>
-			<template v-if="dataset.DataType == 'video'">
-				<video controls>
-					<source :src="'/items/'+viewingItem.ID+'/get?format=mp4'" type="video/mp4" />
-				</video>
-			</template>
-			<template v-else-if="dataset.DataType == 'image'">
-				<img :src="'/items/'+viewingItem.ID+'/get?format=jpeg'" />
-			</template>
+			<render-item v-bind:dataType="dataset.DataType" v-bind:item="viewingItem"></render-item>
 		</template>
 	</template>
 </div>

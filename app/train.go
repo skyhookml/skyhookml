@@ -9,13 +9,31 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func (node *DBTrainNode) Run() error {
+// Run this node.
+// If force, we run even if trained model already available.
+func (node *DBTrainNode) Run(force bool) error {
+	nodeHash := node.Hash()
+
+	// check existing model
+	if node.ModelID != nil {
+		prevModel := GetModel(*node.ModelID)
+		if prevModel.Hash == nodeHash && !force {
+			return nil
+		}
+		node.ModelID = nil
+		db.Exec("UPDATE train_nodes SET model_id = NULL WHERE id = ?", node.ID)
+		prevModel.CheckRefs()
+	}
+
 	op := skyhook.GetTrainOp(node.Op)
 	err := op.Train("http://127.0.0.1:8080", node.TrainNode)
 	if err != nil {
 		return err
 	}
-	db.Exec("UPDATE train_nodes SET trained = 1 WHERE id = ?", node.ID)
+	res := db.Exec("INSERT INTO models (hash) VALUES (?)", nodeHash)
+	modelID := res.LastInsertId()
+	node.ModelID = &modelID
+	db.Exec("UPDATE train_nodes SET model_id = ? WHERE id = ?", modelID, node.ID)
 	return nil
 }
 
@@ -66,6 +84,16 @@ func init() {
 		node.Update(request)
 	}).Methods("POST")
 
+	Router.HandleFunc("/train-nodes/{node_id}", func(w http.ResponseWriter, r *http.Request) {
+		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
+		node := GetTrainNode(nodeID)
+		if node == nil {
+			http.Error(w, "no such train node", 404)
+			return
+		}
+		node.Delete()
+	}).Methods("DELETE")
+
 	Router.HandleFunc("/train-nodes/{node_id}/run", func(w http.ResponseWriter, r *http.Request) {
 		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
 		node := GetTrainNode(nodeID)
@@ -74,7 +102,7 @@ func init() {
 			return
 		}
 		go func() {
-			err := node.Run()
+			err := node.Run(true)
 			if err != nil {
 				log.Printf("[train node %s] run error: %v", node.Name, err)
 			}

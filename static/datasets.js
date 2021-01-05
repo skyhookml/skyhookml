@@ -30,7 +30,7 @@ const Datasets = {
 			});
 		},
 		deleteDataset: function(dsID) {
-			utils.request(this, 'DELETE', '/timelines/'+dsID, null, () => {
+			utils.request(this, 'DELETE', '/datasets/'+dsID, null, () => {
 				this.fetchDatasets();
 			});
 		},

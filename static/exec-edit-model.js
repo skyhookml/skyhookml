@@ -11,9 +11,6 @@ export default {
 	created: function() {
 		utils.request(this, 'GET', '/train-nodes', null, (trainNodes) => {
 			trainNodes.forEach((node) => {
-				if(!node.Trained) {
-					return;
-				}
 				this.$set(this.trainNodes, node.ID, node);
 			});
 		});

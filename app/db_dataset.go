@@ -3,6 +3,7 @@ package app
 import (
 	"../skyhook"
 
+	"log"
 	"math/rand"
 	"strings"
 )
@@ -17,13 +18,13 @@ type DBItem struct {
 	loaded bool
 }
 
-const DatasetQuery = "SELECT id, name, type, data_type FROM datasets"
+const DatasetQuery = "SELECT id, name, type, data_type, hash FROM datasets"
 
 func datasetListHelper(rows *Rows) []*DBDataset {
 	datasets := []*DBDataset{}
 	for rows.Next() {
 		var ds DBDataset
-		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType)
+		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType, &ds.Hash)
 		datasets = append(datasets, &ds)
 	}
 	return datasets
@@ -36,6 +37,16 @@ func ListDatasets() []*DBDataset {
 
 func GetDataset(id int) *DBDataset {
 	rows := db.Query(DatasetQuery + " WHERE id = ?", id)
+	datasets := datasetListHelper(rows)
+	if len(datasets) == 1 {
+		return datasets[0]
+	} else {
+		return nil
+	}
+}
+
+func FindDataset(hash string) *DBDataset {
+	rows := db.Query(DatasetQuery + " WHERE hash = ?", hash)
 	datasets := datasetListHelper(rows)
 	if len(datasets) == 1 {
 		return datasets[0]
@@ -185,12 +196,29 @@ func (ds *DBDataset) WriteItem(key string, data skyhook.Data) *DBItem {
 
 func (ds *DBDataset) Delete() {
 	ds.Clear()
-	db.Exec("DELETE FROM datasets")
+	db.Exec("DELETE FROM datasets WHERE id = ?", ds.ID)
 }
 
 func (ds *DBDataset) Clear() {
 	ds.Dataset.Remove()
 	db.Exec("DELETE FROM items WHERE dataset_id = ?", ds.ID)
+}
+
+func (ds *DBDataset) AddExecRef(nodeID int) {
+	db.Exec("INSERT OR IGNORE INTO exec_ds_refs (node_id, dataset_id) VALUES (?, ?)", nodeID, ds.ID)
+}
+
+func (ds *DBDataset) DeleteExecRef(nodeID int) {
+	db.Exec("DELETE FROM exec_ds_refs WHERE node_id = ? AND dataset_id = ?", nodeID, ds.ID)
+
+	// if dataset no longer has any references, then we should delete the dataset
+	var count int
+	db.QueryRow("SELECT COUNT(*) from exec_ds_refs WHERE dataset_id = ?", ds.ID).Scan(&count)
+	if count > 0 {
+		return
+	}
+	log.Printf("[dataset %d-%s] removing empty dataset", ds.ID, ds.Name)
+	ds.Delete()
 }
 
 func (item *DBItem) Delete() {
@@ -219,7 +247,9 @@ func (item *DBItem) SetMetadata() error {
 	return nil
 }
 
-func NewDataset(name string, t string, dataType skyhook.DataType) *DBDataset {
-	res := db.Exec("INSERT INTO datasets (name, type, data_type) VALUES (?, ?, ?)", name, t, dataType)
-	return GetDataset(res.LastInsertId())
+func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) *DBDataset {
+	res := db.Exec("INSERT INTO datasets (name, type, data_type, hash) VALUES (?, ?, ?, ?)", name, t, dataType, hash)
+	id := res.LastInsertId()
+	log.Printf("[dataset %d-%s] created new dataset, data_type=%v", id, name, dataType)
+	return GetDataset(id)
 }
