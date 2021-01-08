@@ -3,10 +3,10 @@ export default {
 	template: `
 <div>
 	<template v-if="dataType == 'video'">
-		<video controls :src="'/items/'+item.ID+'/get?format=mp4'"></video>
+		<video controls :src="'/datasets/'+item.Dataset.ID+'/items/'+item.Key+'/get?format=mp4'"></video>
 	</template>
 	<template v-else-if="dataType == 'image'">
-		<img :src="'/items/'+item.ID+'/get?format=jpeg'" />
+		<img :src="'/datasets/'+item.Dataset.ID+'/items/'+item.Key+'/get?format=jpeg'" />
 	</template>
 </div>
 	`,

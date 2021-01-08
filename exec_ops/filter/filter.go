@@ -2,10 +2,14 @@ package python
 
 import (
 	"../../skyhook"
+	"../../exec_ops"
+	"runtime"
 )
 
 type FilterOp struct {
+	url string
 	node skyhook.ExecNode
+	dataset skyhook.Dataset
 }
 
 func truthiness(data skyhook.Data) bool {
@@ -21,20 +25,24 @@ func truthiness(data skyhook.Data) bool {
 	return false
 }
 
-func (e *FilterOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.Data, error) {
+func (e *FilterOp) Parallelism() int {
+	return runtime.NumCPU()
+}
+
+func (e *FilterOp) Apply(task skyhook.ExecTask) error {
 	// make sure all inputs are non-empty
-	for _, item := range inputs {
+	for _, item := range task.Items {
 		data, err := item.LoadData()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if !truthiness(data) {
-			return nil, nil
+			return nil
 		}
 	}
 
 	mydata := skyhook.IntData{Ints: []int{1}}
-	return map[string][]skyhook.Data{key: {mydata}}, nil
+	return exec_ops.WriteItem(e.url, e.dataset, task.Key, mydata)
 }
 
 func (e *FilterOp) Close() {}
@@ -44,8 +52,14 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode) (skyhook.ExecOp, error) {
-			return &FilterOp{node}, nil
+		Prepare: func(url string, node skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+			op := &FilterOp{
+				url: url,
+				node: node,
+				dataset: outputDatasets[0],
+			}
+			tasks := exec_ops.SimpleTasks(url, node, items)
+			return op, tasks, nil
 		},
 	}
 }

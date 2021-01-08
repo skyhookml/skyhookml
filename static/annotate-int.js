@@ -57,8 +57,8 @@ const AnnotateInt = {
 		update: function(response) {
 			this.response = response;
 			this.inputVal = '';
-			if(this.response.ID !== null) {
-				utils.request(this, 'GET', '/items/'+this.response.ID+'/get', {format: 'json'}, (data) => {
+			if(this.response.IsExisting) {
+				utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items/'+this.response.Key+'/get', {format: 'json'}, (data) => {
 					this.inputVal = data.toString();
 				});
 			}
@@ -114,7 +114,7 @@ const AnnotateInt = {
 		</div>
 		<div>
 			<template v-if="response != null">
-				<img :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" />
+				<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key'/get?format=jpeg'" />
 			</template>
 		</div>
 		<div class="form-row align-items-center">
@@ -123,7 +123,7 @@ const AnnotateInt = {
 			</div>
 			<div class="col-auto">
 				<template v-if="response != null">
-					<span>{{ response.key }}</span>
+					<span>{{ response.Key }}</span>
 					<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
 					<template v-if="inputVal">
 						<span>(Value: {{ inputVal }})</span>

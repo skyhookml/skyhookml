@@ -2,6 +2,7 @@ package keras
 
 import (
 	"../../skyhook"
+	"../../exec_ops"
 	"../../exec_ops/python"
 
 	"fmt"
@@ -74,10 +75,10 @@ func Train(url string, node skyhook.TrainNode) error {
 	return err
 }
 
-func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode) (skyhook.ExecOp, error) {
+func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
 	arch, components, _, err := getArgs(url, trainNode)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	paramsArg := trainNode.Params
@@ -90,8 +91,9 @@ func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode)
 		fmt.Sprintf("%d", trainNode.ID), paramsArg, archArg, compsArg, execParamsArg,
 	)
 
-	op, err := python.NewPythonOp(cmd, url, execNode)
-	return op, err
+	op, err := python.NewPythonOp(cmd, url, execNode, outputDatasets)
+	tasks := exec_ops.SimpleTasks(url, execNode, items)
+	return op, tasks, err
 }
 
 func init() {

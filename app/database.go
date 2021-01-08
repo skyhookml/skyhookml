@@ -90,7 +90,6 @@ func init() {
 		op TEXT,
 		params TEXT,
 		parents TEXT,
-		filter_parents TEXT,
 		data_types TEXT,
 		workspace TEXT
 	)`)

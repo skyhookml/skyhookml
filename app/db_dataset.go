@@ -136,20 +136,25 @@ func (s *DBAnnotateDataset) SampleMissingKey() string {
 	return keyList[rand.Intn(len(keyList))]
 }
 
-const ItemQuery = "SELECT id, dataset_id, k, ext, format, metadata FROM items"
+const ItemQuery = "SELECT k, ext, format, metadata, provider, provider_info FROM items"
 
 func itemListHelper(rows *Rows) []*DBItem {
 	var items []*DBItem
 	for rows.Next() {
 		var item DBItem
-		rows.Scan(&item.ID, &item.Dataset.ID, &item.Key, &item.Ext, &item.Format, &item.Metadata)
+		rows.Scan(&item.Key, &item.Ext, &item.Format, &item.Metadata, &item.Provider, &item.ProviderInfo)
 		items = append(items, &item)
 	}
 	return items
 }
 
+func (ds *DBDataset) getDB() *Database {
+	return GetCachedDB(ds.DBFname())
+}
+
 func (ds *DBDataset) ListItems() []*DBItem {
-	rows := db.Query(ItemQuery + " WHERE dataset_id = ? ORDER BY id", ds.ID)
+	db := ds.getDB()
+	rows := db.Query(ItemQuery + " ORDER BY k")
 	items := itemListHelper(rows)
 	// populate dataset
 	for _, item := range items {
@@ -159,37 +164,38 @@ func (ds *DBDataset) ListItems() []*DBItem {
 	return items
 }
 
-func GetItem(id int) *DBItem {
-	rows := db.Query(ItemQuery + " WHERE id = ?", id)
-	items := itemListHelper(rows)
-	if len(items) == 1 {
-		return items[0]
-	} else {
-		return nil
-	}
-}
-
-func (ds *DBDataset) AddItem(key string, ext string, format string, metadata string) *DBItem {
-	res := db.Exec(
-		"INSERT INTO items (dataset_id, k, ext, format, metadata) VALUES (?, ?, ?, ?, ?)",
-		ds.ID, key, ext, format, metadata,
+func (ds *DBDataset) AddItem(item skyhook.Item) *DBItem {
+	db := ds.getDB()
+	db.Exec(
+		"INSERT INTO items (k, ext, format, metadata, provider, provider_info) VALUES (?, ?, ?, ?, ?, ?)",
+		item.Key, item.Ext, item.Format, item.Metadata, item.Provider, item.ProviderInfo,
 	)
-	return GetItem(res.LastInsertId())
+	return ds.GetItem(item.Key)
 }
 
 func (ds *DBDataset) GetItem(key string) *DBItem {
-	rows := db.Query(ItemQuery + " WHERE dataset_id = ? AND k = ? LIMIT 1", ds.ID, key)
+	db := ds.getDB()
+	rows := db.Query(ItemQuery + " WHERE k = ?", key)
 	items := itemListHelper(rows)
 	if len(items) == 1 {
-		return items[0]
+		item := items[0]
+		item.Dataset = ds.Dataset
+		item.loaded = true
+		return item
 	} else {
 		return nil
 	}
 }
 
 func (ds *DBDataset) WriteItem(key string, data skyhook.Data) *DBItem {
+	// TODO: might want to write the item before updating database
 	ext, format := data.GetDefaultExtAndFormat()
-	item := ds.AddItem(key, ext, format, string(skyhook.JsonMarshal(data.GetMetadata())))
+	item := ds.AddItem(skyhook.Item{
+		Key: key,
+		Ext: ext,
+		Format: format,
+		Metadata: string(skyhook.JsonMarshal(data.GetMetadata())),
+	})
 	item.UpdateData(data)
 	return item
 }
@@ -197,11 +203,13 @@ func (ds *DBDataset) WriteItem(key string, data skyhook.Data) *DBItem {
 func (ds *DBDataset) Delete() {
 	ds.Clear()
 	db.Exec("DELETE FROM datasets WHERE id = ?", ds.ID)
+	db.Exec("DELETE FROM exec_ds_refs WHERE dataset_id = ?", ds.ID)
 }
 
+// Clear the dataset without deleting it.
 func (ds *DBDataset) Clear() {
 	ds.Dataset.Remove()
-	db.Exec("DELETE FROM items WHERE dataset_id = ?", ds.ID)
+	UncacheDB(ds.DBFname())
 }
 
 func (ds *DBDataset) AddExecRef(nodeID int) {
@@ -222,8 +230,9 @@ func (ds *DBDataset) DeleteExecRef(nodeID int) {
 }
 
 func (item *DBItem) Delete() {
+	db := (&DBDataset{Dataset: item.Dataset}).getDB()
+	db.Exec("DELETE FROM items WHERE k = ?", item.Key)
 	item.Item.Remove()
-	db.Exec("DELETE FROM items WHERE id = ?", item.ID)
 }
 
 func (item *DBItem) Load() {
@@ -237,13 +246,14 @@ func (item *DBItem) Load() {
 // Set metadata based on the file.
 func (item *DBItem) SetMetadata() error {
 	item.Load()
+	db := (&DBDataset{Dataset: item.Dataset}).getDB()
 	format, metadata, err := skyhook.DataImpls[item.Dataset.DataType].GetDefaultMetadata(item.Fname())
 	if err != nil {
 		return err
 	}
 	item.Format = format
 	item.Metadata = metadata
-	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE id = ?", item.Format, item.Metadata, item.ID)
+	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE k = ?", item.Format, item.Metadata, item.Key)
 	return nil
 }
 

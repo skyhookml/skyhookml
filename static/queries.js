@@ -363,6 +363,11 @@ const Queries = {
 		runNode: function() {
 			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run');
 		},
+		runIncrementalNode: function() {
+			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/incremental', {
+				count: 4,
+			});
+		},
 		deleteNode: function() {
 			utils.request(this, 'DELETE', '/exec-nodes/'+this.selectedNode.ID, null, () => {
 				this.update();
@@ -405,6 +410,7 @@ const Queries = {
 			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
 			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
+			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runIncrementalNode">Run Some</button>
 			<button type="button" class="btn btn-danger" :disabled="selectedNode == null" v-on:click="deleteNode">Delete Node</button>
 		</div>
 		<hr />
@@ -419,18 +425,6 @@ const Queries = {
 					label="Parents"
 					v-on:add="addParent($event, 'Parents')"
 					v-on:remove="removeParent($event, 'Parents')"
-					>
-				</exec-node-parents>
-			</div>
-			<div>
-				<exec-node-parents
-					:node="selectedNode"
-					pkey="FilterParents"
-					:nodes="nodes"
-					:datasets="datasets"
-					label="Filter Parents"
-					v-on:add="addParent($event, 'FilterParents')"
-					v-on:remove="removeParent($event, 'FilterParents')"
 					>
 				</exec-node-parents>
 			</div>

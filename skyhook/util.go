@@ -74,11 +74,7 @@ func ParseJsonRequest(w http.ResponseWriter, r *http.Request, x interface{}) err
 	return nil
 }
 
-func JsonGet(baseURL string, path string, response interface{}) error {
-	resp, err := http.Get(baseURL + path)
-	if err != nil {
-		return fmt.Errorf("error performing HTTP request: %v", err)
-	}
+func ParseJsonResponse(resp *http.Response, response interface{}) error {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("error performing HTTP request: %v", err)
@@ -91,6 +87,14 @@ func JsonGet(baseURL string, path string, response interface{}) error {
 	return nil
 }
 
+func JsonGet(baseURL string, path string, response interface{}) error {
+	resp, err := http.Get(baseURL + path)
+	if err != nil {
+		return fmt.Errorf("error performing HTTP request: %v", err)
+	}
+	return ParseJsonResponse(resp, response)
+}
+
 func JsonPost(baseURL string, path string, request interface{}, response interface{}) error {
 	var body io.Reader
 	if request != nil {
@@ -100,16 +104,7 @@ func JsonPost(baseURL string, path string, request interface{}, response interfa
 	if err != nil {
 		return fmt.Errorf("error performing HTTP request: %v", err)
 	}
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error performing HTTP request: %v", err)
-	} else if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("HTTP error %d: %s", resp.StatusCode, string(bytes))
-	}
-	if response != nil {
-		JsonUnmarshal(bytes, response)
-	}
-	return nil
+	return ParseJsonResponse(resp, response)
 }
 
 func ParseInt(str string) int {

@@ -3,7 +3,7 @@ package skyhook
 type TrainOp struct {
 	Requirements func(url string, node TrainNode) map[string]int
 	Train func(url string, node TrainNode) error
-	Prepare func(url string, trainNode TrainNode, execNode ExecNode) (ExecOp, error)
+	Prepare func(url string, trainNode TrainNode, execNode ExecNode, items [][]Item, outputDatasets []Dataset) (ExecOp, []ExecTask, error)
 }
 
 var TrainOps = make(map[string]TrainOp)

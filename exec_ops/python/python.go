@@ -33,7 +33,9 @@ type ResponsePacket struct {
 }
 
 type PythonOp struct {
+	url string
 	node skyhook.ExecNode
+	datasets []skyhook.Dataset
 
 	cmd *skyhook.Cmd
 	stdin io.WriteCloser
@@ -52,7 +54,7 @@ type PythonOp struct {
 	mu sync.Mutex
 }
 
-func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode) (*PythonOp, error) {
+func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
 	stdin := cmd.Stdin()
 	stdout := cmd.Stdout()
 
@@ -78,7 +80,9 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode) (*PythonOp
 	}
 
 	op := &PythonOp{
+		url: url,
 		node: node,
+		datasets: outputDatasets,
 		cmd: cmd,
 		stdin: stdin,
 		stdout: stdout,
@@ -86,6 +90,11 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode) (*PythonOp
 	}
 	go op.readLoop()
 	return op, nil
+}
+
+func (e *PythonOp) Parallelism() int {
+	// python process is single-threaded, so there's no reason to run more than one task at a time
+	return 1
 }
 
 func (e *PythonOp) readLoop() {
@@ -167,39 +176,39 @@ func (e *PythonOp) readLoop() {
 
 }
 
-func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.Data, error) {
+func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 	// add pendingKey (and check if already err)
 	e.mu.Lock()
 	if e.err != nil {
 		e.mu.Unlock()
-		return nil, e.err
+		return e.err
 	}
 
 	pk := &pendingKey{
-		key: key,
+		key: task.Key,
 		outputs: make(map[string][]skyhook.Data),
 		builders: make(map[string][]skyhook.ChunkBuilder),
 		cond: sync.NewCond(&e.mu),
 	}
-	e.pending[key] = pk
+	e.pending[task.Key] = pk
 	e.mu.Unlock()
 
 	// write init packet
 	e.writeLock.Lock()
 	err := skyhook.WriteJsonData(JobPacket{
-		Key: key,
+		Key: task.Key,
 		Type: "init",
 	}, e.stdin)
 	e.writeLock.Unlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	inputDatas := make([]skyhook.Data, len(inputs))
-	for i, input := range inputs {
+	inputDatas := make([]skyhook.Data, len(task.Items))
+	for i, input := range task.Items {
 		data, err := input.LoadData()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		inputDatas[i] = data
 	}
@@ -208,7 +217,7 @@ func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhoo
 		e.writeLock.Lock()
 
 		skyhook.WriteJsonData(JobPacket{
-			Key: key,
+			Key: task.Key,
 			Type: "job",
 			Length: length,
 		}, e.stdin)
@@ -228,7 +237,7 @@ func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhoo
 	// check err from SynchronizedReader after this packet is written
 	e.writeLock.Lock()
 	skyhook.WriteJsonData(JobPacket{
-		Key: key,
+		Key: task.Key,
 		Type: "finish",
 	}, e.stdin)
 	e.writeLock.Unlock()
@@ -237,10 +246,10 @@ func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhoo
 	// first check e.err because that may have caused the EncodeStream error
 	if e.err != nil {
 		e.mu.Unlock()
-		return nil, e.err
+		return e.err
 	} else if err != nil {
 		e.mu.Unlock()
-		return nil, err
+		return err
 	}
 
 	for !pk.done && e.err == nil {
@@ -249,10 +258,19 @@ func (e *PythonOp) Apply(key string, inputs []skyhook.Item) (map[string][]skyhoo
 	e.mu.Unlock()
 
 	if e.err != nil {
-		return nil, e.err
+		return e.err
 	}
 
-	return pk.outputs, nil
+	// write the outputs that were collected by readLoop
+	for key, datas := range pk.outputs {
+		for i := range datas {
+			err := exec_ops.WriteItem(e.url, e.datasets[i], key, datas[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (e *PythonOp) Close() {
@@ -272,10 +290,18 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, allItems [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
 			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
-			op, err := NewPythonOp(cmd, url, node)
-			return op, err
+			fmt.Println("python output datasets", outputDatasets)
+			op, err := NewPythonOp(cmd, url, node, outputDatasets)
+			if err != nil {
+				return nil, nil, err
+			}
+			tasks := exec_ops.SimpleTasks(url, node, allItems)
+			return op, tasks, nil
 		},
+		Incremental: true,
+		GetOutputKeys: exec_ops.MapGetOutputKeys,
+		GetNeededInputs: exec_ops.MapGetNeededInputs,
 	}
 }

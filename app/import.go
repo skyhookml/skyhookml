@@ -46,7 +46,12 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 		if len(ext) > 0 && ext[0] == '.' {
 			ext = ext[1:]
 		}
-		item := ds.AddItem(key, ext, "", "")
+		item := ds.AddItem(skyhook.Item{
+			Key: key,
+			Ext: ext,
+			Format: "",
+			Metadata: "",
+		})
 		item.Mkdir()
 
 		// copy the file

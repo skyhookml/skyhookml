@@ -64,7 +64,6 @@ type ExecNode struct {
 	Op string
 	Params string
 	Parents []ExecParent
-	FilterParents []ExecParent
 	DataTypes []DataType
 }
 

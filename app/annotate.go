@@ -4,7 +4,6 @@ import (
 	"../skyhook"
 
 	"bytes"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,12 +25,11 @@ func NewAnnotateDataset(dataset skyhook.Dataset, inputs []skyhook.Dataset, tool 
 
 // info needed to annotate one item, which may or may not be present in the destination dataset
 type AnnotateResponse struct {
-	// IDs of items in input datasets
-	InputIDs []int
-	// Item ID in the destination dataset, or null if annotating a new key.
-	ID *int
 	// The key that we're labeling.
+	// May be an existing key in the destination dataset, or a new key.
 	Key string
+
+	IsExisting bool
 }
 
 func init() {
@@ -92,40 +90,22 @@ func init() {
 		// then, set input item IDs and other params in response struct
 		var resp AnnotateResponse
 
-		setInputs := func(key string) error {
-			for _, ds := range annoset.Inputs {
-				item := (&DBDataset{Dataset: ds}).GetItem(key)
-				if item == nil {
-					return fmt.Errorf("no item with key %s in dataset %s", key, ds.Name)
-				}
-				resp.InputIDs = append(resp.InputIDs, item.ID)
-			}
-			return nil
-		}
-
 		if key == "" {
 			key = annoset.SampleMissingKey()
 			if key == "" {
 				http.Error(w, "everything has been labeled already", 400)
 				return
 			}
-			if err := setInputs(key); err != nil {
-				http.Error(w, err.Error(), 400)
-				return
-			}
 			resp.Key = key
+			resp.IsExisting = false
 		} else {
 			item := (&DBDataset{Dataset: annoset.Dataset}).GetItem(key)
 			if item == nil {
 				http.Error(w, "no item with key in annotate dataset", 404)
 				return
 			}
-			resp.ID = &item.ID
-			if err := setInputs(key); err != nil {
-				http.Error(w, err.Error(), 400)
-				return
-			}
 			resp.Key = key
+			resp.IsExisting = true
 		}
 
 		skyhook.JsonResponse(w, resp)

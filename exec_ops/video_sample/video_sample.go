@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"runtime"
 )
 
 type Params struct {
@@ -26,24 +27,30 @@ type VideoSample struct {
 	Params Params
 	// map from keys to list of (start, end) segments
 	Samples map[string][][2]int
+	Dataset skyhook.Dataset
 }
 
-func (e *VideoSample) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.Data, error) {
-	samples := e.Samples[key]
+func (e *VideoSample) Parallelism() int {
+	// each ffmpeg runs with two threads
+	return runtime.NumCPU()/2
+}
+
+func (e *VideoSample) Apply(task skyhook.ExecTask) error {
+	samples := e.Samples[task.Key]
 	if len(samples) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	log.Printf("[video_sample %s] extracting %d samples from %s", e.Node.Name, len(samples), key)
+	log.Printf("[video_sample %s] extracting %d samples from %s", e.Node.Name, len(samples), task.Key)
 
-	if len(inputs) != 1 {
-		return nil, fmt.Errorf("video_sample expects exactly one input")
+	if len(task.Items) != 1 {
+		return fmt.Errorf("video_sample expects exactly one input")
 	}
-	data, err := inputs[0].LoadData()
+	data, err := task.Items[0].LoadData()
 	if err != nil {
-		return nil, err
+		return err
 	} else if data.Type() != skyhook.VideoType {
-		return nil, fmt.Errorf("video_sample expects video input")
+		return fmt.Errorf("video_sample expects video input")
 	}
 	vdata := data.(skyhook.VideoData)
 
@@ -53,7 +60,7 @@ func (e *VideoSample) Apply(key string, inputs []skyhook.Item) (map[string][]sky
 		startToEnd[sample[0]] = append(startToEnd[sample[0]], sample[1])
 	}
 
-	outputs := make(map[string][]skyhook.Data)
+	outputs := make(map[string]skyhook.Data)
 
 	type ProcessingClip struct {
 		Key string
@@ -76,7 +83,7 @@ func (e *VideoSample) Apply(key string, inputs []skyhook.Item) (map[string][]sky
 	err = vdata.Iterator().Iterate(32, func(im skyhook.Image) {
 		// add segments that start at this frame to the processing set
 		for _, end := range startToEnd[counter] {
-			sampleKey := fmt.Sprintf("%s_%d_%d", key, counter, end)
+			sampleKey := fmt.Sprintf("%s_%d_%d", task.Key, counter, end)
 			if _, ok := processing[sampleKey]; ok {
 				// duplicate interval
 				continue
@@ -84,7 +91,7 @@ func (e *VideoSample) Apply(key string, inputs []skyhook.Item) (map[string][]sky
 
 			// for images, we can do it quickly
 			if end - counter == 1 {
-				outputs[sampleKey] = []skyhook.Data{skyhook.ImageData{Images: []skyhook.Image{im}}}
+				outputs[sampleKey] = skyhook.ImageData{Images: []skyhook.Image{im}}
 				continue
 			}
 
@@ -150,17 +157,24 @@ func (e *VideoSample) Apply(key string, inputs []skyhook.Item) (map[string][]sky
 		resp := <- ch
 		delete(pending, resp.Key)
 		if resp.Error == nil {
-			outputs[resp.Key] = []skyhook.Data{resp.Data}
+			outputs[resp.Key] = resp.Data
 		} else if err == nil {
 			err = resp.Error
 		}
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return outputs, nil
+	for key, data := range outputs {
+		err := exec_ops.WriteItem(e.URL, e.Dataset, key, data)
+		if err != nil {
+			return fmt.Errorf("error writing item to dataset %d: %v", e.Dataset.ID, err)
+		}
+	}
+
+	return nil
 }
 
 func (e *VideoSample) Close() {}
@@ -170,29 +184,15 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, allItems [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
-				return nil, fmt.Errorf("node has not been configured", err)
+				return nil, nil, fmt.Errorf("node has not been configured", err)
 			}
 
-			// get items in the video parent
-			datasets, err := exec_ops.GetParentDatasets(url, node)
-			if err != nil {
-				return nil, fmt.Errorf("error getting parent datasets: %v", err)
-			}
-			dataset := datasets[0]
-			var rawItems []skyhook.Item
-			err = skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), &rawItems)
-			if err != nil {
-				return nil, fmt.Errorf("error getting parent dataset items: %v", err)
-			}
-
-			keys, err := exec_ops.GetKeys(url, node)
-			if err != nil {
-				return nil, fmt.Errorf("error getting keys: %v", err)
-			}
+			// take set intersection of parents
+			tasks := exec_ops.SimpleTasks(url, node, allItems)
 
 			// only keep items that have length set, and at least params.Length
 			type Item struct {
@@ -201,10 +201,8 @@ func init() {
 				NumFrames int
 			}
 			var items []Item
-			for _, item := range rawItems {
-				if !keys[item.Key] {
-					continue
-				}
+			for _, task := range tasks {
+				item := task.Items[0]
 
 				var metadata skyhook.VideoMetadata
 				err := json.Unmarshal([]byte(item.Metadata), &metadata)
@@ -250,15 +248,17 @@ func init() {
 					samples[item.Item.Key] = append(samples[item.Item.Key], [2]int{startIdx, startIdx+params.Length})
 				}
 			} else {
-				return nil, fmt.Errorf("unknown video_sample mode %s", params.Mode)
+				return nil, nil, fmt.Errorf("unknown video_sample mode %s", params.Mode)
 			}
 
-			return &VideoSample{
+			op := &VideoSample{
 				URL: url,
 				Node: node,
 				Params: params,
 				Samples: samples,
-			}, nil
+				Dataset: outputDatasets[0],
+			}
+			return op, tasks, nil
 		},
 	}
 }

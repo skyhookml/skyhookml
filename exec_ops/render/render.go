@@ -2,16 +2,23 @@ package render
 
 import (
 	"../../skyhook"
+	"../../exec_ops"
 
 	"bytes"
 	"fmt"
 	"io"
+	"runtime"
 	"strconv"
 )
 
 type Render struct {
 	URL string
 	Node skyhook.ExecNode
+	Dataset skyhook.Dataset
+}
+
+func (e *Render) Parallelism() int {
+	return runtime.NumCPU()
 }
 
 func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
@@ -40,12 +47,12 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 	return canvas, nil
 }
 
-func (e *Render) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.Data, error) {
-	inputDatas := make([]skyhook.Data, len(inputs))
-	for i, input := range inputs {
+func (e *Render) Apply(task skyhook.ExecTask) error {
+	inputDatas := make([]skyhook.Data, len(task.Items))
+	for i, input := range task.Items {
 		data, err := input.LoadData()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		inputDatas[i] = data
 	}
@@ -84,20 +91,18 @@ func (e *Render) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.
 		// check donech err first, since we need to make sure we read from donech
 		err := <- doneCh
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if perFrameErr != nil {
-			return nil, err
+			return err
 		}
 
 		output := skyhook.VideoData{
 			Bytes: buf.Bytes(),
 			Metadata: videoData.Metadata,
 		}
-		return map[string][]skyhook.Data{
-			key: {output},
-		}, nil
+		return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
 	} else if inputDatas[0].Type() == skyhook.ImageType {
 		var output skyhook.ImageData
 		err := skyhook.PerFrame(inputDatas, func(pos int, datas []skyhook.Data) error {
@@ -109,13 +114,11 @@ func (e *Render) Apply(key string, inputs []skyhook.Item) (map[string][]skyhook.
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return map[string][]skyhook.Data{
-			key: {output},
-		}, nil
+		return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
 	} else {
-		return nil, fmt.Errorf("first input must be either video or image")
+		return fmt.Errorf("first input must be either video or image")
 	}
 }
 
@@ -126,8 +129,13 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode) (skyhook.ExecOp, error) {
-			return &Render{url, node}, nil
+		Prepare: func(url string, node skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+			op := &Render{url, node, outputDatasets[0]}
+			tasks := exec_ops.SimpleTasks(url, node, items)
+			return op, tasks, nil
 		},
+		Incremental: true,
+		GetOutputKeys: exec_ops.MapGetOutputKeys,
+		GetNeededInputs: exec_ops.MapGetNeededInputs,
 	}
 }

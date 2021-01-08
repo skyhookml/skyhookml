@@ -44,12 +44,12 @@ export default {
 				this.response = response;
 				this.shapes = [];
 
-				if(this.response.ID !== null) {
+				if(this.response.IsExisting) {
 					let params = {
 						format: 'json',
 						t: new Date().getTime(),
 					};
-					utils.request(this, 'GET', '/items/'+this.response.ID+'/get', params, (data) => {
+					utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items/'+this.response.Key+'/get', params, (data) => {
 						if(data.length == 0) {
 							return;
 						}
@@ -303,7 +303,7 @@ export default {
 			</form>
 		</div>
 		<div class="canvas-container">
-			<img v-if="response != null" :src="'/items/'+response.InputIDs[0]+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
+			<img v-if="response != null" :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
 			<div
 				v-if="imageMeta != null"
 				class="conva"

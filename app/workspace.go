@@ -129,11 +129,7 @@ func init() {
 					if !ok {
 						continue
 					}
-					filterParents, ok := getParents(node.FilterParents)
-					if !ok {
-						continue
-					}
-					node_ := NewExecNode(node.Name, node.Op, node.Params, parents, filterParents, node.DataTypes, cloneWS)
+					node_ := NewExecNode(node.Name, node.Op, node.Params, parents, node.DataTypes, cloneWS)
 					newNodes[id] = node_
 					delete(pendingNodes, id)
 				}
