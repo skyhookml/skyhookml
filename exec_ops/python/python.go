@@ -290,18 +290,21 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, allItems [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+		GetTasks: exec_ops.SimpleTasks,
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
 			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
 			fmt.Println("python output datasets", outputDatasets)
 			op, err := NewPythonOp(cmd, url, node, outputDatasets)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
-			tasks := exec_ops.SimpleTasks(url, node, allItems)
-			return op, tasks, nil
+			return op, nil
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+			return "skyhookml/basic", nil
+		},
 	}
 }

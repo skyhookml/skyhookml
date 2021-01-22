@@ -1,0 +1,10 @@
+FROM skyhookml/base
+
+WORKDIR /usr/src/app/skyhook
+RUN mkdir items models
+
+COPY ./ ./
+RUN go build container.go
+
+EXPOSE 8080
+CMD go run container.go

@@ -302,8 +302,8 @@ backup=%s
 	return nil
 }
 
-func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
-	return nil, nil, fmt.Errorf("not implemented yet")
+func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 func init() {

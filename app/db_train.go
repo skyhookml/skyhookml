@@ -57,7 +57,7 @@ func GetTrainNode(id int) *DBTrainNode {
 }
 
 func NewTrainNode(name string, op string, workspace string) *DBTrainNode {
-	res := db.Exec("INSERT INTO train_nodes (name, op, params, parents, outputs, trained, workspace) VALUES (?, ?, '', '', '', 0, ?)", name, op, workspace)
+	res := db.Exec("INSERT INTO train_nodes (name, op, params, parents, outputs, workspace) VALUES (?, ?, '', '', '', ?)", name, op, workspace)
 	return GetTrainNode(res.LastInsertId())
 }
 

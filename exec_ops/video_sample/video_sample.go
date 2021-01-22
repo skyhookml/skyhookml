@@ -25,8 +25,6 @@ type VideoSample struct {
 	URL string
 	Node skyhook.ExecNode
 	Params Params
-	// map from keys to list of (start, end) segments
-	Samples map[string][][2]int
 	Dataset skyhook.Dataset
 }
 
@@ -36,10 +34,9 @@ func (e *VideoSample) Parallelism() int {
 }
 
 func (e *VideoSample) Apply(task skyhook.ExecTask) error {
-	samples := e.Samples[task.Key]
-	if len(samples) == 0 {
-		return nil
-	}
+	// decode task metadata to get the samples we need to extract
+	var samples [][2]int
+	skyhook.JsonUnmarshal([]byte(task.Metadata), &samples)
 
 	log.Printf("[video_sample %s] extracting %d samples from %s", e.Node.Name, len(samples), task.Key)
 
@@ -184,15 +181,12 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, allItems [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+		GetTasks: func(url string, node skyhook.ExecNode, allItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
-				return nil, nil, fmt.Errorf("node has not been configured", err)
+				return nil, fmt.Errorf("node has not been configured", err)
 			}
-
-			// take set intersection of parents
-			tasks := exec_ops.SimpleTasks(url, node, allItems)
 
 			// only keep items that have length set, and at least params.Length
 			type Item struct {
@@ -201,9 +195,8 @@ func init() {
 				NumFrames int
 			}
 			var items []Item
-			for _, task := range tasks {
-				item := task.Items[0]
-
+			itemsByKey := make(map[string]skyhook.Item)
+			for _, item := range allItems[0] {
 				var metadata skyhook.VideoMetadata
 				err := json.Unmarshal([]byte(item.Metadata), &metadata)
 				if err != nil {
@@ -216,6 +209,7 @@ func init() {
 					continue
 				}
 				items = append(items, Item{item, metadata, numFrames})
+				itemsByKey[item.Key] = item
 			}
 
 			// select the samples
@@ -248,17 +242,35 @@ func init() {
 					samples[item.Item.Key] = append(samples[item.Item.Key], [2]int{startIdx, startIdx+params.Length})
 				}
 			} else {
-				return nil, nil, fmt.Errorf("unknown video_sample mode %s", params.Mode)
+				return nil, fmt.Errorf("unknown video_sample mode %s", params.Mode)
 			}
 
+			var tasks []skyhook.ExecTask
+			for key, intervals := range samples {
+				tasks = append(tasks, skyhook.ExecTask{
+					Key: key,
+					Items: []skyhook.Item{itemsByKey[key]},
+					Metadata: string(skyhook.JsonMarshal(intervals)),
+				})
+			}
+			return tasks, nil
+		},
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+			var params Params
+			err := json.Unmarshal([]byte(node.Params), &params)
+			if err != nil {
+				return nil, fmt.Errorf("node has not been configured", err)
+			}
 			op := &VideoSample{
 				URL: url,
 				Node: node,
 				Params: params,
-				Samples: samples,
 				Dataset: outputDatasets[0],
 			}
-			return op, tasks, nil
+			return op, nil
+		},
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+			return "skyhookml/basic", nil
 		},
 	}
 }

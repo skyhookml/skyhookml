@@ -4,7 +4,6 @@ import (
 	"../skyhook"
 
 	"fmt"
-	"net/http"
 	urllib "net/url"
 )
 
@@ -105,7 +104,7 @@ func GetItems(url string, datasets []skyhook.Dataset) (map[string][]skyhook.Item
 }
 
 // make tasks by grouping items of same key across the datasets
-func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) []skyhook.ExecTask {
+func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
 	// group items by key
 	items := make([]map[string]skyhook.Item, len(rawItems))
 	for i, curItems := range rawItems {
@@ -142,22 +141,19 @@ func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) [
 			Items: curItems,
 		})
 	}
-	return tasks
+	return tasks, nil
 }
 
 func WriteItem(url string, dataset skyhook.Dataset, key string, data skyhook.Data) error {
 	ext, format := data.GetDefaultExtAndFormat()
 	var item skyhook.Item
-	resp, err := http.PostForm(url + fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
+	err := skyhook.JsonPostForm(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
 		"key": {key},
 		"ext": {ext},
 		"format": {format},
 		"metadata": {string(skyhook.JsonMarshal(data.GetMetadata()))},
-	})
+	}, &item)
 	if err != nil {
-		return err
-	}
-	if err := skyhook.ParseJsonResponse(resp, &item); err != nil {
 		return err
 	}
 	item.UpdateData(data)

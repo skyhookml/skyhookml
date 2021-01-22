@@ -3,8 +3,10 @@ package app
 import (
 	"../skyhook"
 
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -25,11 +27,40 @@ func (node *DBTrainNode) Run(force bool) error {
 		prevModel.CheckRefs()
 	}
 
-	op := skyhook.GetTrainOp(node.Op)
-	err := op.Train("http://127.0.0.1:8080", node.TrainNode)
-	if err != nil {
+
+	log.Printf("[train-node %s] [run] acquiring worker", node.Name)
+	workerURL := AcquireWorker()
+	log.Printf("[train-node %s] [run] ... acquired worker at %s", node.Name, workerURL)
+	defer ReleaseWorker(workerURL)
+
+	beginRequest := skyhook.TrainBeginRequest{
+		Node: node.TrainNode,
+	}
+	var beginResponse skyhook.TrainBeginResponse
+	if err := skyhook.JsonPost(workerURL, "/train/start", beginRequest, &beginResponse); err != nil {
 		return err
 	}
+	defer func() {
+		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
+		if err != nil {
+			log.Printf("[train-node %s] [run] error ending train container: %v", node.Name, err)
+		}
+	}()
+
+	for {
+		var pollResponse skyhook.TrainPollResponse
+		if err := skyhook.JsonGet(beginResponse.BaseURL, "/train/poll", &pollResponse); err != nil {
+			return err
+		}
+		if !pollResponse.Done {
+			time.Sleep(time.Second)
+			continue
+		}
+		if pollResponse.Error != "" {
+			return fmt.Errorf(pollResponse.Error)
+		}
+	}
+
 	res := db.Exec("INSERT INTO models (hash) VALUES (?)", nodeHash)
 	modelID := res.LastInsertId()
 	node.ModelID = &modelID

@@ -114,7 +114,7 @@ const AnnotateInt = {
 		</div>
 		<div>
 			<template v-if="response != null">
-				<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key'/get?format=jpeg'" />
+				<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" />
 			</template>
 		</div>
 		<div class="form-row align-items-center">

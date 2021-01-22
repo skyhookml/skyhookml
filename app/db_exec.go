@@ -49,7 +49,7 @@ func GetExecNode(id int) *DBExecNode {
 
 func NewExecNode(name string, op string, params string, parents []skyhook.ExecParent, dataTypes []skyhook.DataType, workspace string) *DBExecNode {
 	res := db.Exec(
-		"INSERT INTO exec_nodes (name, op, params, parents, data_types, workspace) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO exec_nodes (name, op, params, parents, data_types, workspace) VALUES (?, ?, ?, ?, ?, ?)",
 		name, op, params, skyhook.ExecParentsToString(parents), skyhook.EncodeTypes(dataTypes), workspace,
 	)
 	return GetExecNode(res.LastInsertId())

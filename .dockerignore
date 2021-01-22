@@ -1,0 +1,6 @@
+items
+models
+**/*.sqlite3
+**/__pycache__
+docker
+files

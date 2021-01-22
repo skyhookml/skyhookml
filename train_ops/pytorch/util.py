@@ -34,7 +34,7 @@ def prepare_input(t, data, opt):
 			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype('uint8')
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
-		return data
+		return numpy.array(data, dtype='int32')
 	elif t == 'floats':
 		return numpy.array(data, dtype='float32')
 	elif t == 'shape':

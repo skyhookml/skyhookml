@@ -62,13 +62,12 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		}
 	}
 
-	// prepare op
+	// get tasks
 	opImpl := skyhook.GetExecOpImpl(node.Op)
-	op, tasks, err := opImpl.Prepare("http://127.0.0.1:8080", node.ExecNode, items, skOutputDatasets)
+	tasks, err := opImpl.GetTasks("http://127.0.0.1:8080", node.ExecNode, items)
 	if err != nil {
 		return err
 	}
-	defer op.Close()
 
 	// limit tasks to LimitOutputKeys if needed
 	if opts.LimitOutputKeys != nil {
@@ -82,7 +81,28 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		tasks = ntasks
 	}
 
-	nthreads := op.Parallelism()
+	// prepare op
+	log.Printf("[exec-node %s] [run] acquiring worker", node.Name)
+	workerURL := AcquireWorker()
+	log.Printf("[exec-node %s] [run] ... acquired worker at %s", node.Name, workerURL)
+	defer ReleaseWorker(workerURL)
+
+	beginRequest := skyhook.ExecBeginRequest{
+		Node: node.ExecNode,
+		OutputDatasets: skOutputDatasets,
+	}
+	var beginResponse skyhook.ExecBeginResponse
+	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
+		return err
+	}
+	defer func() {
+		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
+		if err != nil {
+			log.Printf("[exec-node %s] [run] error ending exec container: %v", node.Name, err)
+		}
+	}()
+
+	nthreads := beginResponse.Parallelism
 	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", node.Name, len(tasks), nthreads)
 
 	counter := 0
@@ -105,7 +125,7 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 				mu.Unlock()
 
 				log.Printf("[exec-node %s] [run] apply on %s", node.Name, task.Key)
-				err := op.Apply(task)
+				err := skyhook.JsonPost(beginResponse.BaseURL, "/exec/task", skyhook.ExecTaskRequest{task}, nil)
 
 				if err != nil {
 					mu.Lock()

@@ -52,14 +52,17 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+		GetTasks: exec_ops.SimpleTasks,
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
 			op := &FilterOp{
 				url: url,
 				node: node,
 				dataset: outputDatasets[0],
 			}
-			tasks := exec_ops.SimpleTasks(url, node, items)
-			return op, tasks, nil
+			return op, nil
+		},
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+			return "skyhookml/basic", nil
 		},
 	}
 }

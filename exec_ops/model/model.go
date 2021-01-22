@@ -12,20 +12,33 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, items [][]skyhook.Item, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, []skyhook.ExecTask, error) {
+		GetTasks: exec_ops.SimpleTasks,
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
 			var params skyhook.ModelExecParams
 			skyhook.JsonUnmarshal([]byte(node.Params), &params)
 
 			var trainNode skyhook.TrainNode
 			err := skyhook.JsonGet(url, fmt.Sprintf("/train-nodes/%d", params.TrainNodeID), &trainNode)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
-			return skyhook.GetTrainOp(trainNode.Op).Prepare(url, trainNode, node, items, outputDatasets)
+			return skyhook.GetTrainOp(trainNode.Op).Prepare(url, trainNode, node, outputDatasets)
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+			var params skyhook.ModelExecParams
+			skyhook.JsonUnmarshal([]byte(node.Params), &params)
+
+			var trainNode skyhook.TrainNode
+			err := skyhook.JsonGet(url, fmt.Sprintf("/train-nodes/%d", params.TrainNodeID), &trainNode)
+			if err != nil {
+				return "", err
+			}
+
+			return skyhook.GetTrainOp(trainNode.Op).ImageName(url, trainNode)
+		},
 	}
 }

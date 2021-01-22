@@ -3,7 +3,10 @@ package skyhook
 type TrainOp struct {
 	Requirements func(url string, node TrainNode) map[string]int
 	Train func(url string, node TrainNode) error
-	Prepare func(url string, trainNode TrainNode, execNode ExecNode, items [][]Item, outputDatasets []Dataset) (ExecOp, []ExecTask, error)
+	Prepare func(url string, trainNode TrainNode, execNode ExecNode, outputDatasets []Dataset) (ExecOp, error)
+
+	// Docker image name
+	ImageName func(url string, trainNode TrainNode) (string, error)
 }
 
 var TrainOps = make(map[string]TrainOp)

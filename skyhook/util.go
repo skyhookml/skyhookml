@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	urllib "net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -92,7 +93,11 @@ func JsonGet(baseURL string, path string, response interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error performing HTTP request: %v", err)
 	}
-	return ParseJsonResponse(resp, response)
+	err = ParseJsonResponse(resp, response)
+	if err != nil {
+		return fmt.Errorf("[GET %s] %v", baseURL+path, err)
+	}
+	return nil
 }
 
 func JsonPost(baseURL string, path string, request interface{}, response interface{}) error {
@@ -102,9 +107,25 @@ func JsonPost(baseURL string, path string, request interface{}, response interfa
 	}
 	resp, err := http.Post(baseURL + path, "application/json", body)
 	if err != nil {
-		return fmt.Errorf("error performing HTTP request: %v", err)
+		return fmt.Errorf("error performing HTTP request (%s): %v", baseURL+path, err)
 	}
-	return ParseJsonResponse(resp, response)
+	err = ParseJsonResponse(resp, response)
+	if err != nil {
+		return fmt.Errorf("[POST %s] %v", baseURL+path, err)
+	}
+	return nil
+}
+
+func JsonPostForm(baseURL string, path string, request urllib.Values, response interface{}) error {
+	resp, err := http.PostForm(baseURL+path, request)
+	if err != nil {
+		return fmt.Errorf("error performing HTTP request (%s): %v", baseURL+path, err)
+	}
+	err = ParseJsonResponse(resp, response)
+	if err != nil {
+		return fmt.Errorf("[POST %s] %v", baseURL+path, err)
+	}
+	return nil
 }
 
 func ParseInt(str string) int {
