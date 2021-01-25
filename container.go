@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 )
 
@@ -17,6 +18,11 @@ func main() {
 	var mu sync.Mutex
 	var trainDone bool
 	var trainErr error
+
+	var bindAddr string = ":8080"
+	if len(os.Args) >= 2 {
+		bindAddr = os.Args[1]
+	}
 
 	http.HandleFunc("/exec/start", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -100,7 +106,15 @@ func main() {
 		})
 	})
 
-	ln, err := net.Listen("tcp", ":8080")
+	http.HandleFunc("/exit", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.WriteHeader(404)
+			return
+		}
+		os.Exit(0)
+	})
+
+	ln, err := net.Listen("tcp", bindAddr)
 	if err != nil {
 		panic(err)
 	}

@@ -26,6 +26,11 @@ func main() {
 	myPort := skyhook.ParseInt(os.Args[2])
 	coordinatorURL := os.Args[3]
 
+	mode := "docker"
+	if len(os.Args) >= 5 {
+		mode = os.Args[4]
+	}
+
 	workingDir, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -34,6 +39,7 @@ func main() {
 	type Cmd struct {
 		Cmd *exec.Cmd
 		Port int
+		BaseURL string
 	}
 	containers := make(map[string]*Cmd)
 	ports := []int{8100, 8101, 8102, 8103}
@@ -67,9 +73,11 @@ func main() {
 
 		mu.Lock()
 		containerPort := getPort()
+		containerBaseURL := fmt.Sprintf("http://localhost:%d", containerPort)
 		containers[uuid] = &Cmd{
 			Cmd: nil,
 			Port: containerPort,
+			BaseURL: containerBaseURL,
 		}
 		mu.Unlock()
 
@@ -78,15 +86,23 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		cmd := exec.Command(
-			"docker", "run",
-			"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/items,type=bind", filepath.Join(workingDir, "items")),
-			"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/models,type=bind", filepath.Join(workingDir, "models")),
-			"--gpus", "all",
-			"-p", fmt.Sprintf("%d:8080", containerPort),
-			"--name", uuid,
-			imageName,
-		)
+
+		var cmd *exec.Cmd
+		if mode == "docker" {
+			cmd = exec.Command(
+				"docker", "run",
+				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/items,type=bind", filepath.Join(workingDir, "items")),
+				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/models,type=bind", filepath.Join(workingDir, "models")),
+				"--gpus", "all",
+				"-p", fmt.Sprintf("%d:8080", containerPort),
+				"--name", uuid,
+				imageName,
+			)
+		} else if mode == "process" {
+			cmd = exec.Command(
+				"go", "run", "container.go", fmt.Sprintf(":%d", containerPort),
+			)
+		}
 
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
@@ -103,7 +119,6 @@ func main() {
 		mu.Unlock()
 
 		// once container is ready, we need to forward this /exec/start to the container
-		containerBaseURL := fmt.Sprintf("http://localhost:%d", containerPort)
 		rd := bufio.NewReader(stdout)
 		_, err = rd.ReadString('\n')
 		if err != nil {
@@ -222,12 +237,19 @@ func main() {
 			return
 		}
 
-		err := exec.Command("docker", "rm", "--force", uuid).Run()
-		if err != nil {
-			panic(err)
+		if mode == "docker" {
+			err := exec.Command("docker", "rm", "--force", uuid).Run()
+			if err != nil {
+				panic(err)
+			}
+			cmd.Cmd.Wait()
+		} else if mode == "process" {
+			skyhook.JsonPost(cmd.BaseURL, "/exit", nil, nil)
+			if err := cmd.Cmd.Wait(); err != nil {
+				panic(err)
+			}
 		}
 
-		cmd.Cmd.Wait()
 		log.Printf("[machine] container %s stopped", uuid)
 	})
 
