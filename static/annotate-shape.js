@@ -14,6 +14,8 @@ export default {
 			// list of keys for iteration over previously labeled items
 			keyList: null,
 			curIndex: 0,
+
+			keyupHandler: null,
 		};
 	},
 	created: function() {
@@ -34,6 +36,9 @@ export default {
 			this.params = params;
 			utils.request(this, 'GET', this.url, null, this.update);
 		});
+	},
+	unmounted: function() {
+		this.setKeyupHandler(null);
 	},
 	methods: {
 		update: function(response) {
@@ -112,6 +117,16 @@ export default {
 		saveParams: function() {
 			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
 		},
+		setKeyupHandler: function(handler) {
+			if(this.keyupHandler != null) {
+				this.$parent.$off('keyup', this.keyupHandler);
+				this.keyupHandler = null;
+			}
+			if(handler != null) {
+				this.keyupHandler = handler;
+				this.$parent.$on('keyup', this.keyupHandler);
+			}
+		},
 		render: function() {
 			let stage = new Konva.Stage({
 				container: this.$refs.layer,
@@ -122,7 +137,7 @@ export default {
 
 			let tr = new Konva.Transformer({
 				nodes: [],
-				rotationEnabled: false,
+				rotateEnabled: false,
 			});
 			layer.add(tr);
 
@@ -238,6 +253,22 @@ export default {
 					updateRect(pos.x, pos.y);
 					layer.batchDraw();
 				});
+
+				this.setKeyupHandler((e) => {
+					if(document.activeElement.tagName == 'INPUT') {
+						return;
+					}
+
+					// ESC key
+					if(e.keyCode === 27) {
+						if(curRect === null) {
+							return;
+						}
+						curRect.destroy();
+						curRect = null;
+						layer.draw();
+					}
+				});
 			} else if(this.params.Mode == 'line') {
 				let curLine = null;
 				let updateLine = (x, y) => {
@@ -282,6 +313,22 @@ export default {
 					var pos = stage.getPointerPosition();
 					updateLine(pos.x, pos.y);
 					layer.batchDraw();
+				});
+
+				this.setKeyupHandler((e) => {
+					if(document.activeElement.tagName == 'INPUT') {
+						return;
+					}
+
+					// ESC key
+					if(e.keyCode === 27) {
+						if(curLine === null) {
+							return;
+						}
+						curLine.destroy();
+						curLine = null;
+						layer.draw();
+					}
 				});
 			}
 		},

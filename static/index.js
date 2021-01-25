@@ -23,6 +23,9 @@ $(document).ready(function() {
 	$('body').keypress(function(e) {
 		app.$emit('keypress', e);
 	});
+	$('body').keyup(function(e) {
+		app.$emit('keyup', e);
+	});
 });
 
 const router = new VueRouter({
