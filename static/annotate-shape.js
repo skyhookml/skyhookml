@@ -3,7 +3,10 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
+			// annoset.DataType can be shape, but can also be detection
 			annoset: null,
+			dataType: null,
+
 			params: null,
 			url: '',
 
@@ -25,6 +28,7 @@ export default {
 		const setID = this.$route.params.setid;
 		utils.request(this, 'GET', '/annotate-datasets/'+setID, null, (annoset) => {
 			this.annoset = annoset;
+			this.dataType = annoset.Dataset.DataType;
 			this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
 			let params;
 			try {
@@ -68,9 +72,7 @@ export default {
 						if(data.length == 0) {
 							return;
 						}
-						let shapes = data[0];
-						shapes.forEach((shp) => this.addShapeMetadataAttributes(shp));
-						this.shapes = shapes;
+						this.shapes = data[0].map((shp) => this.decodeShape(shp));
 
 						// update if we already rendered before setting shapes
 						if(this.imageMeta != null) {
@@ -80,19 +82,30 @@ export default {
 				}
 			});
 		},
-		addShapeMetadataAttributes: function(shape) {
-			if(!shape.hasOwnProperty('Category')) {
-				shape.Category = '';
+		decodeShape: function(shape) {
+			let shp = {};
+			if(this.dataType === 'shape') {
+				shp.Type = shape.Type;
+				shp.Points = shape.Points;
+			} else if(this.dataType === 'detection') {
+				shp.Type = 'box';
+				shp.Points = [[shape.Left, shape.Top], [shape.Right, shape.Bottom]];
 			}
-			if(!shape.hasOwnProperty('TrackID')) {
-				shape.TrackID = '';
-			}
+			shp.Category = (shape.Category) ? shape.Category : '';
+			shp.TrackID = (shape.TrackID) ? shape.TrackID : '';
+			return shp;
 		},
-		encodableShape: function(shape) {
-			let shp = {
-				'Type': shape.Type,
-				'Points': shape.Points,
-			};
+		encodeShape: function(shape) {
+			let shp = {};
+			if(this.dataType === 'shape') {
+				shp.Type = shape.Type;
+				shp.Points = shape.Points;
+			} else if(this.dataType === 'detection') {
+				shp.Left = shape.Points[0][0];
+				shp.Top = shape.Points[0][1];
+				shp.Right = shape.Points[1][0];
+				shp.Bottom = shape.Points[1][1];
+			}
 			if(shape.Category !== '') {
 				shp.Category = shape.Category;
 			}
@@ -131,7 +144,7 @@ export default {
 			utils.request(this, 'GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
 		},
 		annotate: function() {
-			let shapes = this.shapes.map((shape) => this.encodableShape(shape));
+			let shapes = this.shapes.map((shape) => this.encodeShape(shape));
 			let request = {
 				Key: this.response.Key,
 				Data: JSON.stringify([shapes]),
@@ -297,8 +310,9 @@ export default {
 								[parseInt(curRect.x()), parseInt(curRect.y())],
 								[parseInt(curRect.x()+curRect.width()), parseInt(curRect.y()+curRect.height())],
 							],
+							Category: '',
+							TrackID: '',
 						};
-						this.addShapeMetadataAttributes(shape);
 						this.shapes.push(shape);
 						drawShape(shape, this.shapes.length-1);
 
@@ -374,8 +388,9 @@ export default {
 								[parseInt(pts[0]), parseInt(pts[1])],
 								[parseInt(pts[2]), parseInt(pts[3])],
 							],
+							Category: '',
+							TrackID: '',
 						};
-						this.addShapeMetadataAttributes(shape);
 						this.shapes.push(shape);
 						drawShape(shape, this.shapes.length-1);
 
