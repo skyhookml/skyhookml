@@ -7,6 +7,7 @@ import (
 
 type DetectionMetadata struct {
 	CanvasDims [2]int
+	Categories []string `json:",omitempty"`
 }
 
 type Detection struct {
@@ -14,6 +15,11 @@ type Detection struct {
 	Top int
 	Right int
 	Bottom int
+
+	// Optional metadata
+	Category string `json:",omitempty"`
+	TrackID int `json:",omitempty"`
+	Metadata map[string]string `json:",omitempty"`
 }
 
 type DetectionData struct {

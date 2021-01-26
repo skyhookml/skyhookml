@@ -136,6 +136,20 @@ func (s *DBAnnotateDataset) SampleMissingKey() string {
 	return keyList[rand.Intn(len(keyList))]
 }
 
+type AnnotateDatasetUpdate struct {
+	Tool *string
+	Params *string
+}
+
+func (s *DBAnnotateDataset) Update(req AnnotateDatasetUpdate) {
+	if req.Tool != nil {
+		db.Exec("UPDATE annotate_datasets SET tool = ? WHERE id = ?", *req.Tool, s.ID)
+	}
+	if req.Params != nil {
+		db.Exec("UPDATE annotate_datasets SET params = ? WHERE id = ?", *req.Params, s.ID)
+	}
+}
+
 const ItemQuery = "SELECT k, ext, format, metadata, provider, provider_info FROM items"
 
 func itemListHelper(rows *Rows) []*DBItem {

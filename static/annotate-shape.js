@@ -11,6 +11,9 @@ export default {
 			imageMeta: null,
 			shapes: [],
 
+			// index of currently selected shape, if any
+			selectedIdx: null,
+
 			// list of keys for iteration over previously labeled items
 			keyList: null,
 			curIndex: 0,
@@ -33,6 +36,12 @@ export default {
 			if(!params.Mode) {
 				params.Mode = 'box';
 			}
+			if(!params.Categories) {
+				params.Categories = [];
+				params.CategoriesStr = '';
+			} else {
+				params.CategoriesStr = params.Categories.join(',');
+			}
 			this.params = params;
 			utils.request(this, 'GET', this.url, null, this.update);
 		});
@@ -48,6 +57,7 @@ export default {
 			Vue.nextTick(() => {
 				this.response = response;
 				this.shapes = [];
+				this.selectedIdx = null;
 
 				if(this.response.IsExisting) {
 					let params = {
@@ -58,7 +68,9 @@ export default {
 						if(data.length == 0) {
 							return;
 						}
-						this.shapes = data[0];
+						let shapes = data[0];
+						shapes.forEach((shp) => this.addShapeMetadataAttributes(shp));
+						this.shapes = shapes;
 
 						// update if we already rendered before setting shapes
 						if(this.imageMeta != null) {
@@ -67,6 +79,27 @@ export default {
 					});
 				}
 			});
+		},
+		addShapeMetadataAttributes: function(shape) {
+			if(!shape.hasOwnProperty('Category')) {
+				shape.Category = '';
+			}
+			if(!shape.hasOwnProperty('TrackID')) {
+				shape.TrackID = '';
+			}
+		},
+		encodableShape: function(shape) {
+			let shp = {
+				'Type': shape.Type,
+				'Points': shape.Points,
+			};
+			if(shape.Category !== '') {
+				shp.Category = shape.Category;
+			}
+			if(shape.TrackID !== '') {
+				shp.TrackID = parseInt(shape.TrackID);
+			}
+			return shp;
 		},
 		imageLoaded: function() {
 			this.imageMeta = {
@@ -98,9 +131,10 @@ export default {
 			utils.request(this, 'GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
 		},
 		annotate: function() {
-			var request = {
+			let shapes = this.shapes.map((shape) => this.encodableShape(shape));
+			let request = {
 				Key: this.response.Key,
-				Data: JSON.stringify([this.shapes]),
+				Data: JSON.stringify([shapes]),
 				Format: 'json',
 				Metadata: JSON.stringify({
 					CanvasDims: [this.imageMeta.Width, this.imageMeta.Height],
@@ -114,8 +148,18 @@ export default {
 				}
 			});
 		},
+		updateCategories: function() {
+			if(this.params.CategoriesStr == '') {
+				this.params.Categories = [];
+			} else {
+				this.params.Categories = this.params.CategoriesStr.split(',');
+			}
+		},
 		saveParams: function() {
-			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
+			let request = {
+				Params: JSON.stringify(this.params),
+			};
+			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, JSON.stringify(request));
 		},
 		setKeyupHandler: function(handler) {
 			if(this.keyupHandler != null) {
@@ -141,9 +185,13 @@ export default {
 			});
 			layer.add(tr);
 
-			let drawShape = (shape) => {
+			let konvaShapes = [];
+
+			let drawShape = (shape, idx) => {
+				let kshp = null;
+
 				if(shape.Type == 'box') {
-					let rect = new Konva.Rect({
+					kshp = new Konva.Rect({
 						x: shape.Points[0][0],
 						y: shape.Points[0][1],
 						width: shape.Points[1][0]-shape.Points[0][0],
@@ -152,49 +200,57 @@ export default {
 						strokeWidth: 3,
 						draggable: true,
 					});
-					layer.add(rect);
 
 					let updateShape = () => {
 						shape.Points = [
-							[parseInt(rect.x()), parseInt(rect.y())],
-							[parseInt(rect.x() + rect.width()*rect.scaleX()), parseInt(rect.y() + rect.height()*rect.scaleY())],
+							[parseInt(kshp.x()), parseInt(kshp.y())],
+							[parseInt(kshp.x() + kshp.width()*kshp.scaleX()), parseInt(kshp.y() + kshp.height()*kshp.scaleY())],
 						];
 					};
 
-					rect.on('click', (e) => {
+					kshp.on('click', (e) => {
 						e.cancelBubble = true;
 
 						// select this rect in the transformer
-						tr.nodes([rect]);
+						tr.nodes([kshp]);
 						layer.draw();
+
+						this.selectedIdx = idx;
 					});
 
-					rect.on('transformend', updateShape);
-					rect.on('dragend', updateShape);
+					kshp.on('transformend', updateShape);
+					kshp.on('dragend', updateShape);
 				} else if(shape.Type == 'line') {
-					let line = new Konva.Line({
+					let kshp = new Konva.Line({
 						points: [shape.Points[0][0], shape.Points[0][1], shape.Points[1][0], shape.Points[1][1]],
 						stroke: 'red',
 						strokeWidth: 3,
 						draggable: true,
 					});
-					layer.add(line);
 
 					let updateShape = () => {
-						let pts = line.points();
+						let pts = kshp.points();
 						shape.Points = [
-							[parseInt(line.x()+pts[0]), parseInt(line.y()+pts[1])],
-							[parseInt(line.x()+pts[2]), parseInt(line.y()+pts[3])],
+							[parseInt(kshp.x()+pts[0]), parseInt(kshp.y()+pts[1])],
+							[parseInt(kshp.x()+pts[2]), parseInt(kshp.y()+pts[3])],
 						];
 					};
 
-					line.on('dragend', updateShape);
+					kshp.on('click', (e) => {
+						e.cancelBubble = true;
+						this.selectedIdx = idx;
+					});
+
+					kshp.on('dragend', updateShape);
 				}
+
+				layer.add(kshp);
+				konvaShapes.push(kshp);
 			};
 
 			// add already existing shapes
-			this.shapes.forEach((shape) => {
-				drawShape(shape);
+			this.shapes.forEach((shape, idx) => {
+				drawShape(shape, idx);
 			});
 
 			stage.add(layer);
@@ -212,7 +268,12 @@ export default {
 					curRect.height(height);
 				};
 				stage.on('click', () => {
-					tr.nodes([]);
+					if(tr.nodes().length > 0) {
+						tr.nodes([]);
+						this.selectedIdx = null;
+						layer.draw();
+						return;
+					}
 
 					var pos = stage.getPointerPosition();
 					if(curRect == null) {
@@ -237,8 +298,9 @@ export default {
 								[parseInt(curRect.x()+curRect.width()), parseInt(curRect.y()+curRect.height())],
 							],
 						};
+						this.addShapeMetadataAttributes(shape);
 						this.shapes.push(shape);
-						drawShape(shape);
+						drawShape(shape, this.shapes.length-1);
 
 						curRect.destroy();
 						curRect = null;
@@ -259,13 +321,23 @@ export default {
 						return;
 					}
 
-					// ESC key
-					if(e.keyCode === 27) {
+					if(e.key === 'Escape') {
 						if(curRect === null) {
 							return;
 						}
 						curRect.destroy();
 						curRect = null;
+						layer.draw();
+					} else if(e.key === 'Delete') {
+						if(this.selectedIdx === null) {
+							return;
+						}
+						this.shapes.splice(this.selectedIdx, 1);
+						let kshp = konvaShapes[this.selectedIdx];
+						konvaShapes.splice(this.selectedIdx, 1);
+						kshp.destroy();
+						tr.nodes([]);
+						this.selectedIdx = null;
 						layer.draw();
 					}
 				});
@@ -276,7 +348,12 @@ export default {
 					curLine.points([pts[0], pts[1], x, y]);
 				};
 				stage.on('click', () => {
-					tr.nodes([]);
+					if(tr.nodes().length > 0) {
+						tr.nodes([]);
+						this.selectedIdx = null;
+						layer.draw();
+						return;
+					}
 
 					var pos = stage.getPointerPosition();
 					if(curLine == null) {
@@ -298,8 +375,9 @@ export default {
 								[parseInt(pts[2]), parseInt(pts[3])],
 							],
 						};
+						this.addShapeMetadataAttributes(shape);
 						this.shapes.push(shape);
-						drawShape(shape);
+						drawShape(shape, this.shapes.length-1);
 
 						curLine.destroy();
 						curLine = null;
@@ -320,13 +398,23 @@ export default {
 						return;
 					}
 
-					// ESC key
-					if(e.keyCode === 27) {
+					if(e.key === 'Escape') {
 						if(curLine === null) {
 							return;
 						}
 						curLine.destroy();
 						curLine = null;
+						layer.draw();
+					} else if(e.key === 'Delete') {
+						if(this.selectedIdx === null) {
+							return;
+						}
+						this.shapes.splice(this.selectedIdx, 1);
+						let kshp = konvaShapes[this.selectedIdx];
+						konvaShapes.splice(this.selectedIdx, 1);
+						kshp.destroy();
+						tr.nodes([]);
+						this.selectedIdx = null;
 						layer.draw();
 					}
 				});
@@ -346,6 +434,9 @@ export default {
 					<option value="polygon">Polygon</option>
 				</select>
 
+				<label class="my-1 mx-1">Categories (comma-separated)</label>
+				<input class="form-control my-1 mx-1" type="text" v-model="params.CategoriesStr" @change="updateCategories">
+
 				<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
 			</form>
 		</div>
@@ -360,6 +451,29 @@ export default {
 					height: imageMeta.Height+'px',
 				}"
 				>
+			</div>
+		</div>
+
+		<div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes.length">
+			<p><strong>Selection: {{ shapes[selectedIdx].Type }} ({{ shapes[selectedIdx].Points }})</strong></p>
+			<div class="small-container">
+				<div class="form-group row">
+					<label class="col-sm-2 col-form-label">Category</label>
+					<div class="col-sm-10">
+						<select class="form-control" v-model="shapes[selectedIdx].Category">
+							<option :key="''" value="">None</option>
+							<template v-for="category in params.Categories">
+								<option :key="category" :value="category">{{ category }}</option>
+							</template>
+						</select>
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="col-sm-2 col-form-label">Track ID</label>
+					<div class="col-sm-10">
+						<input type="text" class="form-control" v-model="shapes[selectedIdx].TrackID" />
+					</div>
+				</div>
 			</div>
 		</div>
 

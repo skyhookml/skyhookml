@@ -7,18 +7,24 @@ import (
 
 type ShapeMetadata struct {
 	CanvasDims [2]int
+	Categories []string `json:",omitempty"`
 }
 
 type Shape struct {
 	Type string
 	Points [][2]int
+
+	// Optional metadata
+	Category string `json:",omitempty"`
+	TrackID int `json:",omitempty"`
+	Metadata map[string]string `json:",omitempty"`
 }
 
 func (shp Shape) Bounds() [4]int {
 	sx := shp.Points[0][0]
 	sy := shp.Points[0][1]
-	ex := shp.Points[1][0]
-	ey := shp.Points[1][1]
+	ex := shp.Points[0][0]
+	ey := shp.Points[0][1]
 	for _, p := range shp.Points {
 		if p[0] < sx {
 			sx = p[0]
