@@ -3,6 +3,9 @@ function request(comp, method, endpoint, params, successFunc, completeFunc, opts
 		type: method,
 		url: endpoint,
 		error: function(req, status, errorMsg) {
+			if(!comp) {
+				return;
+			}
 			if(comp.setError) {
 				comp.setError(errorMsg);
 			} else {

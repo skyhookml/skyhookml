@@ -23,6 +23,19 @@ const (
 	StringType = "string"
 )
 
+var DataTypes = map[string]DataType{
+	"Image": ImageType,
+	"Video": VideoType,
+	"Detection": DetectionType,
+	"Track": TrackType,
+	"Shape": ShapeType,
+	"Int": IntType,
+	"Floats": FloatsType,
+	"Image List": ImListType,
+	"Text": TextType,
+	"String": StringType,
+}
+
 func EncodeTypes(types []DataType) string {
 	strs := make([]string, len(types))
 	for i, t := range types {

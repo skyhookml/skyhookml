@@ -1,6 +1,8 @@
 package app
 
 import (
+	"../skyhook"
+
 	"net/http"
 
 	"github.com/googollee/go-socket.io"
@@ -17,4 +19,8 @@ func init() {
 		w.Header().Set("Cache-Control", "no-cache")
 		fileServer.ServeHTTP(w, r)
 	})
+
+	Router.HandleFunc("/data-types", func(w http.ResponseWriter, r *http.Request) {
+		skyhook.JsonResponse(w, skyhook.DataTypes)
+	}).Methods("GET")
 }

@@ -57,16 +57,7 @@ const Datasets = {
 								<label class="col-sm-4 col-form-label">Data Type</label>
 								<div class="col-sm-8">
 									<select v-model="addDatasetForm.data_type" class="form-control">
-										<option value="image">Image</option>
-										<option value="video">Video</option>
-										<option value="detection">Detection</option>
-										<option value="track">Track</option>
-										<option value="shape">Shape</option>
-										<option value="int">Integer</option>
-										<option value="floats">Floats</option>
-										<option value="imlist">Image List</option>
-										<option value="text">Text</option>
-										<option value="string">String</option>
+										<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
 									</select>
 								</div>
 							</div>

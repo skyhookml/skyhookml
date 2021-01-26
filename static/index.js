@@ -19,15 +19,6 @@ import ExecPython from './exec-edit-python.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 import Compare from './compare.js';
 
-$(document).ready(function() {
-	$('body').keypress(function(e) {
-		app.$emit('keypress', e);
-	});
-	$('body').keyup(function(e) {
-		app.$emit('keyup', e);
-	});
-});
-
 const router = new VueRouter({
 	routes: [
 		{path: '/ws/:ws', component: Datasets},
@@ -53,74 +44,91 @@ const router = new VueRouter({
 	],
 });
 
-const app = new Vue({
-	el: '#app',
-	data: {
-		error: '',
-		selectedWorkspace: '',
-		workspaces: [],
-		addForms: null,
-	},
-	created: function() {
-		this.fetch();
-		this.resetForm();
-
-		if(this.$route.params.ws) {
-			this.selectedWorkspace = this.$route.params.ws;
-		}
-	},
-	methods: {
-		fetch: function() {
-			utils.request(this, 'GET', '/workspaces', null, (data) => {
-				this.workspaces = data;
-			});
+const globals = {};
+Vue.prototype.$globals = globals;
+Promise.all([
+	utils.request(null, 'GET', '/data-types', null, (dataTypes) => {
+		globals.dataTypes = dataTypes;
+	}),
+]).then(() => {
+	const app = new Vue({
+		el: '#app',
+		data: {
+			error: '',
+			selectedWorkspace: '',
+			workspaces: [],
+			addForms: null,
 		},
-		resetForm: function() {
-			this.addForms = {
-				workspace: {
-					name: '',
-				},
-			};
-		},
-		setPage: function(name) {
-			if(!this.$route.params.ws) {
-				return;
-			}
-			this.$router.push('/ws/'+this.$route.params.ws+'/'+name);
-			this.setError('');
-		},
-		changedWorkspace: function() {
-			this.$router.push('/ws/'+this.selectedWorkspace);
+		created: function() {
+			this.fetch();
 			this.resetForm();
+
+			if(this.$route.params.ws) {
+				this.selectedWorkspace = this.$route.params.ws;
+			}
 		},
-		createWorkspace: function() {
-			let name = this.addForms.workspace.name;
-			utils.request(this, 'POST', '/workspaces', {name: name}, () => {
+		methods: {
+			fetch: function() {
+				utils.request(this, 'GET', '/workspaces', null, (data) => {
+					this.workspaces = data;
+				});
+			},
+			resetForm: function() {
+				this.addForms = {
+					workspace: {
+						name: '',
+					},
+				};
+			},
+			setPage: function(name) {
+				if(!this.$route.params.ws) {
+					return;
+				}
+				this.$router.push('/ws/'+this.$route.params.ws+'/'+name);
+				this.setError('');
+			},
+			changedWorkspace: function() {
+				this.$router.push('/ws/'+this.selectedWorkspace);
 				this.resetForm();
-				this.fetch();
-				this.$router.push('/ws/'+name);
-			});
+			},
+			createWorkspace: function() {
+				let name = this.addForms.workspace.name;
+				utils.request(this, 'POST', '/workspaces', {name: name}, () => {
+					this.resetForm();
+					this.fetch();
+					this.$router.push('/ws/'+name);
+				});
+			},
+			cloneWorkspace: function() {
+				let url = '/workspaces/'+this.$route.params.ws+'/clone';
+				var params = {
+					name: this.addForms.workspace.name,
+				};
+				utils.request(this, 'POST', url, params, () => {
+					this.resetForm();
+					this.fetch();
+					this.$router.push('/ws/'+params.name);
+				});
+			},
+			deleteWorkspace: function() {
+				utils.request(this, 'DELETE', '/workspaces/'+this.selectedWorkspace, null, () => {
+					this.fetch();
+					this.$router.push('/');
+				});
+			},
+			setError: function(error) {
+				this.error = error;
+			},
 		},
-		cloneWorkspace: function() {
-			let url = '/workspaces/'+this.$route.params.ws+'/clone';
-			var params = {
-				name: this.addForms.workspace.name,
-			};
-			utils.request(this, 'POST', url, params, () => {
-				this.resetForm();
-				this.fetch();
-				this.$router.push('/ws/'+params.name);
-			});
-		},
-		deleteWorkspace: function() {
-			utils.request(this, 'DELETE', '/workspaces/'+this.selectedWorkspace, null, () => {
-				this.fetch();
-				this.$router.push('/');
-			});
-		},
-		setError: function(error) {
-			this.error = error;
-		},
-	},
-	router: router,
+		router: router,
+	});
+
+	$(document).ready(function() {
+		$('body').keypress(function(e) {
+			app.$emit('keypress', e);
+		});
+		$('body').keyup(function(e) {
+			app.$emit('keyup', e);
+		});
+	});
 });
