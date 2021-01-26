@@ -6,6 +6,11 @@ const Annotate = {
 			annosets: [],
 			datasets: [],
 			addForm: {},
+
+			tools: [
+				{ID: "shape", Name: "Shapes and Detections"},
+				{ID: "int", Name: "Integers (e.g., classes, categories)"},
+			],
 		};
 	},
 	created: function() {
@@ -104,7 +109,9 @@ const Annotate = {
 							<div class="form-group row">
 								<label class="col-sm-4 col-form-label">Tool</label>
 								<div class="col-sm-8">
-									<input class="form-control" type="text" v-model="addForm.tool" />
+									<select v-model="addForm.tool" class="form-control">
+										<option v-for="toolObj in tools" :value="toolObj.ID">{{ toolObj.Name }}</option>
+									</select>
 								</div>
 							</div>
 							<div class="form-group row">
