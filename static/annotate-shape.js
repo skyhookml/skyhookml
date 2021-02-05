@@ -4,22 +4,36 @@ export default {
 	data: function() {
 		return {
 			// annoset.DataType can be shape, but can also be detection
+			// the source data type can be image or video
 			annoset: null,
 			dataType: null,
-
-			params: null,
+			source: null,
+			sourceType: null,
 			url: '',
 
-			response: null,
+			// config for this annotation tool
+			params: null,
+
+			// dimensions of currently loaded image
 			imageMeta: null,
-			shapes: [],
+
+			// the item metadata and annotation response for the current source item
+			itemMeta: null,
+			response: null,
+
+			// current frame index that we're looking at (always 0 for image source)
+			frameIdx: null,
+			numFrames: 0,
+
+			// shapes for current image sequence
+			shapes: null,
 
 			// index of currently selected shape, if any
 			selectedIdx: null,
 
 			// list of keys for iteration over previously labeled items
 			keyList: null,
-			curIndex: 0,
+			itemIdx: 0,
 
 			keyupHandler: null,
 		};
@@ -29,6 +43,8 @@ export default {
 		utils.request(this, 'GET', '/annotate-datasets/'+setID, null, (annoset) => {
 			this.annoset = annoset;
 			this.dataType = annoset.Dataset.DataType;
+			this.source = annoset.Inputs[0];
+			this.sourceType = this.source.DataType;
 			this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
 			let params;
 			try {
@@ -47,39 +63,75 @@ export default {
 				params.CategoriesStr = params.Categories.join(',');
 			}
 			this.params = params;
-			utils.request(this, 'GET', this.url, null, this.update);
+			this.update();
 		});
 	},
 	unmounted: function() {
 		this.setKeyupHandler(null);
 	},
 	methods: {
-		update: function(response) {
-			this.response = null;
+		resetFrame: function() {
 			this.imageMeta = null;
-
-			Vue.nextTick(() => {
-				this.response = response;
+			this.frameIdx = null;
+			this.selectedIdx = null;
+		},
+		resetItem: function() {
+			this.resetFrame();
+			this.itemMeta = null;
+			this.response = null;
+			this.numFrames = 0;
+		},
+		update: function() {
+			let url = this.url;
+			if(this.keyList != null) {
+				url += '?key='+this.keyList[this.itemIdx];
+			}
+			let response, itemMeta;
+			utils.request(this, 'GET', url, null, (data) => {
+				response = data;
+			}).then(() => {
+				return utils.request(this, 'GET', '/datasets/'+this.source.ID+'/items/'+response.Key+'/get?format=meta', null, (data) => {
+					itemMeta = data;
+				});
+			}).then(() => {
+				this.resetItem();
+				this.itemMeta = itemMeta;
 				this.shapes = [];
-				this.selectedIdx = null;
 
-				if(this.response.IsExisting) {
-					let params = {
-						format: 'json',
-						t: new Date().getTime(),
-					};
-					utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items/'+this.response.Key+'/get', params, (data) => {
-						if(data.length == 0) {
-							return;
-						}
-						this.shapes = data[0].map((shp) => this.decodeShape(shp));
-
-						// update if we already rendered before setting shapes
-						if(this.imageMeta != null) {
-							this.imageLoaded();
-						}
-					});
+				// initialize shapes for each frame
+				if(this.sourceType == 'image') {
+					this.numFrames = 1;
+				} else if(this.sourceType == 'video') {
+					this.numFrames = parseInt(this.itemMeta.Duration * this.itemMeta.Framerate[0] / this.itemMeta.Framerate[1]);
 				}
+				for(let i = 0; i < this.numFrames; i++) {
+					this.shapes.push([]);
+				}
+
+				Vue.nextTick(() => {
+					this.response = response;
+					this.frameIdx = 0;
+
+					if(this.response.IsExisting) {
+						let params = {
+							format: 'json',
+							t: new Date().getTime(),
+						};
+						utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items/'+this.response.Key+'/get', params, (data) => {
+							if(data.length == 0) {
+								return;
+							}
+							this.shapes = data.map((shapeList) => {
+								return shapeList.map((shp) => this.decodeShape(shp));
+							});
+
+							// update if we already rendered before setting shapes
+							if(this.imageMeta != null) {
+								this.imageLoaded();
+							}
+						});
+					}
+				});
 			});
 		},
 		decodeShape: function(shape) {
@@ -123,31 +175,41 @@ export default {
 				this.render();
 			});
 		},
-		getNew: function() {
+		getNewItem: function() {
 			this.keyList = null;
-			this.curIndex = 0;
-			utils.request(this, 'GET', this.url, null, this.update);
+			this.itemIdx = 0;
+			this.update();
 		},
-		getOld: function(i) {
+		getOldItem: function(i) {
 			if(!this.keyList) {
 				utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
 					if(!items || items.length == 0) {
 						return;
 					}
 					this.keyList = items.map((item) => item.Key);
-					this.getOld(0);
+					this.getOldItem(0);
 				});
 				return;
 			}
 
-			this.curIndex = (i + this.keyList.length) % this.keyList.length;
-			utils.request(this, 'GET', this.url+'?key='+this.keyList[this.curIndex], null, this.update);
+			this.itemIdx = (i + this.keyList.length) % this.keyList.length;
+			this.update();
 		},
-		annotate: function() {
-			let shapes = this.shapes.map((shape) => this.encodeShape(shape));
+		getFrame: function(i) {
+			this.resetFrame();
+			// wait until next tick so that the <img> will be deleted
+			// this ensures the onload will correctly call imageLoaded to populate imageMeta
+			Vue.nextTick(() => {
+				this.frameIdx = (i + this.numFrames) % this.numFrames;
+			});
+		},
+		annotateItem: function() {
+			let shapes = this.shapes.map((shapeList) => {
+				return shapeList.map((shape) => this.encodeShape(shape))
+			});
 			let request = {
 				Key: this.response.Key,
-				Data: JSON.stringify([shapes]),
+				Data: JSON.stringify(shapes),
 				Format: 'json',
 				Metadata: JSON.stringify({
 					CanvasDims: [this.imageMeta.Width, this.imageMeta.Height],
@@ -155,9 +217,9 @@ export default {
 			};
 			utils.request(this, 'POST', this.url, JSON.stringify(request), () => {
 				if(this.keyList == null) {
-					this.getNew();
+					this.getNewItem();
 				} else {
-					this.getOld(this.curIndex+1);
+					this.getOldItem(this.itemIdx+1);
 				}
 			});
 		},
@@ -262,7 +324,7 @@ export default {
 			};
 
 			// add already existing shapes
-			this.shapes.forEach((shape, idx) => {
+			this.shapes[this.frameIdx].forEach((shape, idx) => {
 				drawShape(shape, idx);
 			});
 
@@ -313,8 +375,8 @@ export default {
 							Category: '',
 							TrackID: '',
 						};
-						this.shapes.push(shape);
-						drawShape(shape, this.shapes.length-1);
+						this.shapes[this.frameIdx].push(shape);
+						drawShape(shape, this.shapes[this.frameIdx].length-1);
 
 						curRect.destroy();
 						curRect = null;
@@ -346,7 +408,7 @@ export default {
 						if(this.selectedIdx === null) {
 							return;
 						}
-						this.shapes.splice(this.selectedIdx, 1);
+						this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
 						let kshp = konvaShapes[this.selectedIdx];
 						konvaShapes.splice(this.selectedIdx, 1);
 						kshp.destroy();
@@ -391,8 +453,8 @@ export default {
 							Category: '',
 							TrackID: '',
 						};
-						this.shapes.push(shape);
-						drawShape(shape, this.shapes.length-1);
+						this.shapes[this.frameIdx].push(shape);
+						drawShape(shape, this.shapes[this.frameIdx].length-1);
 
 						curLine.destroy();
 						curLine = null;
@@ -424,7 +486,7 @@ export default {
 						if(this.selectedIdx === null) {
 							return;
 						}
-						this.shapes.splice(this.selectedIdx, 1);
+						this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
 						let kshp = konvaShapes[this.selectedIdx];
 						konvaShapes.splice(this.selectedIdx, 1);
 						kshp.destroy();
@@ -455,8 +517,37 @@ export default {
 				<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
 			</form>
 		</div>
+
+		<div class="form-row align-items-center">
+			<div class="col-auto">
+				<button v-on:click="getOldItem(itemIdx-1)" type="button" class="btn btn-primary">Prev</button>
+			</div>
+			<div class="col-auto">
+				<template v-if="response != null">
+					<span>{{ response.Key }}</span>
+					<span v-if="keyList != null">({{ itemIdx }} of {{ keyList.length }})</span>
+				</template>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getOldItem(itemIdx+1)" type="button" class="btn btn-primary">Next</button>
+			</div>
+			<div class="col-auto">
+				<button v-on:click="getNewItem" type="button" class="btn btn-primary">New</button>
+			</div>
+			<div class="col-auto" v-if="response != null">
+				<button type="button" class="btn btn-primary" v-on:click="annotateItem">Done</button>
+			</div>
+		</div>
+
 		<div class="canvas-container">
-			<img v-if="response != null" :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
+			<template v-if="frameIdx != null">
+				<template v-if="sourceType == 'video'">
+					<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get-video-frame?idx='+frameIdx" @load="imageLoaded" ref="image" />
+				</template>
+				<template v-else>
+					<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
+				</template>
+			</template>
 			<div
 				v-if="imageMeta != null"
 				class="conva"
@@ -469,13 +560,13 @@ export default {
 			</div>
 		</div>
 
-		<div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes.length">
-			<p><strong>Selection: {{ shapes[selectedIdx].Type }} ({{ shapes[selectedIdx].Points }})</strong></p>
+		<div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes[frameIdx].length">
+			<p><strong>Selection: {{ shapes[frameIdx][selectedIdx].Type }} ({{ shapes[frameIdx][selectedIdx].Points }})</strong></p>
 			<div class="small-container">
 				<div class="form-group row">
 					<label class="col-sm-2 col-form-label">Category</label>
 					<div class="col-sm-10">
-						<select class="form-control" v-model="shapes[selectedIdx].Category">
+						<select class="form-control" v-model="shapes[frameIdx][selectedIdx].Category">
 							<option :key="''" value="">None</option>
 							<template v-for="category in params.Categories">
 								<option :key="category" :value="category">{{ category }}</option>
@@ -486,30 +577,23 @@ export default {
 				<div class="form-group row">
 					<label class="col-sm-2 col-form-label">Track ID</label>
 					<div class="col-sm-10">
-						<input type="text" class="form-control" v-model="shapes[selectedIdx].TrackID" />
+						<input type="text" class="form-control" v-model="shapes[frameIdx][selectedIdx].TrackID" />
 					</div>
 				</div>
 			</div>
 		</div>
 
-		<div class="form-row align-items-center">
+		<div v-if="sourceType == 'video'" class="form-row align-items-center">
 			<div class="col-auto">
-				<button v-on:click="getOld(curIndex-1)" type="button" class="btn btn-primary">Prev</button>
+				<button v-on:click="getFrame(frameIdx-1)" type="button" class="btn btn-primary">Prev Frame</button>
 			</div>
 			<div class="col-auto">
 				<template v-if="response != null">
-					<span>{{ response.key }}</span>
-					<span v-if="keyList != null">({{ curIndex }} of {{ keyList.length }})</span>
+					Frame {{ frameIdx }} / {{ numFrames }}
 				</template>
 			</div>
 			<div class="col-auto">
-				<button v-on:click="getOld(curIndex+1)" type="button" class="btn btn-primary">Next</button>
-			</div>
-			<div class="col-auto">
-				<button v-on:click="getNew" type="button" class="btn btn-primary">New</button>
-			</div>
-			<div class="col-auto" v-if="response != null">
-				<button type="button" class="btn btn-primary" v-on:click="annotate">Done</button>
+				<button v-on:click="getFrame(frameIdx+1)" type="button" class="btn btn-primary">Next Frame</button>
 			</div>
 		</div>
 	</template>

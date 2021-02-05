@@ -159,4 +159,41 @@ func init() {
 
 		item.Handle(format, w, r)
 	})
+
+	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}/get-video-frame", func(w http.ResponseWriter, r *http.Request) {
+		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
+		itemKey := mux.Vars(r)["item_key"]
+		r.ParseForm()
+		frameIdx := skyhook.ParseInt(r.Form.Get("idx"))
+
+		dataset := GetDataset(dsID)
+		if dataset == nil {
+			http.Error(w, "no such dataset", 404)
+			return
+		} else if dataset.DataType != skyhook.VideoType {
+			http.Error(w, "dataset is not video type", 404)
+			return
+		}
+		item := dataset.GetItem(itemKey)
+		if item == nil {
+			http.Error(w, "no matching item", 404)
+			return
+		}
+
+		item.Load()
+		data, err := item.LoadData()
+		if err != nil {
+			panic(err)
+		}
+		reader := data.(skyhook.VideoData).ReadSlice(frameIdx, frameIdx+1)
+		defer reader.Close()
+		imageData, err := reader.Read(1)
+		if err != nil {
+			panic(err)
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		if err := imageData.Encode("jpeg", w); err != nil {
+			panic(err)
+		}
+	})
 }

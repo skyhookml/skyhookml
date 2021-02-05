@@ -26,17 +26,40 @@ type FfmpegReader struct {
 	Buf []byte
 }
 
-func ReadFfmpeg(fname string, dims [2]int, rate [2]int) *FfmpegReader {
+// Read video file from fname with the given dimensions and framerate.
+// Start and length specify a range of frame indexes to read, but can be 0 to read the entire file.
+func ReadFfmpeg(fname string, dims [2]int, rate [2]int, start int, length int) *FfmpegReader {
 	log.Printf("[ffmpeg] from %s extract frames %dx%d", fname, dims[0], dims[1])
+
+	var args []string
+	args = append(args, []string{
+		"-threads", "2",
+	}...)
+	if start != 0 {
+		ts := start * rate[1] * 100 / rate[0]
+		tsStr := fmt.Sprintf("%d.%02d", ts/100, ts%100)
+		args = append(args, []string{
+			"-ss", tsStr,
+		}...)
+	}
+	args = append(args, []string{
+		"-i", fname,
+	}...)
+	if length != 0 {
+		args = append(args, []string{
+			"-vframes", fmt.Sprintf("%d", length),
+		}...)
+	}
+	args = append(args, []string{
+		"-c:v", "rawvideo", "-pix_fmt", "rgb24", "-f", "rawvideo",
+		"-vf", fmt.Sprintf("scale=%dx%d,fps=fps=%d/%d", dims[0], dims[1], rate[0], rate[1]),
+		"-",
+	}...)
 
 	cmd := Command(
 		"ffmpeg-read", CommandOptions{NoStdin: true, OnlyDebug: true},
 		"ffmpeg",
-		"-threads", "2",
-		"-i", fname,
-		"-c:v", "rawvideo", "-pix_fmt", "rgb24", "-f", "rawvideo",
-		"-vf", fmt.Sprintf("scale=%dx%d,fps=fps=%d/%d", dims[0], dims[1], rate[0], rate[1]),
-		"-",
+		args...,
 	)
 
 	return &FfmpegReader{

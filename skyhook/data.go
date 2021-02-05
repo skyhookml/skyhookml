@@ -134,6 +134,11 @@ type ReadableData interface {
 	Reader() DataReader
 }
 
+type RandomAccessData interface {
+	Data
+	ReadSlice(i, j int) DataReader
+}
+
 type DataReader interface {
 	Read(n int) (Data, error)
 	Close()

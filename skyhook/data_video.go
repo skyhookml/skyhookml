@@ -93,26 +93,58 @@ func (d VideoData) Reader() DataReader {
 	return d.Iterator()
 }
 
+func (d VideoData) ReadSlice(i, j int) DataReader {
+	return &VideoIterator{
+		Data: d,
+		start: i,
+		length: j-i,
+	}
+}
+
 // VideoIterator duals as a DataReader for video (producing ImageData chunks)
 type VideoIterator struct {
 	Data VideoData
 	rd *FfmpegReader
 	err error
+
+	start int
+	length int
 }
 
-func (it *VideoIterator) start() {
+func (it *VideoIterator) init() {
 	dims := it.Data.Metadata.Dims
 	rate := it.Data.Metadata.Framerate
 
 	if it.Data.Bytes != nil {
-		cmd := Command(
-			"ffmpeg-iter", CommandOptions{OnlyDebug: true},
-			"ffmpeg",
+		var args []string
+		args = append(args, []string{
 			"-threads", "2",
+		}...)
+		if it.start != 0 {
+			ts := it.start * rate[1] * 100 / rate[0]
+			tsStr := fmt.Sprintf("%d.%02d", ts/100, ts%100)
+			args = append(args, []string{
+				"-ss", tsStr,
+			}...)
+		}
+		args = append(args, []string{
 			"-f", "mp4", "-i", "-",
+		}...)
+		if it.length != 0 {
+			args = append(args, []string{
+				"-vframes", fmt.Sprintf("%d", it.length),
+			}...)
+		}
+		args = append(args, []string{
 			"-c:v", "rawvideo", "-pix_fmt", "rgb24", "-f", "rawvideo",
 			"-vf", fmt.Sprintf("scale=%dx%d,fps=fps=%d/%d", dims[0], dims[1], rate[0], rate[1]),
 			"-",
+		}...)
+
+		cmd := Command(
+			"ffmpeg-iter", CommandOptions{OnlyDebug: true},
+			"ffmpeg",
+			args...,
 		)
 
 		go func() {
@@ -129,13 +161,13 @@ func (it *VideoIterator) start() {
 			Buf: make([]byte, dims[0]*dims[1]*3),
 		}
 	} else {
-		it.rd = ReadFfmpeg(it.Data.Fname, dims, rate)
+		it.rd = ReadFfmpeg(it.Data.Fname, dims, rate, it.start, it.length)
 	}
 }
 
 func (it *VideoIterator) Get(n int) ([]Image, error) {
 	if it.rd == nil {
-		it.start()
+		it.init()
 	}
 
 	if it.err != nil {
