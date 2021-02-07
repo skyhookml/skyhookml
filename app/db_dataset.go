@@ -150,6 +150,10 @@ func (s *DBAnnotateDataset) Update(req AnnotateDatasetUpdate) {
 	}
 }
 
+func (s *DBAnnotateDataset) Delete() {
+	db.Exec("DELETE FROM annotate_datasets WHERE id = ?", s.ID)
+}
+
 const ItemQuery = "SELECT k, ext, format, metadata, provider, provider_info FROM items"
 
 func itemListHelper(rows *Rows) []*DBItem {

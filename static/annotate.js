@@ -48,7 +48,7 @@ const Annotate = {
 		formRemoveInput: function(i) {
 			this.addForm.inputs.splice(i, 1);
 		},
-		add: function() {
+		addAnnoset: function() {
 			var inputIDs = this.addForm.inputs.map((ds) => ds.ID);
 			let params = {
 				ds_id: this.addForm.dataset,
@@ -61,8 +61,13 @@ const Annotate = {
 				this.fetch(true);
 			});
 		},
-		select: function(annoset) {
+		selectAnnoset: function(annoset) {
 			this.$router.push('/ws/'+this.$route.params.ws+'/annotate/'+annoset.Tool+'/'+annoset.ID);
+		},
+		removeAnnoset: function(annoset) {
+			utils.request(this, 'DELETE', '/annotate-datasets/'+annoset.ID, null, () => {
+				this.fetch();
+			});
 		},
 	},
 	template: `
@@ -73,7 +78,7 @@ const Annotate = {
 			<div class="modal-dialog" role="document">
 				<div class="modal-content">
 					<div class="modal-body">
-						<form v-on:submit.prevent="add">
+						<form v-on:submit.prevent="addAnnoset">
 							<div class="form-group row">
 								<label class="col-sm-4 col-form-label">Dataset</label>
 								<div class="col-sm-8">
@@ -141,8 +146,8 @@ const Annotate = {
 				<td>{{ set.Tool }}</td>
 				<td>{{ set.Dataset.DataType }}</td>
 				<td>
-					<button v-on:click="select(set)" class="btn btn-primary">Annotate</button>
-					<!--<button v-on:click="deleteDataset(set.ID)" class="btn btn-danger">Delete</button>-->
+					<button v-on:click="selectAnnoset(set)" class="btn btn-primary">Annotate</button>
+					<button v-on:click="removeAnnoset(set)" class="btn btn-danger">Remove</button>
 				</td>
 			</tr>
 		</tbody>

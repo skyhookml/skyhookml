@@ -91,6 +91,16 @@ func init() {
 		annoset.Update(request)
 	}).Methods("POST")
 
+	Router.HandleFunc("/annotate-datasets/{s_id}", func(w http.ResponseWriter, r *http.Request) {
+		sID := skyhook.ParseInt(mux.Vars(r)["s_id"])
+		annoset := GetAnnotateDataset(sID)
+		if annoset == nil {
+			http.Error(w, "no such annotate dataset", 404)
+			return
+		}
+		annoset.Delete()
+	}).Methods("DELETE")
+
 	Router.HandleFunc("/annotate-datasets/{s_id}/annotate", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		sID := skyhook.ParseInt(mux.Vars(r)["s_id"])
