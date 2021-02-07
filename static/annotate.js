@@ -10,6 +10,7 @@ const Annotate = {
 			tools: [
 				{ID: "shape", Name: "Shapes and Detections"},
 				{ID: "int", Name: "Integers (e.g., classes, categories)"},
+				{ID: "detection-to-track", Name: "Group Detections into Tracks"},
 			],
 		};
 	},
