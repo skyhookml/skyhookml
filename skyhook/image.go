@@ -179,6 +179,17 @@ func (im Image) DrawImage(left int, top int, other Image) {
 	}
 }
 
+// Resize using simple nearest-neighbor method.
+func (im Image) Resize(width int, height int) Image {
+	other := NewImage(width, height)
+	for i := 0; i < width; i++ {
+		for j := 0; j < height; j++ {
+			other.SetRGB(i, j, im.GetRGB(i*im.Width/width, j*im.Height/height))
+		}
+	}
+	return other
+}
+
 type RichText struct {
 	Text string
 	X int

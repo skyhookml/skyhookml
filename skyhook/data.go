@@ -14,7 +14,6 @@ const (
 	ImageType DataType = "image"
 	VideoType = "video"
 	DetectionType = "detection"
-	TrackType = "track"
 	ShapeType = "shape"
 	IntType = "int"
 	FloatsType = "floats"
@@ -27,7 +26,6 @@ var DataTypes = map[string]DataType{
 	"Image": ImageType,
 	"Video": VideoType,
 	"Detection": DetectionType,
-	"Track": TrackType,
 	"Shape": ShapeType,
 	"Int": IntType,
 	"Floats": FloatsType,

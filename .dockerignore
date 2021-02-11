@@ -3,4 +3,5 @@ models
 **/*.sqlite3
 **/__pycache__
 docker
+lib
 files

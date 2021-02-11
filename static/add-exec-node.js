@@ -18,6 +18,18 @@ export default {
 							Description: "Filter",
 							DataTypes: ["int"],
 						},
+						{
+							ID: "detection_filter",
+							Name: "Detection Filter",
+							Description: "Detection Filter",
+							DataTypes: ["detection"],
+						},
+						{
+							ID: "simple_tracker",
+							Name: "Simple Tracker",
+							Description: "Simple Tracker",
+							DataTypes: ["detection"],
+						},
 					],
 				},
 				{

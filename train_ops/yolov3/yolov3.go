@@ -6,6 +6,7 @@ import (
 
 	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -14,13 +15,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Params struct {
 	InputSize [2]int
 	ConfigPath string
-	ModelPath string
-	MetaPath string
 
 	ImageDatasetID int
 	DetectionDatasetID int
@@ -34,27 +34,11 @@ func (p Params) GetConfigPath() string {
 	}
 }
 
-func (p Params) GetModelPath() string {
-	if p.ModelPath == "" {
-		return "yolov3.weights"
-	} else {
-		return p.ModelPath
-	}
-}
-
-func (p Params) GetMetaPath() string {
-	if p.MetaPath == "" {
-		return "cfg/coco.data"
-	} else {
-		return p.MetaPath
-	}
-}
-
 func CreateParams(fname string, p Params, training bool) {
 	// prepare configuration with this width/height
 	configPath := p.GetConfigPath()
 	if !filepath.IsAbs(configPath) {
-		configPath = filepath.Join("darknet/", configPath)
+		configPath = filepath.Join("lib/darknet/", configPath)
 	}
 	bytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -96,9 +80,6 @@ func Train(url string, node skyhook.TrainNode) error {
 	if err := os.Mkdir(trainPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", trainPath, err)
 	}
-	/*defer func() {
-		os.RemoveAll(trainPath)
-	}()*/
 
 	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", node.ID))
 	if err := os.Mkdir(exportPath, 0755); err != nil {
@@ -241,7 +222,7 @@ backup=%s
 		filepath.Join(trainPath, "yolov3.cfg"),
 		"darknet53.conv.74",
 	)
-	cmd.Dir = "darknet/"
+	cmd.Dir = "lib/darknet/"
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -303,7 +284,114 @@ backup=%s
 }
 
 func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	var params Params
+	skyhook.JsonUnmarshal([]byte(trainNode.Params), &params)
+
+	batchSize := 8
+
+	cmd := skyhook.Command(
+		fmt.Sprintf("yolov3-exec-%s", execNode.Name), skyhook.CommandOptions{},
+		"python3", "train_ops/yolov3/run.py",
+		fmt.Sprintf("%d", trainNode.ID),
+		fmt.Sprintf("%d", batchSize),
+		fmt.Sprintf("%d", params.InputSize[0]), fmt.Sprintf("%d", params.InputSize[1]),
+	)
+
+	return &Yolov3{
+		URL: url,
+		Dataset: outputDatasets[0],
+		cmd: cmd,
+		stdin: cmd.Stdin(),
+		rd: bufio.NewReader(cmd.Stdout()),
+		batchSize: batchSize,
+		dims: params.InputSize,
+	}, nil
+}
+
+type Yolov3 struct {
+	URL string
+	Dataset skyhook.Dataset
+
+	mu sync.Mutex
+	cmd *skyhook.Cmd
+	stdin io.WriteCloser
+	rd *bufio.Reader
+	batchSize int
+	dims [2]int
+}
+
+func (e *Yolov3) Parallelism() int {
+	return 1
+}
+
+func (e *Yolov3) Apply(task skyhook.ExecTask) error {
+	data, err := task.Items[0].LoadData()
+	if err != nil {
+		return err
+	}
+	reader := data.(skyhook.ReadableData).Reader()
+	defer reader.Close()
+	var detections [][]skyhook.Detection
+	zeroImage := skyhook.NewImage(e.dims[0], e.dims[1])
+	for {
+		imageData, err := reader.Read(e.batchSize)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		images := imageData.(skyhook.ImageData).Images
+
+		e.mu.Lock()
+		// write this batch of images
+		for _, im := range images {
+			if im.Width != e.dims[0] || im.Height != e.dims[1] {
+				im = im.Resize(e.dims[0], e.dims[1])
+			}
+			e.stdin.Write(im.Bytes)
+		}
+		for i := len(images); i < e.batchSize; i++ {
+			e.stdin.Write(zeroImage.Bytes)
+		}
+
+		// read the output detections for the batch
+		signature := "json"
+		var line string
+		for {
+			line, err = e.rd.ReadString('\n')
+			if err != nil || strings.Contains(line, signature) {
+				break
+			}
+		}
+		e.mu.Unlock()
+
+		if err != nil {
+			return fmt.Errorf("error reading from yolov3 script: %v", err)
+		}
+
+		line = strings.TrimSpace(line[len(signature):])
+		var batchDetections [][]skyhook.Detection
+		skyhook.JsonUnmarshal([]byte(line), &batchDetections)
+		detections = append(detections, batchDetections...)
+	}
+
+	output := skyhook.DetectionData{
+		Detections: detections,
+		Metadata: skyhook.DetectionMetadata{
+			CanvasDims: e.dims,
+		},
+	}
+	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
+}
+
+func (e *Yolov3) Close() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.stdin.Close()
+	if e.cmd != nil {
+		e.cmd.Wait()
+		e.cmd = nil
+	}
 }
 
 func init() {
@@ -313,5 +401,8 @@ func init() {
 		},
 		Train: Train,
 		Prepare: Prepare,
+		ImageName: func(url string, node skyhook.TrainNode) (string, error) {
+			return "skyhookml/yolov3", nil
+		},
 	}
 }

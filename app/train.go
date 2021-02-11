@@ -28,7 +28,7 @@ func (node *DBTrainNode) Run(force bool) error {
 	}
 
 
-	log.Printf("[train-node %s] [run] acquiring worker", node.Name)
+	log.Printf("[train-node %s] [run] acquiring worker (hash=%v)", node.Name, nodeHash)
 	workerURL := AcquireWorker()
 	log.Printf("[train-node %s] [run] ... acquired worker at %s", node.Name, workerURL)
 	defer ReleaseWorker(workerURL)

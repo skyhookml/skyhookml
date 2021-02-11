@@ -11,6 +11,29 @@ import (
 	"strconv"
 )
 
+var Colors = [][3]uint8{
+	[3]uint8{255, 0, 0},
+	[3]uint8{0, 255, 0},
+	[3]uint8{0, 0, 255},
+	[3]uint8{255, 255, 0},
+	[3]uint8{0, 255, 255},
+	[3]uint8{255, 0, 255},
+	[3]uint8{0, 51, 51},
+	[3]uint8{51, 153, 153},
+	[3]uint8{102, 0, 51},
+	[3]uint8{102, 51, 204},
+	[3]uint8{102, 153, 204},
+	[3]uint8{102, 255, 204},
+	[3]uint8{153, 102, 102},
+	[3]uint8{204, 102, 51},
+	[3]uint8{204, 255, 102},
+	[3]uint8{255, 255, 204},
+	[3]uint8{121, 125, 127},
+	[3]uint8{69, 179, 157},
+	[3]uint8{250, 215, 160},
+}
+
+
 type Render struct {
 	URL string
 	Node skyhook.ExecNode
@@ -38,9 +61,16 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 				}
 			}
 		} else if data.Type() == skyhook.DetectionType {
-			detections := data.(skyhook.DetectionData).Detections[0]
+			detectionData := data.(skyhook.DetectionData)
+			detections := detectionData.Detections[0]
+			detectionDims := detectionData.Metadata.CanvasDims
+			targetDims := [2]int{canvas.Width, canvas.Height}
 			for _, d := range detections {
-				canvas.DrawRectangle(d.Left, d.Top, d.Right, d.Bottom, 2, [3]uint8{255, 0, 0})
+				if detectionDims[0] != 0 && detectionDims != targetDims {
+					d = d.Rescale(detectionDims, targetDims)
+				}
+				color := Colors[d.TrackID % len(Colors)]
+				canvas.DrawRectangle(d.Left, d.Top, d.Right, d.Bottom, 2, color)
 			}
 		}
 	}

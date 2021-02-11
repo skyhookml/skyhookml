@@ -8,8 +8,6 @@ export default {
 				inputWidth: '',
 				inputHeight: '',
 				configPath: '',
-				modelPath: '',
-				metaPath: '',
 				imageDatasetID: '',
 				detectionDatasetID: '',
 			},
@@ -33,12 +31,6 @@ export default {
 				if(s.ConfigPath) {
 					this.params.configPath = s.ConfigPath;
 				}
-				if(s.ModelPath) {
-					this.params.modelPath = s.ModelPath;
-				}
-				if(s.MetaPath) {
-					this.params.metaPath = s.MetaPath;
-				}
 				if(s.ImageDatasetID) {
 					this.params.imageDatasetID = s.ImageDatasetID;
 				}
@@ -53,8 +45,6 @@ export default {
 			let params = {
 				InputSize: [parseInt(this.params.inputWidth), parseInt(this.params.inputHeight)],
 				ConfigPath: this.params.configPath,
-				ModelPath: this.params.modelPath,
-				MetaPath: this.params.metaPath,
 				ImageDatasetID: parseInt(this.params.imageDatasetID),
 				DetectionDatasetID: parseInt(this.params.detectionDatasetID),
 			};
@@ -82,18 +72,6 @@ export default {
 			<label class="col-sm-2 col-form-label">Config Path</label>
 			<div class="col-sm-10">
 				<input v-model="params.configPath" type="text" class="form-control">
-			</div>
-		</div>
-		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Model Path</label>
-			<div class="col-sm-10">
-				<input v-model="params.modelPath" type="text" class="form-control">
-			</div>
-		</div>
-		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Meta Path</label>
-			<div class="col-sm-10">
-				<input v-model="params.metaPath" type="text" class="form-control">
 			</div>
 		</div>
 		<div class="form-group row">

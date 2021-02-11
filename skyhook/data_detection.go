@@ -3,6 +3,7 @@ package skyhook
 import (
 	"io"
 	"io/ioutil"
+	"math"
 )
 
 type DetectionMetadata struct {
@@ -19,7 +20,23 @@ type Detection struct {
 	// Optional metadata
 	Category string `json:",omitempty"`
 	TrackID int `json:",omitempty"`
+	Score float64 `json:",omitempty"`
 	Metadata map[string]string `json:",omitempty"`
+}
+
+func (d Detection) CenterDistance(other Detection) float64 {
+	dx := (d.Left+d.Right-other.Left-other.Right)/2
+	dy := (d.Top+d.Bottom-other.Top-other.Bottom)/2
+	return math.Sqrt(float64(dx*dx+dy*dy))
+}
+
+func (d Detection) Rescale(origDims [2]int, newDims [2]int) Detection {
+	copy := d
+	copy.Left = copy.Left * newDims[0] / origDims[0]
+	copy.Right = copy.Right * newDims[0] / origDims[0]
+	copy.Top = copy.Top * newDims[1] / origDims[1]
+	copy.Bottom = copy.Bottom * newDims[1] / origDims[1]
+	return copy
 }
 
 type DetectionData struct {

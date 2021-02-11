@@ -6,6 +6,7 @@ import (
 	_ "./ops"
 
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -61,6 +62,7 @@ func main() {
 
 		err := execOp.Apply(request.Task)
 		if err != nil {
+			log.Printf("[container] apply error: %v", err)
 			http.Error(w, err.Error(), 400)
 			return
 		}

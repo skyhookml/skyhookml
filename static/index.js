@@ -15,6 +15,7 @@ import TrainPytorch from './m-train-pytorch.js';
 import TrainYolov3 from './m-train-yolov3.js';
 
 import Queries from './queries.js';
+import ExecDetectionFilter from './exec-edit-detection_filter.js';
 import ExecModel from './exec-edit-model.js';
 import ExecPython from './exec-edit-python.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
@@ -39,6 +40,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/train/yolov3/:nodeid', component: TrainYolov3},
 
 		{path: '/ws/:ws/queries', component: Queries},
+		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
 		{path: '/ws/:ws/exec/model/:nodeid', component: ExecModel},
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
 		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
