@@ -18,6 +18,7 @@ import Queries from './queries.js';
 import ExecDetectionFilter from './exec-edit-detection_filter.js';
 import ExecModel from './exec-edit-model.js';
 import ExecPython from './exec-edit-python.js';
+import ExecReidTracker from './exec-edit-reid_tracker.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 import Compare from './compare.js';
 
@@ -38,11 +39,13 @@ const router = new VueRouter({
 		{path: '/ws/:ws/models/comp/:compid', component: MComp},
 		{path: '/ws/:ws/train/pytorch/:nodeid', component: TrainPytorch},
 		{path: '/ws/:ws/train/yolov3/:nodeid', component: TrainYolov3},
+		{path: '/ws/:ws/train/unsupervised_reid/:nodeid', component: TrainPytorch},
 
 		{path: '/ws/:ws/queries', component: Queries},
 		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
 		{path: '/ws/:ws/exec/model/:nodeid', component: ExecModel},
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
+		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
 		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
 		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
 	],

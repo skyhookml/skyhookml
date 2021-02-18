@@ -30,6 +30,12 @@ export default {
 							Description: "Simple Tracker",
 							DataTypes: ["detection"],
 						},
+						{
+							ID: "reid_tracker",
+							Name: "Reid Tracker",
+							Description: "Tracker using Re-identification Model",
+							DataTypes: ["detection"],
+						},
 					],
 				},
 				{

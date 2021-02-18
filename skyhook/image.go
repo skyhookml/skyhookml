@@ -172,11 +172,21 @@ func (im Image) DrawLine(sx, sy, ex, ey int, width int, color [3]uint8) {
 }
 
 func (im Image) DrawImage(left int, top int, other Image) {
-	for i := 0; i < other.Width; i++ {
-		for j := 0; j < other.Height; j++ {
+	for i := 0; i < other.Width && i < im.Width-left; i++ {
+		for j := 0; j < other.Height && j < im.Height-top; j++ {
 			im.SetRGB(left+i, top+j, other.GetRGB(i, j))
 		}
 	}
+}
+
+func (im Image) Crop(sx, sy, ex, ey int) Image {
+	crop := NewImage(ex-sx, ey-sy)
+	for i := sx; i < ex; i++ {
+		for j := sy; j < ey; j++ {
+			crop.SetRGB(i-sx, j-sy, im.GetRGB(i, j))
+		}
+	}
+	return crop
 }
 
 // Resize using simple nearest-neighbor method.

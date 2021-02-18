@@ -8,6 +8,8 @@ import skimage.io
 import struct
 import sys
 
+import ffmpeg
+
 def eprint(s):
 	sys.stderr.write(str(s) + "\n")
 	sys.stderr.flush()
@@ -67,6 +69,19 @@ def data_len(t, data):
 		return len(data['Detections'])
 	else:
 		return len(data)
+
+def load_item(dataset, item):
+	fname = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
+	t = dataset['DataType']
+	if t == 'image':
+		return skimage.io.imread(fname)
+	elif t == 'video':
+		metadata = json.loads(item['Metadata'])
+		return ffmpeg.Ffmpeg(fname, metadata['Dims'], metadata['Framerate'])
+	else:
+		with open(fname, 'r') as f:
+			data = json.load(f)
+		return data
 
 def per_frame_decorate(f):
 	def wrap(*args):

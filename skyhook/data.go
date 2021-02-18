@@ -234,7 +234,7 @@ func SynchronizedReader(inputs []Data, n int, f func(pos int, length int, datas 
 }
 
 func PerFrame(inputs []Data, f func(pos int, datas []Data) error) error {
-	SynchronizedReader(inputs, 32, func(pos int, length int, datas []Data) error {
+	return SynchronizedReader(inputs, 32, func(pos int, length int, datas []Data) error {
 		for i := 0; i < length; i++ {
 			var cur []Data
 			for _, d := range datas {
@@ -247,5 +247,4 @@ func PerFrame(inputs []Data, f func(pos int, datas []Data) error) error {
 		}
 		return nil
 	})
-	return nil
 }

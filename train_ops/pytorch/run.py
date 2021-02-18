@@ -43,13 +43,6 @@ def meta_func(x):
 	global meta
 	meta = x
 
-def inputs_to_device(inputs):
-	for i, d in enumerate(inputs):
-		if isinstance(d, tuple):
-			inputs[i] = [x.to(device) for x in d]
-		else:
-			inputs[i] = d.to(device)
-
 @lib.per_frame_decorate
 def callback_func(*inputs):
 	datas = []

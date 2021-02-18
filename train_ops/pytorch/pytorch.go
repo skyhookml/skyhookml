@@ -1,4 +1,4 @@
-package keras
+package pytorch
 
 import (
 	"../../skyhook"
@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-func getArgs(url string, node skyhook.TrainNode) (*skyhook.PytorchArch, map[int]*skyhook.PytorchComponent, map[int]*skyhook.Dataset, error) {
+func GetArgs(url string, node skyhook.TrainNode) (*skyhook.PytorchArch, map[int]*skyhook.PytorchComponent, map[int]*skyhook.Dataset, error) {
 	var params skyhook.PytorchNodeParams
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
 
@@ -50,7 +50,7 @@ func getArgs(url string, node skyhook.TrainNode) (*skyhook.PytorchArch, map[int]
 }
 
 func Train(url string, node skyhook.TrainNode) error {
-	arch, components, datasets, err := getArgs(url, node)
+	arch, components, datasets, err := GetArgs(url, node)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func Train(url string, node skyhook.TrainNode) error {
 }
 
 func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	arch, components, _, err := getArgs(url, trainNode)
+	arch, components, _, err := GetArgs(url, trainNode)
 	if err != nil {
 		return nil, err
 	}

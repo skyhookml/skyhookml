@@ -58,17 +58,8 @@ func main() {
 		panic(fmt.Errorf("no available port"))
 	}
 
-	http.HandleFunc("/exec/start", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(404)
-			return
-		}
-
-		var request skyhook.ExecBeginRequest
-		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
-			return
-		}
-
+	// Returns (container base URL, uuid, error)
+	startContainer := func(imageName string) (string, string, error) {
 		uuid := gouuid.New().String()
 
 		mu.Lock()
@@ -80,12 +71,6 @@ func main() {
 			BaseURL: containerBaseURL,
 		}
 		mu.Unlock()
-
-		opImpl := skyhook.GetExecOpImpl(request.Node.Op)
-		imageName, err := opImpl.ImageName(coordinatorURL, request.Node)
-		if err != nil {
-			panic(err)
-		}
 
 		var cmd *exec.Cmd
 		if mode == "docker" {
@@ -118,11 +103,46 @@ func main() {
 		containers[uuid].Cmd = cmd
 		mu.Unlock()
 
-		// once container is ready, we need to forward this /exec/start to the container
+		// wait for container to be ready
 		rd := bufio.NewReader(stdout)
 		_, err = rd.ReadString('\n')
 		if err != nil {
 			panic(err)
+		}
+		go func() {
+			for {
+				line, err := rd.ReadString('\n')
+				if err != nil {
+					break
+				}
+				log.Printf("[container %s] %s", uuid, line)
+			}
+		}()
+
+		return containerBaseURL, uuid, nil
+	}
+
+	http.HandleFunc("/exec/start", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.WriteHeader(404)
+			return
+		}
+
+		var request skyhook.ExecBeginRequest
+		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			return
+		}
+
+		opImpl := skyhook.GetExecOpImpl(request.Node.Op)
+		imageName, err := opImpl.ImageName(coordinatorURL, request.Node)
+		if err != nil {
+			panic(err)
+		}
+
+		containerBaseURL, uuid, err := startContainer(imageName)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
 		}
 
 		request.CoordinatorURL = coordinatorURL
@@ -150,59 +170,17 @@ func main() {
 
 		uuid := gouuid.New().String()
 
-		mu.Lock()
-		containerPort := getPort()
-		containers[uuid] = &Cmd{
-			Cmd: nil,
-			Port: containerPort,
-		}
-		mu.Unlock()
-
 		op := skyhook.GetTrainOp(request.Node.Op)
 		imageName, err := op.ImageName(coordinatorURL, request.Node)
 		if err != nil {
 			panic(err)
 		}
-		cmd := exec.Command(
-			"docker", "run",
-			"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/items,type=bind", filepath.Join(workingDir, "items")),
-			"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/models,type=bind", filepath.Join(workingDir, "models")),
-			"--gpus", "all",
-			"-p", fmt.Sprintf("%d:8080", containerPort),
-			"--name", uuid,
-			imageName,
-		)
 
-		stdout, err := cmd.StdoutPipe()
+		containerBaseURL, uuid, err := startContainer(imageName)
 		if err != nil {
-			panic(err)
+			http.Error(w, err.Error(), 400)
+			return
 		}
-		cmd.Stderr = os.Stderr
-		if err := cmd.Start(); err != nil {
-			panic(err)
-		}
-		log.Printf("[machine] container %s started", uuid)
-
-		mu.Lock()
-		containers[uuid].Cmd = cmd
-		mu.Unlock()
-
-		// once container is ready, we need to forward this /train/start to the container
-		containerBaseURL := fmt.Sprintf("http://localhost:%d", containerPort)
-		rd := bufio.NewReader(stdout)
-		_, err = rd.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-		go func() {
-			for {
-				line, err := rd.ReadString('\n')
-				if err != nil {
-					break
-				}
-				log.Printf("[container %s] %s", uuid, line)
-			}
-		}()
 
 		request.CoordinatorURL = coordinatorURL
 		var response skyhook.TrainBeginResponse

@@ -25,6 +25,11 @@ export default {
 							Name: "YOLOv3",
 							Description: "YOLOv3 Object Detector (darknet implementation)",
 						},
+						{
+							ID: "unsupervised_reid",
+							Name: "Unsupervised Re-identification",
+							Description: "Self-Supervised Re-identification Model",
+						},
 					],
 				},
 			],

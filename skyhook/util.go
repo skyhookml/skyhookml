@@ -302,3 +302,13 @@ func SeedRand() {
 	}
 	rand.Seed(int64(binary.BigEndian.Uint64(b[:])))
 }
+
+func Clip(x, lo, hi int) int {
+	if x < lo {
+		return lo
+	} else if x > hi {
+		return hi
+	} else {
+		return x
+	}
+}
