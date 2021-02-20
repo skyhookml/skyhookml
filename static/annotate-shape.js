@@ -127,14 +127,29 @@ export default AnnotateGenericUI({
 				height: this.imageDims.Height,
 			});
 			let layer = new Konva.Layer();
-
-			let tr = new Konva.Transformer({
-				nodes: [],
-				rotateEnabled: false,
-			});
-			layer.add(tr);
+			let resizeLayer = null;
+			let destroyResizeLayer = () => {
+				if(resizeLayer) {
+					resizeLayer.destroy();
+					resizeLayer = null;
+				}
+			};
 
 			let konvaShapes = [];
+			// curShape is set if we are currently drawing a new shape
+			let curShape = null;
+
+			let resetColors = () => {
+				konvaShapes.forEach((kshp, idx) => {
+					console.log(this.selectedIdx, idx);
+					if(this.selectedIdx === idx) {
+						kshp.stroke('orange');
+					} else {
+						kshp.stroke('red');
+					}
+				});
+				layer.draw();
+			};
 
 			let drawShape = (shape, idx) => {
 				let kshp = null;
@@ -147,8 +162,11 @@ export default AnnotateGenericUI({
 						height: shape.Points[1][1]-shape.Points[0][1],
 						stroke: 'red',
 						strokeWidth: 3,
+						hitStrokeWidth: 20,
+						fillEnabled: false,
 						draggable: true,
 					});
+					kshp.myindex = idx;
 
 					let updateShape = () => {
 						shape.Points = [
@@ -157,20 +175,92 @@ export default AnnotateGenericUI({
 						];
 					};
 
+					// called when a rectangle is selected
+					// adds circles to the corners of the rectangle that the user can drag to resize the rectangle
+					let handleResize = () => {
+						destroyResizeLayer()
+						resizeLayer = new Konva.Layer();
+						stage.add(resizeLayer);
+
+						// add circles at the four corners of the rectangle
+						let offsets = [
+							[0, 0],
+							[1, 0],
+							[0, 1],
+							[1, 1],
+						];
+						let circles = [];
+						let updateCircles = () => {
+							circles.forEach((circle) => {
+								circle.x(kshp.x()+circle.myoffset[0]*kshp.width());
+								circle.y(kshp.y()+circle.myoffset[1]*kshp.height());
+							});
+						};
+						offsets.forEach((offset) => {
+							let circle = new Konva.Circle({
+								x: kshp.x()+offset[0]*kshp.width(),
+								y: kshp.y()+offset[1]*kshp.height(),
+								radius: 10,
+								fill: 'blue',
+								stroke: 'black',
+								strokeWidth: 2,
+								draggable: true,
+							});
+							circle.myoffset = offset;
+							circles.push(circle);
+
+							circle.on('dragmove', (e) => {
+								// If we move the right/bottom circle, then we just need to change the width/height.
+								// But if we move the left/top circle, we need to update the x/y and correspondingly increase the width/height.
+								if(offset[0] === 0) {
+									kshp.width(kshp.width()+kshp.x()-circle.x());
+									kshp.x(circle.x());
+								} else {
+									kshp.width(circle.x()-kshp.x());
+								}
+								if(offset[1] === 0) {
+									kshp.height(kshp.height()+kshp.y()-circle.y());
+									kshp.y(circle.y());
+								} else {
+									kshp.height(circle.y()-kshp.y());
+								}
+								updateCircles();
+								updateShape();
+								layer.draw();
+								resizeLayer.draw();
+							});
+
+							resizeLayer.add(circle);
+						});
+
+						resizeLayer.draw();
+					};
+
 					kshp.on('click', (e) => {
+						if(curShape) {
+							return;
+						}
+
 						e.cancelBubble = true;
-
-						// select this rect in the transformer
-						tr.nodes([kshp]);
-						layer.draw();
-
-						this.selectedIdx = idx;
+						handleResize();
+						this.selectedIdx = kshp.myindex;
+						resetColors();
 					});
 
-					kshp.on('transformend', updateShape);
-					kshp.on('dragend', updateShape);
+					kshp.on('dragstart', () => {
+						// we don't want to worry about moving around the resize layer during drag operation
+						// so instead we simply destroy it
+						destroyResizeLayer();
+					});
+					kshp.on('dragend', () => {
+						updateShape();
+						// if this shape is selected, restore the resize layer
+						if(this.selectedIdx === kshp.myindex) {
+							handleResize();
+						}
+					});
 				} else if(shape.Type == 'line') {
-					let kshp = new Konva.Line({
+					kshp = new Konva.Line({
 						points: [shape.Points[0][0], shape.Points[0][1], shape.Points[1][0], shape.Points[1][1]],
 						stroke: 'red',
 						strokeWidth: 3,
@@ -186,12 +276,32 @@ export default AnnotateGenericUI({
 					};
 
 					kshp.on('click', (e) => {
+						if(curShape) {
+							return;
+						}
+
 						e.cancelBubble = true;
-						this.selectedIdx = idx;
+						this.selectedIdx = kshp.myindex;
+						resetColors();
 					});
 
 					kshp.on('dragend', updateShape);
 				}
+
+				kshp.on('mouseover', () => {
+					if(curShape) {
+						return;
+					}
+					if(this.selectedIdx === kshp.myindex) {
+						// leave it under selected color instead of hover color
+						return;
+					}
+					kshp.stroke('yellow');
+					layer.draw();
+				});
+				kshp.on('mouseout', () => {
+					resetColors();
+				});
 
 				layer.add(kshp);
 				konvaShapes.push(kshp);
@@ -205,28 +315,31 @@ export default AnnotateGenericUI({
 			stage.add(layer);
 			layer.draw();
 
+			// mode-dependent handler in case user wants to cancel drawing a shape
+			// (e.g., presses escape key)
+			let cancelDrawHandler = null;
+
 			if(this.params.Mode == 'box') {
-				let curRect = null;
 				let updateRect = (x, y) => {
-					let meta = curRect.meta;
+					let meta = curShape.meta;
 					let width = Math.abs(meta.x - x);
 					let height = Math.abs(meta.y - y);
-					curRect.x(Math.min(meta.x, x));
-					curRect.y(Math.min(meta.y, y));
-					curRect.width(width);
-					curRect.height(height);
+					curShape.x(Math.min(meta.x, x));
+					curShape.y(Math.min(meta.y, y));
+					curShape.width(width);
+					curShape.height(height);
 				};
 				stage.on('click', () => {
-					if(tr.nodes().length > 0) {
-						tr.nodes([]);
+					if(resizeLayer) {
+						destroyResizeLayer()
 						this.selectedIdx = null;
-						layer.draw();
+						resetColors();
 						return;
 					}
 
 					var pos = stage.getPointerPosition();
-					if(curRect == null) {
-						curRect = new Konva.Rect({
+					if(curShape == null) {
+						curShape = new Konva.Rect({
 							x: pos.x,
 							y: pos.y,
 							width: 1,
@@ -234,8 +347,8 @@ export default AnnotateGenericUI({
 							stroke: 'yellow',
 							strokeWidth: 3,
 						});
-						curRect.meta = {x: pos.x, y: pos.y};
-						layer.add(curRect);
+						curShape.meta = {x: pos.x, y: pos.y};
+						layer.add(curShape);
 						layer.draw();
 					} else {
 						updateRect(pos.x, pos.y);
@@ -243,8 +356,8 @@ export default AnnotateGenericUI({
 						let shape = {
 							Type: 'box',
 							Points: [
-								[parseInt(curRect.x()), parseInt(curRect.y())],
-								[parseInt(curRect.x()+curRect.width()), parseInt(curRect.y()+curRect.height())],
+								[parseInt(curShape.x()), parseInt(curShape.y())],
+								[parseInt(curShape.x()+curShape.width()), parseInt(curShape.y()+curShape.height())],
 							],
 							Category: '',
 							TrackID: '',
@@ -252,13 +365,13 @@ export default AnnotateGenericUI({
 						this.shapes[this.frameIdx].push(shape);
 						drawShape(shape, this.shapes[this.frameIdx].length-1);
 
-						curRect.destroy();
-						curRect = null;
+						curShape.destroy();
+						curShape = null;
 						layer.draw();
 					}
 				});
 				stage.on('mousemove', () => {
-					if(curRect == null) {
+					if(curShape == null) {
 						return;
 					}
 					var pos = stage.getPointerPosition();
@@ -266,58 +379,40 @@ export default AnnotateGenericUI({
 					layer.batchDraw();
 				});
 
-				this.setKeyupHandler((e) => {
-					if(document.activeElement.tagName == 'INPUT') {
+				cancelDrawHandler = () => {
+					if(curShape === null) {
 						return;
 					}
-
-					if(e.key === 'Escape') {
-						if(curRect === null) {
-							return;
-						}
-						curRect.destroy();
-						curRect = null;
-						layer.draw();
-					} else if(e.key === 'Delete') {
-						if(this.selectedIdx === null) {
-							return;
-						}
-						this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
-						let kshp = konvaShapes[this.selectedIdx];
-						konvaShapes.splice(this.selectedIdx, 1);
-						kshp.destroy();
-						tr.nodes([]);
-						this.selectedIdx = null;
-						layer.draw();
-					}
-				});
+					curShape.destroy();
+					curShape = null;
+					layer.draw();
+				};
 			} else if(this.params.Mode == 'line') {
-				let curLine = null;
 				let updateLine = (x, y) => {
-					let pts = curLine.points();
-					curLine.points([pts[0], pts[1], x, y]);
+					let pts = curShape.points();
+					curShape.points([pts[0], pts[1], x, y]);
 				};
 				stage.on('click', () => {
-					if(tr.nodes().length > 0) {
-						tr.nodes([]);
+					if(resizeLayer) {
+						destroyResizeLayer()
 						this.selectedIdx = null;
 						layer.draw();
 						return;
 					}
 
 					var pos = stage.getPointerPosition();
-					if(curLine == null) {
-						curLine = new Konva.Line({
+					if(curShape == null) {
+						curShape = new Konva.Line({
 							points: [pos.x, pos.y, pos.x+1, pos.y+1],
 							stroke: 'yellow',
 							strokeWidth: 3,
 						});
-						layer.add(curLine);
+						layer.add(curShape);
 						layer.draw();
 					} else {
 						updateLine(pos.x, pos.y);
 
-						let pts = curLine.points();
+						let pts = curShape.points();
 						let shape = {
 							Type: 'line',
 							Points: [
@@ -330,13 +425,13 @@ export default AnnotateGenericUI({
 						this.shapes[this.frameIdx].push(shape);
 						drawShape(shape, this.shapes[this.frameIdx].length-1);
 
-						curLine.destroy();
-						curLine = null;
+						curShape.destroy();
+						curShape = null;
 						layer.draw();
 					}
 				});
 				stage.on('mousemove', () => {
-					if(curLine == null) {
+					if(curShape == null) {
 						return;
 					}
 					var pos = stage.getPointerPosition();
@@ -344,32 +439,40 @@ export default AnnotateGenericUI({
 					layer.batchDraw();
 				});
 
-				this.setKeyupHandler((e) => {
-					if(document.activeElement.tagName == 'INPUT') {
+				cancelDrawHandler = () => {
+					if(curShape === null) {
 						return;
 					}
-
-					if(e.key === 'Escape') {
-						if(curLine === null) {
-							return;
-						}
-						curLine.destroy();
-						curLine = null;
-						layer.draw();
-					} else if(e.key === 'Delete') {
-						if(this.selectedIdx === null) {
-							return;
-						}
-						this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
-						let kshp = konvaShapes[this.selectedIdx];
-						konvaShapes.splice(this.selectedIdx, 1);
-						kshp.destroy();
-						tr.nodes([]);
-						this.selectedIdx = null;
-						layer.draw();
-					}
-				});
+					curShape.destroy();
+					curShape = null;
+					layer.draw();
+				}
 			}
+
+			// initialize a key handler to handle cancel drawing and deleting selected shapes
+			this.setKeyupHandler((e) => {
+				if(document.activeElement.tagName == 'INPUT') {
+					return;
+				}
+
+				if(e.key === 'Escape' && cancelDrawHandler) {
+					cancelDrawHandler();
+				} else if(e.key === 'Delete') {
+					if(this.selectedIdx === null) {
+						return;
+					}
+					this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
+					let kshp = konvaShapes[this.selectedIdx];
+					konvaShapes.splice(this.selectedIdx, 1);
+					konvaShapes.forEach((kshp, idx) => {
+						kshp.myindex = idx;
+					});
+					kshp.destroy();
+					destroyResizeLayer();
+					this.selectedIdx = null;
+					layer.draw();
+				}
+			});
 		},
 	},
 	template: {
