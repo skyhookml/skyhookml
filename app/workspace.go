@@ -23,9 +23,6 @@ func GetWorkspace(wsName string) *DBWorkspace {
 }
 
 func (ws DBWorkspace) Delete() {
-	for _, node := range ws.ListTrainNodes() {
-		node.Delete()
-	}
 	for _, node := range ws.ListExecNodes() {
 		node.Delete()
 	}
@@ -60,41 +57,6 @@ func init() {
 
 		// create workspace
 		db.Exec("INSERT INTO workspaces (name) VALUES (?)", cloneWS)
-
-		// copy train nodes
-		func() {
-			pendingNodes := make(map[int]*DBTrainNode)
-			for _, node := range ws.ListTrainNodes() {
-				pendingNodes[node.ID] = node
-			}
-			// map from old node ID to new node object
-			newNodes := make(map[int]*DBTrainNode)
-			for len(pendingNodes) > 0 {
-				for id, node := range pendingNodes {
-					// collect parents
-					var parents []int
-					ok := true
-					for _, parentID := range node.ParentIDs {
-						if newNodes[parentID] == nil {
-							ok = false
-							break
-						}
-						parents = append(parents, newNodes[parentID].ID)
-					}
-					if !ok {
-						continue
-					}
-					node_ := NewTrainNode(node.Name, node.Op, cloneWS)
-					node_.Update(TrainNodeUpdate{
-						Params: &node.Params,
-						ParentIDs: &parents,
-						Outputs: &node.Outputs,
-					})
-					newNodes[id] = node_
-					delete(pendingNodes, id)
-				}
-			}
-		}()
 
 		// copy exec nodes
 		func() {

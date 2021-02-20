@@ -103,9 +103,11 @@ func GetItems(url string, datasets []skyhook.Dataset) (map[string][]skyhook.Item
 	return groupedItems, nil
 }
 
-// make tasks by grouping items of same key across the datasets
-func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-	// group items by key
+// group together items of the same key across the datasets
+// rawItems[i][j] is the jth item in the ith dataset
+// returns map from key to list of corresponding items in each dataset
+// items with keys that don't appear in all datasets are dropped
+func groupItems(rawItems [][]skyhook.Item) map[string][]skyhook.Item {
 	items := make([]map[string]skyhook.Item, len(rawItems))
 	for i, curItems := range rawItems {
 		items[i] = make(map[string]skyhook.Item)
@@ -134,6 +136,12 @@ func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) (
 		}
 	}
 
+	return groupedItems
+}
+
+// make tasks by grouping items of same key across the datasets
+func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
+	groupedItems := groupItems(rawItems)
 	var tasks []skyhook.ExecTask
 	for key, curItems := range groupedItems {
 		tasks = append(tasks, skyhook.ExecTask{
@@ -142,6 +150,19 @@ func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) (
 		})
 	}
 	return tasks, nil
+}
+
+// make a single task with all the input items
+func SingleTask(key string) func(string, skyhook.ExecNode, [][]skyhook.Item) ([]skyhook.ExecTask, error) {
+	return func(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		task := skyhook.ExecTask{Key: key}
+		for _, itemList := range rawItems {
+			for _, item := range itemList {
+				task.Items = append(task.Items, item)
+			}
+		}
+		return []skyhook.ExecTask{task}, nil
+	}
 }
 
 func WriteItem(url string, dataset skyhook.Dataset, key string, data skyhook.Data) error {

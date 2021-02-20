@@ -3,7 +3,7 @@ package reid
 import (
 	"../../skyhook"
 	"../../exec_ops"
-	"../../train_ops/pytorch"
+	"../../exec_ops/pytorch"
 
 	"fmt"
 	"io/ioutil"
@@ -13,8 +13,18 @@ import (
 	"path/filepath"
 )
 
-func Train(url string, node skyhook.TrainNode) error {
-	arch, components, datasets, err := pytorch.GetArgs(url, node)
+type TrainOp struct {
+	url string
+	node skyhook.ExecNode
+	dataset skyhook.Dataset
+}
+
+func (e *TrainOp) Parallelism() int {
+	return 1
+}
+
+func (e *TrainOp) Apply(task skyhook.ExecTask) error {
+	arch, components, datasets, err := pytorch.GetArgs(e.url, e.node)
 	if err != nil {
 		return err
 	}
@@ -28,11 +38,11 @@ func Train(url string, node skyhook.TrainNode) error {
 			detectionDataset = ds
 		}
 	}
-	items, err := exec_ops.GetItems(url, []skyhook.Dataset{*videoDataset, *detectionDataset})
+	items, err := exec_ops.GetItems(e.url, []skyhook.Dataset{*videoDataset, *detectionDataset})
 	if err != nil {
 		return err
 	}
-	matchesPath := filepath.Join(os.TempDir(), fmt.Sprintf("reid-%d", node.ID))
+	matchesPath := filepath.Join(os.TempDir(), fmt.Sprintf("reid-%d", e.node.ID))
 	if err := os.Mkdir(matchesPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", matchesPath, err)
 	}
@@ -61,14 +71,14 @@ func Train(url string, node skyhook.TrainNode) error {
 		}
 	}
 
-	paramsArg := node.Params
+	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	datasetsArg := string(skyhook.JsonMarshal(datasets))
-	fmt.Println(node.ID, url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
+	fmt.Println(e.node.ID, e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
 	cmd := exec.Command(
-		"python3", "train_ops/unsupervised_reid/train.py",
-		fmt.Sprintf("%d", node.ID), url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
+		"python3", "exec_ops/unsupervised_reid/train.py",
+		fmt.Sprintf("%d", e.node.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -76,21 +86,32 @@ func Train(url string, node skyhook.TrainNode) error {
 		return err
 	}
 	err = cmd.Wait()
-	return err
+	if err != nil {
+		return err
+	}
+
+	// add filename to the string dataset
+	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.node.ID)}}
+	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
 }
 
-func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	return nil, nil
-}
+func (e *TrainOp) Close() {}
 
 func init() {
-	skyhook.TrainOps["unsupervised_reid"] = skyhook.TrainOp{
-		Requirements: func(url string, node skyhook.TrainNode) map[string]int {
-			return map[string]int{}
+	skyhook.ExecOpImpls["unsupervised_reid"] = skyhook.ExecOpImpl{
+		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+			return nil
 		},
-		Train: Train,
-		Prepare: Prepare,
-		ImageName: func(url string, node skyhook.TrainNode) (string, error) {
+		GetTasks: exec_ops.SingleTask("model"),
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+			op := &TrainOp{
+				url: url,
+				node: node,
+				dataset: outputDatasets[0],
+			}
+			return op, nil
+		},
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
 			return "skyhookml/pytorch", nil
 		},
 	}

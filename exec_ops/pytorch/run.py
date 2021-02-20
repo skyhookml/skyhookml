@@ -18,12 +18,10 @@ node_id = int(sys.argv[1])
 params_arg = sys.argv[2]
 arch_arg = sys.argv[3]
 comps_arg = sys.argv[4]
-exec_params_arg = sys.argv[5]
 
 params = json.loads(params_arg)
 arch = json.loads(arch_arg)
 comps = json.loads(comps_arg)
-exec_params = json.loads(exec_params_arg)
 
 arch = arch['Params']
 comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}

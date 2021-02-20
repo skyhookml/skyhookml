@@ -1,8 +1,6 @@
 package app
 
 import (
-	"../skyhook"
-
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -50,12 +48,6 @@ func (node *DBExecNode) GraphParents() map[string]Node {
 		}
 	}
 
-	if node.Op == "model" {
-		var params skyhook.ModelExecParams
-		skyhook.JsonUnmarshal([]byte(node.Params), &params)
-		parents["model"] = GetTrainNode(params.TrainNodeID)
-	}
-
 	return parents
 }
 
@@ -76,35 +68,6 @@ func (node *DBExecNode) IsDone() bool {
 
 func (node *DBExecNode) GraphID() string {
 	return fmt.Sprintf("exec-%d", node.ID)
-}
-
-func (node *DBTrainNode) GraphParents() map[string]Node {
-	parents := make(map[string]Node)
-	for i, id := range node.ParentIDs {
-		parents[fmt.Sprintf("%d", i)] = GetTrainNode(id)
-	}
-	return parents
-}
-
-func (node *DBTrainNode) Hash() string {
-	bytes := GetNodeHash(node)
-	return hex.EncodeToString(bytes)
-}
-
-func (node *DBTrainNode) GraphType() string {
-	return "train"
-}
-
-func (node *DBTrainNode) IsDone() bool {
-	if node.ModelID == nil {
-		return false
-	}
-	model := GetModel(*node.ModelID)
-	return model.Hash == node.Hash()
-}
-
-func (node *DBTrainNode) GraphID() string {
-	return fmt.Sprintf("train-%d", node.ID)
 }
 
 func (node *DBDataset) GraphParents() map[string]Node {
@@ -159,8 +122,6 @@ func RunTree(node Node) error {
 			var err error
 			if cur.GraphType() == "exec" {
 				err = cur.(*DBExecNode).Run(ExecRunOptions{})
-			} else if cur.GraphType() == "train" {
-				err = cur.(*DBTrainNode).Run(false)
 			} else {
 				err = fmt.Errorf("unknown type %s", cur.GraphType())
 			}

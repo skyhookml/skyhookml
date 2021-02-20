@@ -12,7 +12,7 @@ import sys
 
 import torch
 
-sys.path.append('./train_ops/pytorch/')
+sys.path.append('./exec_ops/pytorch/')
 import model
 import util
 

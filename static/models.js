@@ -1,10 +1,8 @@
-import MTraining from './m-training.js';
 import MComponents from './m-components.js';
 import MArchitectures from './m-architectures.js';
 
 const Models = {
 	components: {
-		'm-training': MTraining,
 		'm-components': MComponents,
 		'm-architectures': MArchitectures,
 	},
@@ -24,20 +22,14 @@ const Models = {
 <div class="flex-container">
 	<ul class="nav nav-tabs" id="m-nav" role="tablist">
 		<li class="nav-item">
-			<a class="nav-link active" id="m-training-tab" data-toggle="tab" href="#m-training-panel" role="tab">Training</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link" id="m-components-tab" data-toggle="tab" href="#m-components-panel" role="tab">Components</a>
+			<a class="nav-link active" id="m-components-tab" data-toggle="tab" href="#m-components-panel" role="tab">Components</a>
 		</li>
 		<li class="nav-item">
 			<a class="nav-link" id="m-architectures-tab" data-toggle="tab" href="#m-architectures-panel" role="tab">Architectures</a>
 		</li>
 	</ul>
 	<div class="tab-content mx-1 flex-content">
-		<div class="tab-pane fade show active" id="m-training-panel" role="tabpanel">
-			<m-training :mtab="mtab"></m-training>
-		</div>
-		<div class="tab-pane fade" id="m-components-panel" role="tabpanel">
+		<div class="tab-pane fade show active" id="m-components-panel" role="tabpanel">
 			<m-components :mtab="mtab"></m-components>
 		</div>
 		<div class="tab-pane fade" id="m-architectures-panel" role="tabpanel">

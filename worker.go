@@ -157,43 +157,6 @@ func main() {
 		skyhook.JsonResponse(w, response)
 	})
 
-	http.HandleFunc("/train/start", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(404)
-			return
-		}
-
-		var request skyhook.TrainBeginRequest
-		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
-			return
-		}
-
-		uuid := gouuid.New().String()
-
-		op := skyhook.GetTrainOp(request.Node.Op)
-		imageName, err := op.ImageName(coordinatorURL, request.Node)
-		if err != nil {
-			panic(err)
-		}
-
-		containerBaseURL, uuid, err := startContainer(imageName)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-
-		request.CoordinatorURL = coordinatorURL
-		var response skyhook.TrainBeginResponse
-		err = skyhook.JsonPost(containerBaseURL, "/train/start", request, &response)
-		if err != nil {
-			panic(err)
-		}
-
-		response.UUID = uuid
-		response.BaseURL = containerBaseURL
-		skyhook.JsonResponse(w, response)
-	})
-
 	http.HandleFunc("/end", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			w.WriteHeader(404)

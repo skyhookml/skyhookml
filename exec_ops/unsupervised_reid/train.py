@@ -14,7 +14,7 @@ import torch
 import torch.optim
 import torch.utils
 
-sys.path.append('./train_ops/pytorch/')
+sys.path.append('./exec_ops/pytorch/')
 import model
 import util
 

@@ -35,7 +35,7 @@ export default {
 		});
 
 		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/train-nodes/'+nodeID, null, (node) => {
+		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
 			this.node = node;
 			try {
 				let s = JSON.parse(this.node.Params);
@@ -66,7 +66,7 @@ export default {
 				InputDatasets: this.params.inputDatasets,
 				OutputDatasets: this.params.outputDatasets,
 			};
-			utils.request(this, 'POST', '/train-nodes/'+this.node.ID, JSON.stringify({
+			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: JSON.stringify(params),
 			}));
 		},

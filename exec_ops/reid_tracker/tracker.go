@@ -4,7 +4,7 @@ import (
 	"../../skyhook"
 	"../../exec_ops"
 	strack "../../exec_ops/simple_tracker"
-	"../../train_ops/pytorch"
+	"../../exec_ops/pytorch"
 
 	"bufio"
 	"encoding/binary"
@@ -36,27 +36,34 @@ type Tracker struct {
 }
 
 func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	var params skyhook.ModelExecParams
-	skyhook.JsonUnmarshal([]byte(node.Params), &params)
-
-	var trainNode skyhook.TrainNode
-	err := skyhook.JsonGet(url, fmt.Sprintf("/train-nodes/%d", params.TrainNodeID), &trainNode)
+	arch, components, _, err := pytorch.GetArgs(url, node)
 	if err != nil {
 		return nil, err
 	}
 
-	arch, components, _, err := pytorch.GetArgs(url, trainNode)
+	// get the model path from the first input dataset
+	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
 	if err != nil {
 		return nil, err
 	}
+	modelItems, err := exec_ops.GetItems(url, datasets)
+	if err != nil {
+		return nil, err
+	}
+	modelItem := modelItems["model"][0]
+	strdata, err := modelItem.LoadData()
+	if err != nil {
+		return nil, err
+	}
+	modelPath := strdata.(skyhook.StringData).Strings[0]
 
-	paramsArg := trainNode.Params
+	paramsArg := node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	cmd := skyhook.Command(
 		fmt.Sprintf("reid_tracker-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/reid_tracker/run.py",
-		fmt.Sprintf("%d", trainNode.ID), paramsArg, archArg, compsArg,
+		modelPath, paramsArg, archArg, compsArg,
 	)
 
 	return &Tracker{
@@ -217,7 +224,11 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		GetTasks: exec_ops.SimpleTasks,
+		GetTasks: func(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
+			// the first input dataset in the model
+			// so we just provide the rest to SimpleTasks
+			return exec_ops.SimpleTasks(url, node, rawItems[1:])
+		},
 		Prepare: Prepare,
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,

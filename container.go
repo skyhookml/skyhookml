@@ -10,15 +10,11 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
 )
 
 func main() {
 	var coordinatorURL string
 	var execOp skyhook.ExecOp
-	var mu sync.Mutex
-	var trainDone bool
-	var trainErr error
 
 	var bindAddr string = ":8080"
 	if len(os.Args) >= 2 {
@@ -66,46 +62,6 @@ func main() {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-	})
-
-	http.HandleFunc("/train/start", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(404)
-			return
-		}
-
-		var request skyhook.TrainBeginRequest
-		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
-			return
-		}
-
-		coordinatorURL = request.CoordinatorURL
-
-		op := skyhook.GetTrainOp(request.Node.Op)
-		go func() {
-			err := op.Train(coordinatorURL, request.Node)
-			mu.Lock()
-			trainDone = true
-			trainErr = err
-			mu.Unlock()
-		}()
-
-		skyhook.JsonResponse(w, skyhook.TrainBeginResponse{})
-	})
-
-	http.HandleFunc("/train/poll", func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		done := trainDone
-		err := trainErr
-		mu.Unlock()
-		var errorStr string
-		if err != nil {
-			errorStr = err.Error()
-		}
-		skyhook.JsonResponse(w, skyhook.TrainPollResponse{
-			Done: done,
-			Error: errorStr,
-		})
 	})
 
 	http.HandleFunc("/exit", func(w http.ResponseWriter, r *http.Request) {

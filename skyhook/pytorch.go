@@ -1,10 +1,5 @@
 package skyhook
 
-import (
-	"crypto/sha256"
-	"fmt"
-)
-
 type PytorchComponentParams struct {
 	// code defining a pytorch nn.Module called "M"
 	// forward pass takes some inputs, potentially some targets
@@ -94,31 +89,4 @@ type PytorchNodeParams struct {
 		Layer string
 		DataType DataType
 	}
-}
-
-type TrainNode struct {
-	ID int
-	Name string
-	Op string
-	Params string
-	ParentIDs []int
-	Outputs []DataType
-}
-
-func (node TrainNode) LocalHash() []byte {
-	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("op=%s\n", node.Op)))
-	h.Write([]byte(fmt.Sprintf("params=%s\n", node.Params)))
-	h.Write([]byte(fmt.Sprintf("outputs=%s\n", EncodeTypes(node.Outputs))))
-	return h.Sum(nil)
-}
-
-// Params for a exec node that infers using model.
-type ModelExecParams struct {
-	TrainNodeID int
-}
-
-type Model struct {
-	ID int
-	Hash string
 }

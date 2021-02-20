@@ -30,21 +30,3 @@ type EndRequest struct {
 type ExecTaskRequest struct {
 	Task ExecTask
 }
-
-type TrainBeginRequest struct {
-	Node TrainNode
-
-	// only set for worker->container
-	CoordinatorURL string
-}
-
-type TrainBeginResponse struct {
-	// filled in by worker for response back to coordinator
-	UUID string
-	BaseURL string
-}
-
-type TrainPollResponse struct {
-	Done bool
-	Error string
-}

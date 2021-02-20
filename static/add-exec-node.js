@@ -47,6 +47,34 @@ export default {
 							Name: "Model",
 							Description: "Model",
 						},
+						{
+							ID: "pytorch_train",
+							Name: "Pytorch (train)",
+							Description: "Pytorch (train)",
+							DataTypes: ["string"],
+						},
+						{
+							ID: "pytorch_infer",
+							Name: "Pytorch (infer)",
+							Description: "Pytorch (infer)",
+						},
+						{
+							ID: "yolov3_train",
+							Name: "Yolov3 (train)",
+							Description: "Yolov3 (train)",
+							DataTypes: ["string"],
+						},
+						{
+							ID: "yolov3_infer",
+							Name: "Yolov3 (infer)",
+							Description: "Yolov3 (infer)",
+						},
+						{
+							ID: "unsupervised_reid",
+							Name: "Unsupervised Re-identification",
+							Description: "Self-Supervised Re-identification Model",
+							DataTypes: ["string"],
+						},
 					],
 				},
 				{

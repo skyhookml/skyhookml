@@ -6,7 +6,6 @@ import (
 
 	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -15,58 +14,21 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 )
 
-type Params struct {
-	InputSize [2]int
-	ConfigPath string
-
-	ImageDatasetID int
-	DetectionDatasetID int
+type TrainOp struct {
+	url string
+	node skyhook.ExecNode
+	dataset skyhook.Dataset
 }
 
-func (p Params) GetConfigPath() string {
-	if p.ConfigPath == "" {
-		return "cfg/yolov3.cfg"
-	} else {
-		return p.ConfigPath
-	}
+func (e *TrainOp) Parallelism() int {
+	return 1
 }
 
-func CreateParams(fname string, p Params, training bool) {
-	// prepare configuration with this width/height
-	configPath := p.GetConfigPath()
-	if !filepath.IsAbs(configPath) {
-		configPath = filepath.Join("lib/darknet/", configPath)
-	}
-	bytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		panic(err)
-	}
-	file, err := os.Create(fname)
-	if err != nil {
-		panic(err)
-	}
-	for _, line := range strings.Split(string(bytes), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "width=") && p.InputSize[0] > 0 {
-			line = fmt.Sprintf("width=%d", p.InputSize[0])
-		} else if strings.HasPrefix(line, "height=") && p.InputSize[1] > 0 {
-			line = fmt.Sprintf("height=%d", p.InputSize[1])
-		} else if training && strings.HasPrefix(line, "batch=") {
-			line = "batch=64"
-		} else if training && strings.HasPrefix(line, "subdivisions=") {
-			line = "subdivisions=8"
-		}
-		file.Write([]byte(line+"\n"))
-	}
-	file.Close()
-}
-
-func Train(url string, node skyhook.TrainNode) error {
+func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	var params Params
-	skyhook.JsonUnmarshal([]byte(node.Params), &params)
+	skyhook.JsonUnmarshal([]byte(e.node.Params), &params)
 
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -76,12 +38,12 @@ func Train(url string, node skyhook.TrainNode) error {
 
 	// create temporary directory for training config/example files
 	log.Println("[yolov3-train] creating training and export directories")
-	trainPath := filepath.Join(workingDir, "models", fmt.Sprintf("yolov3-%d", node.ID))
+	trainPath := filepath.Join(workingDir, "models", fmt.Sprintf("yolov3-%d", e.node.ID))
 	if err := os.Mkdir(trainPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", trainPath, err)
 	}
 
-	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", node.ID))
+	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", e.node.ID))
 	if err := os.Mkdir(exportPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", exportPath, err)
 	}
@@ -91,11 +53,11 @@ func Train(url string, node skyhook.TrainNode) error {
 
 	// export the images and detections to a new folder in darknet format
 	log.Println("[yolov3-train] exporting examples")
-	datasets, err := exec_ops.GetDatasets(url, []int{params.ImageDatasetID, params.DetectionDatasetID})
+	datasets, err := exec_ops.GetDatasets(e.url, []int{params.ImageDatasetID, params.DetectionDatasetID})
 	if err != nil {
 		return err
 	}
-	items, err := exec_ops.GetItems(url, datasets)
+	items, err := exec_ops.GetItems(e.url, datasets)
 	if err != nil {
 		return err
 	}
@@ -280,128 +242,29 @@ backup=%s
 	}
 
 	skyhook.CopyFile(exportPath+"yolov3_best.weights", trainPath+"yolov3.weights")
-	return nil
+
+	// add filename to the string dataset
+	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.node.ID)}}
+	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
 }
 
-func Prepare(url string, trainNode skyhook.TrainNode, execNode skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	var params Params
-	skyhook.JsonUnmarshal([]byte(trainNode.Params), &params)
-
-	batchSize := 8
-
-	cmd := skyhook.Command(
-		fmt.Sprintf("yolov3-exec-%s", execNode.Name), skyhook.CommandOptions{},
-		"python3", "train_ops/yolov3/run.py",
-		fmt.Sprintf("%d", trainNode.ID),
-		fmt.Sprintf("%d", batchSize),
-		fmt.Sprintf("%d", params.InputSize[0]), fmt.Sprintf("%d", params.InputSize[1]),
-	)
-
-	return &Yolov3{
-		URL: url,
-		Dataset: outputDatasets[0],
-		cmd: cmd,
-		stdin: cmd.Stdin(),
-		rd: bufio.NewReader(cmd.Stdout()),
-		batchSize: batchSize,
-		dims: params.InputSize,
-	}, nil
-}
-
-type Yolov3 struct {
-	URL string
-	Dataset skyhook.Dataset
-
-	mu sync.Mutex
-	cmd *skyhook.Cmd
-	stdin io.WriteCloser
-	rd *bufio.Reader
-	batchSize int
-	dims [2]int
-}
-
-func (e *Yolov3) Parallelism() int {
-	return 1
-}
-
-func (e *Yolov3) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items[0].LoadData()
-	if err != nil {
-		return err
-	}
-	reader := data.(skyhook.ReadableData).Reader()
-	defer reader.Close()
-	var detections [][]skyhook.Detection
-	zeroImage := skyhook.NewImage(e.dims[0], e.dims[1])
-	for {
-		imageData, err := reader.Read(e.batchSize)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		images := imageData.(skyhook.ImageData).Images
-
-		e.mu.Lock()
-		// write this batch of images
-		for _, im := range images {
-			if im.Width != e.dims[0] || im.Height != e.dims[1] {
-				im = im.Resize(e.dims[0], e.dims[1])
-			}
-			e.stdin.Write(im.Bytes)
-		}
-		for i := len(images); i < e.batchSize; i++ {
-			e.stdin.Write(zeroImage.Bytes)
-		}
-
-		// read the output detections for the batch
-		signature := "json"
-		var line string
-		for {
-			line, err = e.rd.ReadString('\n')
-			if err != nil || strings.Contains(line, signature) {
-				break
-			}
-		}
-		e.mu.Unlock()
-
-		if err != nil {
-			return fmt.Errorf("error reading from yolov3 script: %v", err)
-		}
-
-		line = strings.TrimSpace(line[len(signature):])
-		var batchDetections [][]skyhook.Detection
-		skyhook.JsonUnmarshal([]byte(line), &batchDetections)
-		detections = append(detections, batchDetections...)
-	}
-
-	output := skyhook.DetectionData{
-		Detections: detections,
-		Metadata: skyhook.DetectionMetadata{
-			CanvasDims: e.dims,
-		},
-	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
-}
-
-func (e *Yolov3) Close() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.stdin.Close()
-	if e.cmd != nil {
-		e.cmd.Wait()
-		e.cmd = nil
-	}
-}
+func (e *TrainOp) Close() {}
 
 func init() {
-	skyhook.TrainOps["yolov3"] = skyhook.TrainOp{
-		Requirements: func(url string, node skyhook.TrainNode) map[string]int {
-			return map[string]int{}
+	skyhook.ExecOpImpls["yolov3_train"] = skyhook.ExecOpImpl{
+		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+			return nil
 		},
-		Train: Train,
-		Prepare: Prepare,
-		ImageName: func(url string, node skyhook.TrainNode) (string, error) {
+		GetTasks: exec_ops.SingleTask("model"),
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+			op := &TrainOp{
+				url: url,
+				node: node,
+				dataset: outputDatasets[0],
+			}
+			return op, nil
+		},
+		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
 			return "skyhookml/yolov3", nil
 		},
 	}

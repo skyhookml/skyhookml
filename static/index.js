@@ -11,14 +11,16 @@ import AnnotateDetectionToTrack from './annotate-detection-to-track.js';
 import Models from './models.js';
 import MArch from './m-architecture.js';
 import MComp from './m-component.js';
-import TrainPytorch from './m-train-pytorch.js';
-import TrainYolov3 from './m-train-yolov3.js';
 
 import Queries from './queries.js';
 import ExecDetectionFilter from './exec-edit-detection_filter.js';
-import ExecModel from './exec-edit-model.js';
 import ExecPython from './exec-edit-python.js';
-import ExecReidTracker from './exec-edit-reid_tracker.js';
+import ExecPytorchTrain from './exec-edit-pytorch_train.js';
+import ExecPytorchInfer from './exec-edit-pytorch_train.js';
+import ExecYolov3Train from './exec-edit-yolov3_train.js';
+import ExecYolov3Infer from './exec-edit-yolov3_train.js';
+import ExecReidTracker from './exec-edit-pytorch_train.js';
+import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 import Compare from './compare.js';
 
@@ -37,15 +39,16 @@ const router = new VueRouter({
 		{path: '/ws/:ws/models', component: Models},
 		{path: '/ws/:ws/models/arch/:archid', component: MArch},
 		{path: '/ws/:ws/models/comp/:compid', component: MComp},
-		{path: '/ws/:ws/train/pytorch/:nodeid', component: TrainPytorch},
-		{path: '/ws/:ws/train/yolov3/:nodeid', component: TrainYolov3},
-		{path: '/ws/:ws/train/unsupervised_reid/:nodeid', component: TrainPytorch},
 
 		{path: '/ws/:ws/queries', component: Queries},
 		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
-		{path: '/ws/:ws/exec/model/:nodeid', component: ExecModel},
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
+		{path: '/ws/:ws/exec/pytorch_train/:nodeid', component: ExecPytorchTrain},
+		{path: '/ws/:ws/exec/pytorch_infer/:nodeid', component: ExecPytorchInfer},
+		{path: '/ws/:ws/exec/yolov3_train/:nodeid', component: ExecYolov3Train},
+		{path: '/ws/:ws/exec/yolov3_infer/:nodeid', component: ExecYolov3Infer},
 		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
+		{path: '/ws/:ws/exec/unsupervised_reid/:nodeid', component: ExecUnsupervisedReid},
 		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
 		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
 	],

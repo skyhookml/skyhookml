@@ -70,20 +70,6 @@ func init() {
 		name TEXT,
 		params TEXT
 	)`)
-	db.Exec(`CREATE TABLE IF NOT EXISTS models (
-		id INTEGER PRIMARY KEY ASC,
-		hash TEXT
-	)`)
-	db.Exec(`CREATE TABLE IF NOT EXISTS train_nodes (
-		id INTEGER PRIMARY KEY ASC,
-		name TEXT,
-		op TEXT,
-		params TEXT,
-		parents TEXT,
-		outputs TEXT,
-		workspace TEXT,
-		model_id INTEGER
-	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS exec_nodes (
 		id INTEGER PRIMARY KEY ASC,
 		name TEXT,
