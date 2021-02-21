@@ -163,6 +163,15 @@ export default function(impl) {
 					this.frameIdx = (i + this.numFrames) % this.numFrames;
 				});
 			},
+			// advance to the next frame, or annotate and proceed to next item if at the end
+			finishFrame: function() {
+				let frameIdx = this.frameIdx + 1;
+				if(frameIdx >= this.numFrames) {
+					this.annotateItem();
+					return;
+				}
+				this.getFrame(frameIdx);
+			},
 			annotateItem: function() {
 				let data = impl.getAnnotateData.call(this);
 				let request = {
@@ -246,6 +255,23 @@ export default function(impl) {
 	for(var key in impl.methods) {
 		component.methods[key] = impl.methods[key];
 	}
+
+	// make sure canvas-container takes up the correct size
+	// TODO: maybe we should always do this below im_after,
+	//       and let the konva divs in shape/track annotation be relative or whatever
+	if(!impl.template.im_after) {
+		impl.template.im_after = `
+<div
+	v-if="imageDims != null"
+	:style="{
+		width: imageDims.Width+'px',
+		height: imageDims.Height+'px',
+	}"
+	>
+</div>
+		`;
+	}
+
 	template = template.replace('[PARAMS]', impl.template.params ? impl.template.params : '');
 	template = template.replace('[IM_ABOVE]', impl.template.im_above ? impl.template.im_above : '');
 	template = template.replace('[IM_AFTER]', impl.template.im_after ? impl.template.im_after : '');
