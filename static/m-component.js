@@ -10,6 +10,7 @@ export default {
 			outputs: {},
 			layers: [],
 			losses: [],
+			repositories: [],
 			addForm: null,
 		};
 	},
@@ -32,6 +33,9 @@ export default {
 			if(params.Losses) {
 				this.losses = params.Losses;
 			}
+			if(params.Repositories) {
+				this.repositories = params.Repositories;
+			}
 		});
 	},
 	methods: {
@@ -41,6 +45,8 @@ export default {
 				outputType: '',
 				layer: '',
 				loss: '',
+				repoURL: '',
+				repoCommit: '',
 			};
 		},
 		save: function() {
@@ -51,6 +57,7 @@ export default {
 				Outputs: this.outputs,
 				Layers: this.layers,
 				Losses: this.losses,
+				Repositories: this.repositories,
 			};
 			utils.request(this, 'POST', '/pytorch/components/'+this.comp.ID, JSON.stringify({
 				Params: params,
@@ -76,6 +83,16 @@ export default {
 		},
 		removeLoss: function(i) {
 			this.losses.splice(i, 1);
+		},
+		addRepository: function() {
+			this.repositories.push({
+				URL: this.addForm.repoURL,
+				Commit: this.addForm.repoCommit,
+			});
+			this.resetForm();
+		},
+		removeRepository: function(i) {
+			this.repositories.splice(i, 1);
 		},
 	},
 	template: `
@@ -166,6 +183,33 @@ export default {
 							</td>
 							<td>
 								<button type="button" class="btn btn-primary" v-on:click="addLoss">Add</button>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Repositories</label>
+			<div class="col-sm-10">
+				<table class="table">
+					<tbody>
+						<tr v-for="(repo, idx) in repositories">
+							<td>{{ repo.URL }}</td>
+							<td>{{ repo.Commit }}</td>
+							<td>
+								<button type="button" class="btn btn-danger" v-on:click="removeRepository(idx)">Remove</button>
+							</td>
+						</tr>
+						<tr>
+							<td>
+								<input v-model="addForm.repoURL" type="text" class="form-control">
+							</td>
+							<td>
+								<input v-model="addForm.repoCommit" type="text" class="form-control">
+							</td>
+							<td>
+								<button type="button" class="btn btn-primary" v-on:click="addRepository">Add</button>
 							</td>
 						</tr>
 					</tbody>

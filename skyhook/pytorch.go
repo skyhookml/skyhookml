@@ -1,5 +1,13 @@
 package skyhook
 
+// A git repository that's used as a library in some component.
+type PytorchRepository struct {
+	URL string
+
+	// Optional (empty string for latest commit in default branch)
+	Commit string
+}
+
 type PytorchComponentParams struct {
 	// code defining a pytorch nn.Module called "M"
 	// forward pass takes some inputs, potentially some targets
@@ -16,6 +24,8 @@ type PytorchComponentParams struct {
 	// forward pass output dict also includes these layers and losses
 	Layers []string
 	Losses []string
+
+	Repositories []PytorchRepository
 
 	// TODO: some kind of preparation functions to support things like triplet loss
 }

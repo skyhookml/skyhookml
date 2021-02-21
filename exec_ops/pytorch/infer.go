@@ -14,6 +14,10 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 		return nil, err
 	}
 
+	if err := EnsureRepositories(components); err != nil {
+		return nil, err
+	}
+
 	// get the model path from the first input dataset
 	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
 	if err != nil {

@@ -25,6 +25,10 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
+	if err := EnsureRepositories(components); err != nil {
+		return err
+	}
+
 	// run the python op
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
