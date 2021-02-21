@@ -9,11 +9,13 @@ import (
 )
 
 func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	arch, components, _, err := GetArgs(url, node)
+	// check the ArchID just to make sure we have all git repositories
+	var params skyhook.PytorchInferParams
+	skyhook.JsonUnmarshal([]byte(node.Params), &params)
+	_, components, err := GetTrainArgs(url, params.ArchID)
 	if err != nil {
 		return nil, err
 	}
-
 	if err := EnsureRepositories(components); err != nil {
 		return nil, err
 	}
@@ -35,16 +37,19 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 	modelPath := strdata.(skyhook.StringData).Strings[0]
 
 	paramsArg := node.Params
-	archArg := string(skyhook.JsonMarshal(arch))
-	compsArg := string(skyhook.JsonMarshal(components))
 	cmd := skyhook.Command(
 		fmt.Sprintf("pytorch-exec-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/pytorch/run.py",
-		modelPath, paramsArg, archArg, compsArg,
+		modelPath, paramsArg,
 	)
 
-	op, err := python.NewPythonOp(cmd, url, node, outputDatasets)
-	return op, err
+	// get datasets for the python op
+	inputDatasets, err := exec_ops.ParentsToDatasets(url, node.Parents[1:])
+	if err != nil {
+		return nil, err
+	}
+
+	return python.NewPythonOp(cmd, url, node, inputDatasets, outputDatasets)
 }
 
 func init() {

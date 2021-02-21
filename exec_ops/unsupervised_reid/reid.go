@@ -24,21 +24,26 @@ func (e *TrainOp) Parallelism() int {
 }
 
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
-	arch, components, datasets, err := pytorch.GetArgs(e.url, e.node)
+	var params skyhook.PytorchTrainParams
+	skyhook.JsonUnmarshal([]byte(e.node.Params), &params)
+	arch, components, err := pytorch.GetTrainArgs(e.url, params.ArchID)
 	if err != nil {
 		return err
 	}
 
-	// pre-process the detections
-	var videoDataset, detectionDataset *skyhook.Dataset
-	for _, ds := range datasets {
-		if ds.DataType == skyhook.VideoType {
-			videoDataset = ds
-		} else if ds.DataType == skyhook.DetectionType {
-			detectionDataset = ds
-		}
+	if err := pytorch.EnsureRepositories(components); err != nil {
+		return err
 	}
-	items, err := exec_ops.GetItems(e.url, []skyhook.Dataset{*videoDataset, *detectionDataset})
+
+	datasets, err := exec_ops.GetParentDatasets(e.url, e.node)
+	if err != nil {
+		return err
+	}
+	videoDataset := datasets[0]
+	detectionDataset := datasets[1]
+
+	// pre-process the detections
+	items, err := exec_ops.GetItems(e.url, []skyhook.Dataset{videoDataset, detectionDataset})
 	if err != nil {
 		return err
 	}

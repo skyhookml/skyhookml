@@ -31,7 +31,6 @@ datasets = json.loads(datasets_arg)
 
 arch = arch['Params']
 comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
-datasets = {int(ds_id): dataset for ds_id, dataset in datasets.items()}
 
 class MyDataset(torch.utils.data.Dataset):
 	def __init__(self, datasets, keys, items):
@@ -66,19 +65,18 @@ class MyDataset(torch.utils.data.Dataset):
 		return inputs
 
 def get_datasets():
-	# get flat dataset list
-	dataset_list = []
-	for ds_spec in params['InputDatasets']:
-		dataset = datasets[ds_spec['ID']].copy()
-		dataset['Options'] = {}
-		if ds_spec['Options']:
-			dataset['Options'] = json.loads(ds_spec['Options'])
-		dataset_list.append(dataset)
+	# add options to datasets
+	dataset_list = [ds.copy() for ds in datasets]
+	for ds in dataset_list:
+		ds['Options'] = {}
+	for spec in params['InputOptions']:
+		dataset_list[spec['Idx']]['Options'] = json.loads(spec['Value'])
 
 	# get items
+	# only fetch once per unique dataset
 	items = {}
-	for dataset in datasets.values():
-		ds_id = dataset['ID']
+	unique_ds_ids = set([ds['ID'] for ds in datasets])
+	for ds_id in unique_ds_ids:
 		cur_items = requests.get(url+'/datasets/{}/items'.format(ds_id)).json()
 		for item in cur_items:
 			key = item['Key']
@@ -88,7 +86,7 @@ def get_datasets():
 				items[key] = {ds_id: item}
 	# only keep keys that exist in all datasets
 	for key in list(items.keys()):
-		if len(items[key]) != len(datasets):
+		if len(items[key]) != len(unique_ds_ids):
 			del items[key]
 
 	keys = list(items.keys())
@@ -110,7 +108,7 @@ train_loader = torch.utils.data.DataLoader(train_set, batch_size=32, shuffle=Tru
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, shuffle=True, num_workers=4, collate_fn=val_set.collate_fn)
 
 example_inputs = train_set.collate_fn([train_set[0]])[0:arch['NumInputs']]
-net = model.Net(arch, comps, params, example_inputs)
+net = model.Net(arch, comps, example_inputs)
 net.to(device)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 updated_lr = False

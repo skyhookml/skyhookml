@@ -6,31 +6,20 @@ export default {
 			node: null,
 			params: {
 				archID: '',
-				inputDatasets: [],
-				outputDatasets: [],
+				inputOptions: [],
 			},
-			datasets: {},
+			// list of {Name, DataType}
+			parents: [],
 			archs: {},
-			comps: {},
 			addForms: null,
 		};
 	},
 	created: function() {
 		this.resetForm();
 
-		utils.request(this, 'GET', '/datasets', null, (datasets) => {
-			datasets.forEach((ds) => {
-				this.$set(this.datasets, ds.ID, ds);
-			});
-		});
 		utils.request(this, 'GET', '/pytorch/archs', null, (archs) => {
 			archs.forEach((arch) => {
 				this.$set(this.archs, arch.ID, arch);
-			});
-		});
-		utils.request(this, 'GET', '/pytorch/components', null, (comps) => {
-			comps.forEach((comp) => {
-				this.$set(this.comps, comp.ID, comp);
 			});
 		});
 
@@ -42,75 +31,59 @@ export default {
 				if(s.ArchID) {
 					this.params.archID = s.ArchID;
 				}
-				if(s.InputDatasets) {
-					this.params.inputDatasets = s.InputDatasets;
-				}
-				if(s.OutputDatasets) {
-					this.params.outputDatasets = s.OutputDatasets;
+				if(s.InputOptions) {
+					this.params.inputOptions = s.InputOptions;
 				}
 			} catch(e) {}
+
+			if(!this.node.Parents) {
+				this.node.Parents = [];
+			}
+			this.parents = [];
+			this.node.Parents.forEach((parent, idx) => {
+				this.parents.push({
+					Name: 'unknown',
+					DataType: 'unknown',
+				});
+				if(parent.Type == 'n') {
+					utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
+						this.parents[idx].Name = node.Name;
+						this.parents[idx].DataType = node.DataTypes[parent.Index];
+					});
+				} else if(parent.Type == 'd') {
+					utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {
+						this.parents[idx].Name = ds.Name;
+						this.parents[idx].DataType = ds.DataType;
+					});
+				}
+			});
 		});
 	},
 	methods: {
 		resetForm: function() {
 			this.addForms = {
-				inputID: '',
+				inputIdx: '',
 				inputOptions: '',
-				outputComponentIdx: '',
-				outputLayer: '',
 			};
 		},
 		save: function() {
 			let params = {
 				ArchID: parseInt(this.params.archID),
-				InputDatasets: this.params.inputDatasets,
-				OutputDatasets: this.params.outputDatasets,
+				InputOptions: this.params.inputOptions,
 			};
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: JSON.stringify(params),
 			}));
 		},
 		addInput: function() {
-			this.params.inputDatasets.push({
-				ID: parseInt(this.addForms.inputID),
-				Options: this.addForms.inputOptions,
+			this.params.inputOptions.push({
+				Idx: parseInt(this.addForms.inputIdx),
+				Value: this.addForms.inputOptions,
 			});
 			this.resetForm();
 		},
 		removeInput: function(i) {
-			this.params.inputDatasets.splice(i, 1);
-		},
-		addOutput: function() {
-			let componentIdx = parseInt(this.addForms.outputComponentIdx);
-			let layer = this.addForms.outputLayer;
-			this.params.outputDatasets.push({
-				ComponentIdx: componentIdx,
-				Layer: layer,
-				DataType: this.getComponent(componentIdx).Params.Outputs[layer],
-			});
-			this.resetForm();
-		},
-		removeOutput: function(i) {
-			this.params.outputDatasets.splice(i, 1);
-		},
-		getComponent: function(compIdx) {
-			if(compIdx === '') {
-				return null;
-			}
-			compIdx = parseInt(compIdx);
-			if(!this.arch) {
-				return null;
-			}
-			if(compIdx >= this.arch.Params.Components.length) {
-				return null;
-			}
-			let compID = this.arch.Params.Components[compIdx].ID;
-			return this.comps[compID];
-		},
-	},
-	computed: {
-		arch: function() {
-			return this.archs[this.params.archID];
+			this.params.inputOptions.splice(i, 1);
 		},
 	},
 	template: `
@@ -126,92 +99,37 @@ export default {
 				</select>
 			</div>
 		</div>
-		<template v-if="arch">
-			<div class="form-group row">
-				<label class="col-sm-2 col-form-label">Input Datasets</label>
-				<div class="col-sm-10">
-					<table class="table">
-						<tbody>
-							<tr v-for="(dsSpec, i) in params.inputDatasets">
-								<td>
-									<template v-if="dsSpec.ID in datasets">{{ datasets[dsSpec.ID].Name }}</template>
-									<template v-else>Unknown</template>
-								</td>
-								<td>{{ dsSpec.Options }}</td>
-								<td>
-									<button type="button" class="btn btn-danger" v-on:click="removeInput(i)">Remove</button>
-								</td>
-							</tr>
-							<tr>
-								<td>
-									<select v-model="addForms.inputID" class="form-control">
-										<template v-for="ds in datasets">
-											<option :key="ds.ID" :value="ds.ID">{{ ds.Name }}</option>
-										</template>
-									</select>
-								</td>
-								<td>
-									<input class="form-control" type="text" v-model="addForms.inputOptions" />
-								</td>
-								<td>
-									<button type="button" class="btn btn-primary" v-on:click="addInput">Add</button>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-			</div>
-			<div class="form-group row">
-				<label class="col-sm-2 col-form-label">Outputs</label>
-				<div class="col-sm-10">
-					<table class="table">
-						<thead>
-							<tr>
-								<th>Component</th>
-								<th>Layer</th>
-								<th>Data Type</th>
-								<th></th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr v-for="(spec, i) in params.outputDatasets">
-								<td>
-									<template v-if="getComponent(spec.ComponentIdx)">{{ getComponent(spec.ComponentIdx).Name }}</template>
-									<template v-else>Component {{ spec.ComponentIdx }}</template>
-								</td>
-								<td>{{ spec.Layer }}</td>
-								<td>{{ spec.DataType }}</td>
-								<td>
-									<button type="button" class="btn btn-danger" v-on:click="removeOutput(i)">Remove</button>
-								</td>
-							</tr>
-							<tr>
-								<td>
-									<select v-model="addForms.outputComponentIdx" class="form-control">
-										<template v-for="(compSpec, compIdx) in arch.Params.Components">
-											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">{{ comps[compSpec.ID].Name }}</option>
-										</template>
-									</select>
-								</td>
-								<td>
-									<template v-if="getComponent(addForms.outputComponentIdx)">
-										<select v-model="addForms.outputLayer" class="form-control">
-											<template v-for="(_, layer) in getComponent(addForms.outputComponentIdx).Params.Outputs">
-												<option :key="layer" :value="layer">{{ layer }}</option>
-											</template>
-										</select>
+		<div class="form-group row" v-if="parents.length > 0">
+			<label class="col-sm-2 col-form-label">Input Options</label>
+			<div class="col-sm-10">
+				<table class="table">
+					<tbody>
+						<tr v-for="(spec, i) in params.inputOptions">
+							<td>{{ parents[spec.Idx].Name }}</td>
+							<td>{{ spec.Value }}</td>
+							<td>
+								<button type="button" class="btn btn-danger" v-on:click="removeInput(i)">Remove</button>
+							</td>
+						</tr>
+						<tr>
+							<td>
+								<select v-model="addForms.inputIdx" class="form-control">
+									<template v-for="(parent, parentIdx) in parents">
+										<option :value="parentIdx">{{ parent.Name }} ({{ parent.DataType }})</option>
 									</template>
-								</td>
-								<td></td>
-								<td>
-									<button type="button" class="btn btn-primary" v-on:click="addOutput">Add</button>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
+								</select>
+							</td>
+							<td>
+								<input class="form-control" type="text" v-model="addForms.inputOptions" />
+							</td>
+							<td>
+								<button type="button" class="btn btn-primary" v-on:click="addInput">Add</button>
+							</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
-		</template>
+		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>
 	</template>
 </div>

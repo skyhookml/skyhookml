@@ -4,7 +4,6 @@ import (
 	"../../skyhook"
 	"../../exec_ops"
 	strack "../../exec_ops/simple_tracker"
-	"../../exec_ops/pytorch"
 
 	"bufio"
 	"encoding/binary"
@@ -36,11 +35,6 @@ type Tracker struct {
 }
 
 func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-	arch, components, _, err := pytorch.GetArgs(url, node)
-	if err != nil {
-		return nil, err
-	}
-
 	// get the model path from the first input dataset
 	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
 	if err != nil {
@@ -57,13 +51,10 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 	}
 	modelPath := strdata.(skyhook.StringData).Strings[0]
 
-	paramsArg := node.Params
-	archArg := string(skyhook.JsonMarshal(arch))
-	compsArg := string(skyhook.JsonMarshal(components))
 	cmd := skyhook.Command(
 		fmt.Sprintf("reid_tracker-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/reid_tracker/run.py",
-		modelPath, paramsArg, archArg, compsArg,
+		modelPath,
 	)
 
 	return &Tracker{

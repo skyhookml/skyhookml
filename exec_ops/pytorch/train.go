@@ -20,12 +20,19 @@ func (e *TrainOp) Parallelism() int {
 }
 
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
-	arch, components, datasets, err := GetArgs(e.url, e.node)
+	var params skyhook.PytorchTrainParams
+	skyhook.JsonUnmarshal([]byte(e.node.Params), &params)
+	arch, components, err := GetTrainArgs(e.url, params.ArchID)
 	if err != nil {
 		return err
 	}
 
 	if err := EnsureRepositories(components); err != nil {
+		return err
+	}
+
+	datasets, err := exec_ops.GetParentDatasets(e.url, e.node)
+	if err != nil {
 		return err
 	}
 

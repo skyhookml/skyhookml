@@ -77,21 +77,25 @@ type PytorchArch struct {
 	Params PytorchArchParams
 }
 
-type PytorchNodeParams struct {
+type PytorchTrainParams struct {
 	ArchID int
 
-	// IDs of other TrainNodes to load model from
-	// TODO: should probably specify some kind of names mapping
-	// (if arch has only one instance of each component, then mapping should
-	// be clear, but need mapping in case arch has multiple of the same component)
-	LoadFrom []int
+	// options for each input dataset
+	// the number of inputs connected to this node should be NumInputs+NumTargets
+	// (but we don't need options for all of them)
+	InputOptions []struct{
+		Idx int
+		// JSON-encoded; structure depends on data type
+		Value string
+	}
+}
 
-	// input datasets, length equals NumInputs+NumTargets
-	InputDatasets []struct{
-		ID int
+type PytorchInferParams struct {
+	ArchID int
 
-		// JSON options, structure depends on data type
-		Options string
+	InputOptions []struct{
+		Idx int
+		Value string
 	}
 
 	OutputDatasets []struct{

@@ -54,7 +54,7 @@ type PythonOp struct {
 	mu sync.Mutex
 }
 
-func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
+func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
 	stdin := cmd.Stdin()
 	stdout := cmd.Stdout()
 
@@ -67,11 +67,7 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, outputData
 	metaPacket.Code = node.Params
 	metaPacket.OutputTypes = node.DataTypes
 
-	datasets, err := exec_ops.GetParentDatasets(url, node)
-	if err != nil {
-		return nil, fmt.Errorf("error getting parent datasets: %v", err)
-	}
-	for _, ds := range datasets {
+	for _, ds := range inputDatasets {
 		metaPacket.InputTypes = append(metaPacket.InputTypes, ds.DataType)
 	}
 
@@ -292,13 +288,13 @@ func init() {
 		},
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
-			fmt.Println("python output datasets", outputDatasets)
-			op, err := NewPythonOp(cmd, url, node, outputDatasets)
+			inputDatasets, err := exec_ops.GetParentDatasets(url, node)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error getting parent datasets: %v", err)
 			}
-			return op, nil
+
+			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
+			return NewPythonOp(cmd, url, node, inputDatasets, outputDatasets)
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,

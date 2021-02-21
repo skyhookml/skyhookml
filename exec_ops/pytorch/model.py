@@ -9,13 +9,13 @@ def eprint(s):
 	sys.stderr.flush()
 
 class Net(torch.nn.Module):
-	def __init__(self, arch, comps, params, example_inputs):
+	def __init__(self, arch, comps, example_inputs, output_datasets=None):
 		super(Net, self).__init__()
 
 		self.arch = arch
 		self.comps = comps
-		self.params = params
 		self.example_inputs = example_inputs
+		self.output_datasets = output_datasets
 
 		# collect modules
 		self.mlist = torch.nn.ModuleList()
@@ -85,10 +85,13 @@ class Net(torch.nn.Module):
 			layers[comp_idx] = cur_outputs
 
 		# collect outputs
-		outputs = []
-		for out_spec in self.params['OutputDatasets']:
-			layer = get_layer(out_spec)
-			outputs.append(layer)
+		if self.output_datasets is None:
+			outputs = [layers]
+		else:
+			outputs = []
+			for out_spec in self.output_datasets:
+				layer = get_layer(out_spec)
+				outputs.append(layer)
 
 		if targets is None:
 			return tuple(outputs)
@@ -105,5 +108,7 @@ class Net(torch.nn.Module):
 	def get_save_dict(self):
 		return {
 			'model': self.state_dict(),
+			'arch': self.arch,
+			'comps': self.comps,
 			'example_inputs': self.example_inputs,
 		}

@@ -16,25 +16,22 @@ import util
 
 node_id = int(sys.argv[1])
 params_arg = sys.argv[2]
-arch_arg = sys.argv[3]
-comps_arg = sys.argv[4]
 
 params = json.loads(params_arg)
-arch = json.loads(arch_arg)
-comps = json.loads(comps_arg)
-
-arch = arch['Params']
-comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
 
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
 model_path = 'models/{}.pt'.format(node_id)
 save_dict = torch.load(model_path)
-net = model.Net(arch, comps, params, save_dict['example_inputs'])
+net = model.Net(save_dict['arch'], save_dict['comps'], save_dict['example_inputs'], output_datasets=params['OutputDatasets'])
 net.to(device)
 
 net.load_state_dict(save_dict['model'])
 net.eval()
+
+input_options = {}
+for spec in params['InputOptions']:
+	input_options[spec['Idx']] = json.loads(spec['Value'])
 
 meta = None
 def meta_func(x):
@@ -46,11 +43,7 @@ def callback_func(*inputs):
 	datas = []
 	for i, input in enumerate(inputs):
 		t = meta['InputTypes'][i]
-		opts = params['InputDatasets'][i]['Options']
-		if opts:
-			opts = json.loads(opts)
-		else:
-			opts = {}
+		opts = input_options.get(i, {})
 		data = util.prepare_input(t, input, opts)
 		data = util.collate(t, [data])
 		datas.append(data)
