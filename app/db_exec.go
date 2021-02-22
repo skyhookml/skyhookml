@@ -145,7 +145,29 @@ func (node *DBExecNode) Delete() {
 		GetDataset(id).DeleteExecRef(node.ID)
 	}
 
-	// TODO: check for other exec nodes that reference this node as a parent
+	// remove reference to this node from children
+	for _, other := range ListExecNodes() {
+		needsUpdate := false
+		for _, parent := range other.Parents {
+			if parent.Type == "n" && parent.ID == node.ID {
+				needsUpdate = true
+				break
+			}
+		}
+		if !needsUpdate {
+			continue
+		}
+		var newParents []skyhook.ExecParent
+		for _, parent := range other.Parents {
+			if parent.Type == "n" && parent.ID == node.ID {
+				continue
+			}
+			newParents = append(newParents, parent)
+		}
+		other.Update(ExecNodeUpdate{
+			Parents: &newParents,
+		})
+	}
 
 	db.Exec("DELETE FROM exec_nodes WHERE id = ?", node.ID)
 }
