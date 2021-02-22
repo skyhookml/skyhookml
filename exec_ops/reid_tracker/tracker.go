@@ -7,26 +7,37 @@ import (
 
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"runtime"
 	"strings"
 	"sync"
 )
 
+type Params struct {
+	Simple strack.Params
+	// what weight to give to reid probabilities
+	// probs = strack_probs + weight*reid_probs
+	Weight *float64
+}
+
+func (params Params) GetWeight() float64 {
+	if params.Weight == nil {
+		return 1
+	}
+	return *params.Weight
+}
+
 const MinPadding = 4
 const CropSize = 64
-
-type TrackedDetection struct {
-	skyhook.Detection
-	FrameIdx int
-	Image skyhook.Image
-}
 
 type Tracker struct {
 	URL string
 	Dataset skyhook.Dataset
+	Params Params
 
 	mu sync.Mutex
 	cmd *skyhook.Cmd
@@ -35,6 +46,13 @@ type Tracker struct {
 }
 
 func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+	var params Params
+	// try to decode parameters, but it's okay if it's not configured
+	// since we have default settings
+	if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
+		log.Printf("[reid_tracker] warning: error decoding parameters: %v", err)
+	}
+
 	// get the model path from the first input dataset
 	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
 	if err != nil {
@@ -60,6 +78,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 	return &Tracker{
 		URL: url,
 		Dataset: outputDatasets[0],
+		Params: params,
 		cmd: cmd,
 		stdin: cmd.Stdin(),
 		rd: bufio.NewReader(cmd.Stdout()),
@@ -83,7 +102,8 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 	detectionData := data1.(skyhook.DetectionData)
 
 	ndetections := make([][]skyhook.Detection, len(detectionData.Detections))
-	activeTracks := make(map[int][]TrackedDetection)
+	activeTracks := make(map[int][]strack.TrackedDetection)
+	activeImages := make(map[int][]skyhook.Image) // images corresponding to activeTracks
 	nextTrackID := 1
 
 	datas := []skyhook.Data{videoData, detectionData}
@@ -100,9 +120,11 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 		var rightImages []skyhook.Image
 
 		var activeIDs []int
+		var activeList [][]strack.TrackedDetection
 		for id, track := range activeTracks {
 			activeIDs = append(activeIDs, id)
-			leftImages = append(leftImages, track[len(track)-1].Image)
+			activeList = append(activeList, track)
+			leftImages = append(leftImages, activeImages[id][len(track)-1])
 		}
 
 		for _, d := range dlist {
@@ -154,18 +176,27 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 			line = strings.TrimSpace(line[len(signature):])
 			var matrix [][]float64
 			skyhook.JsonUnmarshal([]byte(line), &matrix)
-			matches := strack.ExtractMatches(matrix)
+
+			// combine this with strack matrix (uses spatial bbox coordinates)
+			simpleMatrix := e.Params.Simple.ComputeScores(frameIdx, activeList, dlist)
+			for i := range matrix {
+				for j := range matrix[i] {
+					matrix[i][j] = e.Params.GetWeight()*matrix[i][j] + simpleMatrix[i][j]
+				}
+			}
+
+			matches := strack.Params{}.ExtractMatches(matrix)
 
 			for _, match := range matches {
 				trackIdx, detectionIdx := match[0], match[1]
 				trackID := activeIDs[trackIdx]
 				detection := dlist[detectionIdx]
 				detection.TrackID = trackID
-				activeTracks[trackID] = append(activeTracks[trackID], TrackedDetection{
+				activeTracks[trackID] = append(activeTracks[trackID], strack.TrackedDetection{
 					Detection: detection,
 					FrameIdx: frameIdx,
-					Image: rightImages[detectionIdx],
 				})
+				activeImages[trackID] = append(activeImages[trackID], rightImages[detectionIdx])
 				ndetections[frameIdx] = append(ndetections[frameIdx], detection)
 				matchedDetections[detectionIdx] = true
 			}
@@ -178,18 +209,17 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 			trackID := nextTrackID
 			nextTrackID++
 			detection.TrackID = trackID
-			activeTracks[trackID] = []TrackedDetection{TrackedDetection{
+			activeTracks[trackID] = []strack.TrackedDetection{strack.TrackedDetection{
 				Detection: detection,
 				FrameIdx: frameIdx,
-				Image: rightImages[j],
 			}}
+			activeImages[trackID] = append(activeImages[trackID], rightImages[j])
 			ndetections[frameIdx] = append(ndetections[frameIdx], detection)
 		}
 
 		// remove old active tracks
 		for trackID, track := range activeTracks {
-			// TODO: parameter
-			if frameIdx - track[len(track)-1].FrameIdx < 10 {
+			if frameIdx - track[len(track)-1].FrameIdx < e.Params.Simple.GetMaxAge() {
 				continue
 			}
 			delete(activeTracks, trackID)

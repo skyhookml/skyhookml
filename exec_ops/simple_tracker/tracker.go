@@ -4,6 +4,8 @@ import (
 	"../../skyhook"
 	"../../exec_ops"
 
+	"encoding/json"
+	"log"
 	"runtime"
 
 	"github.com/mitroadmaps/gomapinfer/common"
@@ -17,10 +19,34 @@ func abs(x int) int {
 	}
 }
 
-type Tracker struct {
-	URL string
-	Node skyhook.ExecNode
-	Dataset skyhook.Dataset
+type Params struct {
+	// max number of steps (frames) to use to estimate velocity
+	VelocitySteps int
+	// minimum IOU to consider when connecting two detections
+	MinIOU float64
+	// maximum age (in frames) of a track before it's considered inactive
+	MaxAge int
+}
+
+func (params Params) GetVelocitySteps() int {
+	if params.VelocitySteps == 0 {
+		return 5
+	}
+	return params.VelocitySteps
+}
+
+func (params Params) GetMinIOU() float64 {
+	if params.MinIOU == 0 {
+		return 0.1
+	}
+	return params.MinIOU
+}
+
+func (params Params) GetMaxAge() int {
+	if params.MaxAge == 0 {
+		return 10
+	}
+	return params.MaxAge
 }
 
 type TrackedDetection struct {
@@ -35,14 +61,9 @@ func (d TrackedDetection) Rectangle() common.Rectangle {
 	}
 }
 
-func (e *Tracker) Parallelism() int {
-	return runtime.NumCPU()
-}
-
 // helper function: estimate current position of track in new frame
 // we make the estimation using the object's recent average speed
-// TODO: parameterize targetFrame
-func EstimatePosition(curFrame int, track []TrackedDetection) TrackedDetection {
+func (params Params) EstimatePosition(curFrame int, track []TrackedDetection) TrackedDetection {
 	lastDetection := track[len(track)-1]
 
 	if len(track) == 1 {
@@ -51,7 +72,7 @@ func EstimatePosition(curFrame int, track []TrackedDetection) TrackedDetection {
 
 	// find detection closest to a frame a certain interval in the past
 	// use this to get a speed estimate
-	targetFrame := lastDetection.FrameIdx - 5
+	targetFrame := lastDetection.FrameIdx - params.GetVelocitySteps()
 	var bestDetection TrackedDetection
 	var bestOffset int = -1
 	for _, d := range track[0:len(track)-1] {
@@ -74,11 +95,11 @@ func EstimatePosition(curFrame int, track []TrackedDetection) TrackedDetection {
 	}}
 }
 
-func ComputeScores(curFrame int, activeTracks [][]TrackedDetection, dlist []skyhook.Detection) [][]float64 {
+func (params Params) ComputeScores(curFrame int, activeTracks [][]TrackedDetection, dlist []skyhook.Detection) [][]float64 {
 	matrix := make([][]float64, len(activeTracks))
 	for i, track := range activeTracks {
 		matrix[i] = make([]float64, len(dlist))
-		curEstimate := EstimatePosition(curFrame, track)
+		curEstimate := params.EstimatePosition(curFrame, track)
 		trackRect := curEstimate.Rectangle()
 
 		for j, detection := range dlist {
@@ -91,7 +112,7 @@ func ComputeScores(curFrame int, activeTracks [][]TrackedDetection, dlist []skyh
 
 // helper function: extract matches from matrix
 // I don't think hungarian algorithm works too well here, instead we do simple greedy approach
-func ExtractMatches(matrix [][]float64) [][2]int {
+func (params Params) ExtractMatches(matrix [][]float64) [][2]int {
 	if len(matrix) == 0 || len(matrix[0]) == 0 {
 		return nil
 	}
@@ -104,8 +125,7 @@ func ExtractMatches(matrix [][]float64) [][2]int {
 	}
 	rowMax := make([]Candidate, len(matrix))
 	for i := range matrix {
-		// TODO: make the 0.1 minimum IOU score a parameter (?)
-		rowMax[i] = Candidate{-1, -1, 0.1}
+		rowMax[i] = Candidate{-1, -1, params.GetMinIOU()}
 		for j := range matrix[i] {
 			prob := matrix[i][j]
 			if prob > rowMax[i].Score {
@@ -141,6 +161,17 @@ func ExtractMatches(matrix [][]float64) [][2]int {
 	return matches
 }
 
+type Tracker struct {
+	URL string
+	Node skyhook.ExecNode
+	Dataset skyhook.Dataset
+	Params Params
+}
+
+func (e *Tracker) Parallelism() int {
+	return runtime.NumCPU()
+}
+
 func (e *Tracker) Apply(task skyhook.ExecTask) error {
 	data, err := task.Items[0].LoadData()
 	if err != nil {
@@ -165,11 +196,11 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 			activeList = append(activeList, track)
 		}
 
-		matrix := ComputeScores(frameIdx, activeList, dlist)
+		matrix := e.Params.ComputeScores(frameIdx, activeList, dlist)
 
 		// compute matches, and add detections to the matched tracks
 		// detections that didn't match to any track will form new tracks
-		matches := ExtractMatches(matrix)
+		matches := e.Params.ExtractMatches(matrix)
 		matchedDetections := make([]bool, len(dlist))
 		for _, match := range matches {
 			trackIdx, detectionIdx := match[0], match[1]
@@ -199,8 +230,7 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 
 		// remove old active tracks
 		for trackID, track := range activeTracks {
-			// TODO: parameter
-			if frameIdx - track[len(track)-1].FrameIdx < 10 {
+			if frameIdx - track[len(track)-1].FrameIdx < e.Params.GetMaxAge() {
 				continue
 			}
 			delete(activeTracks, trackID)
@@ -223,7 +253,14 @@ func init() {
 		},
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-			op := &Tracker{url, node, outputDatasets[0]}
+			var params Params
+			// try to decode parameters, but it's okay if it's not configured
+			// since we have default settings
+			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
+				log.Printf("[simple_tracker] warning: error decoding parameters: %v", err)
+			}
+
+			op := &Tracker{url, node, outputDatasets[0], params}
 			return op, nil
 		},
 		Incremental: true,

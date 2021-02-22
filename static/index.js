@@ -14,6 +14,8 @@ import MComp from './m-component.js';
 
 import Queries from './queries.js';
 import ExecDetectionFilter from './exec-edit-detection_filter.js';
+import ExecSimpleTracker from './exec-edit-simple_tracker.js';
+import ExecReidTracker from './exec-edit-reid_tracker.js';
 import ExecPython from './exec-edit-python.js';
 import ExecPytorchTrain from './exec-edit-pytorch_train.js';
 import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
@@ -41,6 +43,8 @@ const router = new VueRouter({
 
 		{path: '/ws/:ws/queries', component: Queries},
 		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
+		{path: '/ws/:ws/exec/simple_tracker/:nodeid', component: ExecSimpleTracker},
+		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
 		{path: '/ws/:ws/exec/pytorch_train/:nodeid', component: ExecPytorchTrain},
 		{path: '/ws/:ws/exec/pytorch_infer/:nodeid', component: ExecPytorchInfer},
