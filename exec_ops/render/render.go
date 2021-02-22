@@ -45,8 +45,14 @@ func (e *Render) Parallelism() int {
 }
 
 func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
-	canvas := datas[0].(skyhook.ImageData).Images[0].Copy()
-	for _, data := range datas[1:] {
+	var canvas skyhook.Image
+	var canvases []skyhook.Image
+	for _, data := range datas {
+		if data.Type() == skyhook.ImageType {
+			canvas = data.(skyhook.ImageData).Images[0].Copy()
+			canvases = append(canvases, canvas)
+		}
+
 		if data.Type() == skyhook.IntType {
 			x := data.(skyhook.IntData).Ints[0]
 			canvas.DrawText(skyhook.RichText{Text: strconv.Itoa(x)})
@@ -74,6 +80,24 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 			}
 		}
 	}
+
+	if len(canvases) > 1 {
+		// stack the canvases vertically
+		var dims [2]int
+		for _, im := range canvases {
+			if im.Width > dims[0] {
+				dims[0] = im.Width
+			}
+			dims[1] += im.Height
+		}
+		canvas = skyhook.NewImage(dims[0], dims[1])
+		heightOffset := 0
+		for _, im := range canvases {
+			canvas.DrawImage(0, heightOffset, im)
+			heightOffset += im.Height
+		}
+	}
+
 	return canvas, nil
 }
 
@@ -88,14 +112,29 @@ func (e *Render) Apply(task skyhook.ExecTask) error {
 	}
 
 	// first input should be video data or image data
+	// there may be multiple video/image that we want to render
+	// but they should all be the same type (and, if video, they must have same framerates)
+	// the output will have all the video/image stacked vertically
 	if inputDatas[0].Type() == skyhook.VideoType {
-		// use video data to get the canvas width/height for rendering
-		videoData := inputDatas[0].(skyhook.VideoData)
-		dims := videoData.Metadata.Dims
+		// use video metadata to determine the canvas dimensions
+		var dims [2]int
+		var videoMetadata skyhook.VideoMetadata
+		for _, data := range inputDatas {
+			if data.Type() != skyhook.VideoType {
+				continue
+			}
+			videoData := data.(skyhook.VideoData)
+			videoMetadata = videoData.Metadata
+			curDims := videoData.Metadata.Dims
+			if curDims[0] > dims[0] {
+				dims[0] = curDims[0]
+			}
+			dims[1] += curDims[1]
+		}
 
 		imCh := make(chan skyhook.Image)
 		doneCh := make(chan error)
-		rd, cmd := skyhook.MakeVideo(&skyhook.ChanReader{imCh}, dims, videoData.Metadata.Framerate)
+		rd, cmd := skyhook.MakeVideo(&skyhook.ChanReader{imCh}, dims, videoMetadata.Framerate)
 		// save encoded video to buffer in background
 		buf := new(bytes.Buffer)
 		go func() {
@@ -130,7 +169,7 @@ func (e *Render) Apply(task skyhook.ExecTask) error {
 
 		output := skyhook.VideoData{
 			Bytes: buf.Bytes(),
-			Metadata: videoData.Metadata,
+			Metadata: videoMetadata,
 		}
 		return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
 	} else if inputDatas[0].Type() == skyhook.ImageType {
