@@ -39,11 +39,12 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	if err != nil {
 		return err
 	}
-	videoDataset := datasets[0]
-	detectionDataset := datasets[1]
+	videoDataset := datasets["video"][0]
+	detectionDataset := datasets["detections"][0]
+	datasetList := []skyhook.Dataset{videoDataset, detectionDataset}
 
 	// pre-process the detections
-	items, err := exec_ops.GetItems(e.url, []skyhook.Dataset{videoDataset, detectionDataset})
+	items, err := exec_ops.GetItems(e.url, datasetList)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
-	datasetsArg := string(skyhook.JsonMarshal(datasets))
+	datasetsArg := string(skyhook.JsonMarshal(datasetList))
 	fmt.Println(e.node.ID, e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
 	cmd := exec.Command(
 		"python3", "exec_ops/unsupervised_reid/train.py",
@@ -108,11 +109,11 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			op := &TrainOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets[0],
+				dataset: outputDatasets["model"],
 			}
 			return op, nil
 		},

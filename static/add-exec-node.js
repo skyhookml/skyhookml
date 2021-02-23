@@ -4,8 +4,8 @@ export default {
 	data: function() {
 		return {
 			name: '',
-			dataTypes: [],
-			addDataTypeSelection: null,
+			outputs: [],
+			addOutputForm: null,
 			op: null,
 			categories: [
 				{
@@ -16,25 +16,33 @@ export default {
 							ID: "filter",
 							Name: "Filter",
 							Description: "Filter",
-							DataTypes: ["int"],
+							Inputs: [{Name: "inputs", Variable: true}],
+							Outputs: [{Name: "output", DataType: "int"}],
 						},
 						{
 							ID: "detection_filter",
 							Name: "Detection Filter",
 							Description: "Detection Filter",
-							DataTypes: ["detection"],
+							Inputs: [{Name: "detections", DataTypes: ["detection"]}],
+							Outputs: [{Name: "detections", DataType: "detection"}],
 						},
 						{
 							ID: "simple_tracker",
 							Name: "Simple Tracker",
 							Description: "Simple Tracker",
-							DataTypes: ["detection"],
+							Inputs: [{Name: "detections", DataTypes: ["detection"]}],
+							Outputs: [{Name: "tracks", DataType: "detection"}],
 						},
 						{
 							ID: "reid_tracker",
 							Name: "Reid Tracker",
 							Description: "Tracker using Re-identification Model",
-							DataTypes: ["detection"],
+							Inputs: [
+								{Name: "model", DataTypes: ["string"]},
+								{Name: "video", DataTypes: ["video"]},
+								{Name: "detections", DataTypes: ["detection"]},
+							],
+							Outputs: [{Name: "tracks", DataType: "detection"}],
 						},
 					],
 				},
@@ -43,37 +51,54 @@ export default {
 					Name: "Model",
 					Ops: [
 						{
-							ID: "model",
-							Name: "Model",
-							Description: "Model",
-						},
-						{
 							ID: "pytorch_train",
 							Name: "Pytorch (train)",
 							Description: "Pytorch (train)",
-							DataTypes: ["string"],
+							Inputs: [
+								{Name: "inputs", Variable: true},
+								{Name: "models", DataTypes: ["string"], Variable: true},
+							],
+							Outputs: [{Name: "model", DataType: "string"}],
 						},
 						{
 							ID: "pytorch_infer",
 							Name: "Pytorch (infer)",
 							Description: "Pytorch (infer)",
+							Inputs: [
+								{Name: "model", DataTypes: ["string"]},
+								{Name: "inputs", Variable: true},
+							],
+							Outputs: [],
 						},
 						{
 							ID: "yolov3_train",
 							Name: "Yolov3 (train)",
 							Description: "Yolov3 (train)",
-							DataTypes: ["string"],
+							Inputs: [
+								{Name: "images", DataTypes: ["video", "image"]},
+								{Name: "detections", DataTypes: ["detection"]},
+							],
+							Outputs: [{Name: "model", DataType: "string"}],
 						},
 						{
 							ID: "yolov3_infer",
 							Name: "Yolov3 (infer)",
 							Description: "Yolov3 (infer)",
+							Inputs: [
+								{Name: "model", DataTypes: ["string"]},
+								{Name: "images", DataTypes: ["video", "image"]},
+							],
+							Outputs: [{Name: "detections", DataType: "detection"}],
 						},
 						{
 							ID: "unsupervised_reid",
 							Name: "Unsupervised Re-identification",
 							Description: "Self-Supervised Re-identification Model",
-							DataTypes: ["string"],
+							Inputs: [
+								{Name: "video", DataTypes: ["video"]},
+								{Name: "detections", DataTypes: ["detection"]},
+							],
+							Outputs: [{Name: "model", DataType: "string"}],
 						},
 					],
 				},
@@ -85,15 +110,19 @@ export default {
 							ID: "video_sample",
 							Name: "Sample video",
 							Description: "Sample images or segments from video",
+							Inputs: [
+								{Name: "video", DataTypes: ["video"]},
+								{Name: "others", Variable: true},
+							],
 							// could also be video, but we'll update it in the node editor
-							DataTypes: ["image"],
-							Parents: ["video"],
+							Outputs: [{Name: "samples", DataType: "image"}],
 						},
 						{
 							ID: "render",
 							Name: "Render video",
 							Description: "Render video from various input data types",
-							DataTypes: ["video"],
+							Inputs: [{Name: "inputs", Variable: true}],
+							Outputs: [{Name: "output", DataType: "video"}],
 						},
 					],
 				},
@@ -105,11 +134,15 @@ export default {
 							ID: "python",
 							Name: "Python",
 							Description: "Express a Python function for the system to execute",
+							Inputs: [{Name: "inputs", Variable: true}],
 						},
 					],
 				},
 			],
 		};
+	},
+	created: function() {
+		this.resetForm();
 	},
 	mounted: function() {
 		$(this.$refs.modal).modal('show');
@@ -121,7 +154,8 @@ export default {
 				Op: this.op.ID,
 				Params: '',
 				Parents: null,
-				DataTypes: this.dataTypes,
+				Inputs: this.op.Inputs,
+				Outputs: this.outputs,
 				Workspace: this.$route.params.ws,
 			};
 			utils.request(this, 'POST', '/exec-nodes', JSON.stringify(params), () => {
@@ -131,16 +165,27 @@ export default {
 		},
 		selectOp: function(op) {
 			this.op = op;
-			if(op.DataTypes) {
-				this.dataTypes = op.DataTypes;
+			if(op.Outputs) {
+				this.outputs = op.Outputs;
+			} else {
+				this.outputs = [];
 			}
 		},
-		addDataType: function() {
-			this.dataTypes.push(this.addDataTypeSelection);
-			this.addDataTypeSelection = '';
+		resetForm: function() {
+			this.addOutputForm = {
+				name: '',
+				dataType: '',
+			};
 		},
-		removeDataType: function(i) {
-			this.dataTypes.splice(i, 1);
+		addOutput: function() {
+			this.outputs.push({
+				Name: this.addOutputForm.name,
+				DataTypes: [this.addOutputForm.dataType],
+			});
+			this.resetForm();
+		},
+		removeOutput: function(i) {
+			this.outputs.splice(i, 1);
 		},
 	},
 	template: `
@@ -195,33 +240,39 @@ export default {
 						</div>
 					</div>
 					<div class="form-group row">
-						<label class="col-sm-2 col-form-label">Output Type</label>
+						<label class="col-sm-2 col-form-label">Outputs</label>
 						<div class="col-sm-10">
-							<template v-if="op != null && op.DataTypes">
-								<input type="text" readonly class="form-control-plaintext" :value="op.DataTypes">
-							</template>
-							<template v-else>
-								<table class="table">
-									<tbody>
-										<tr v-for="(t, i) in dataTypes">
-											<td>{{ t }}</td>
-											<td>
-												<button type="button" class="btn btn-danger" v-on:click="removeDataType(i)">Remove</button>
-											</td>
-										</tr>
-										<tr>
-											<td>
-												<select v-model="addDataTypeSelection" class="form-control">
-													<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
-												</select>
-											</td>
-											<td>
-												<button type="button" class="btn btn-primary" v-on:click="addDataType">Add</button>
-											</td>
-										</tr>
-									</tbody>
-								</table>
-							</template>
+							<table v-if="op != null" class="table">
+								<thead>
+									<tr>
+										<th>Name</th>
+										<th>Type</th>
+										<th v-if="!op.Outputs"></th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(output, i) in outputs">
+										<td>{{ output.Name }}</td>
+										<td>{{ output.DataTypes }}</td>
+										<td v-if="!op.Outputs">
+											<button type="button" class="btn btn-danger" v-on:click="removeOutput(i)">Remove</button>
+										</td>
+									</tr>
+									<tr v-if="!op.Outputs">
+										<td>
+											<input type="text" class="form-control" v-model="addOutputForm.name" />
+										</td>
+										<td>
+											<select v-model="addOutputForm.dataType" class="form-control">
+												<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
+											</select>
+										</td>
+										<td>
+											<button type="button" class="btn btn-primary" v-on:click="addOutput">Add</button>
+										</td>
+									</tr>
+								</tbody>
+							</table>
 						</div>
 					</div>
 					<div class="form-group row">

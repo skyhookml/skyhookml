@@ -11,20 +11,26 @@ type ExecTask struct {
 	// TODO: operation may need to produce multiple output keys at some task
 	// For other operations, I think this can be arbitrary, but usually it's still related to the output key
 	Key string
-	Items []Item
+
+	// Generally maps from input name to list of items in each dataset at that input
+	Items map[string][][]Item
 
 	Metadata string
 }
 
 type ExecOpImpl struct {
 	Requirements func(url string, node ExecNode) map[string]int
-	GetTasks func(url string, node ExecNode, items [][]Item) ([]ExecTask, error)
-	Prepare func(url string, node ExecNode, outputDatasets []Dataset) (ExecOp, error)
+	// items is: input name -> input dataset index -> items in that dataset
+	GetTasks func(url string, node ExecNode, items map[string][][]Item) ([]ExecTask, error)
+	// initialize an ExecOp
+	Prepare func(url string, node ExecNode, outputDatasets map[string]Dataset) (ExecOp, error)
+	// determine the output names/types given current inputs and configuration
+	GetOutputs func(url string, node ExecNode) []ExecOutput
 
 	// optional; if set, op is considered "incremental"
 	Incremental bool
-	GetOutputKeys func(node ExecNode, inputs [][]string) []string
-	GetNeededInputs func(node ExecNode, outputs []string) [][]string
+	GetOutputKeys func(node ExecNode, inputs map[string][][]string) []string
+	GetNeededInputs func(node ExecNode, outputs []string) map[string][][]string
 
 	// Docker image name
 	ImageName func(url string, node ExecNode) (string, error)

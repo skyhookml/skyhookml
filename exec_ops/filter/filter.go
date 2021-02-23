@@ -31,8 +31,8 @@ func (e *FilterOp) Parallelism() int {
 
 func (e *FilterOp) Apply(task skyhook.ExecTask) error {
 	// make sure all inputs are non-empty
-	for _, item := range task.Items {
-		data, err := item.LoadData()
+	for _, itemList := range task.Items["inputs"] {
+		data, err := itemList[0].LoadData()
 		if err != nil {
 			return err
 		}
@@ -53,11 +53,11 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			op := &FilterOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets[0],
+				dataset: outputDatasets["output"],
 			}
 			return op, nil
 		},

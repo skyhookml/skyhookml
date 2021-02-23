@@ -32,33 +32,41 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		// but in the future, ops may support incremental execution
 		ds.Clear()
 	}
-	skOutputDatasets := make([]skyhook.Dataset, len(outputDatasets))
-	for i, ds := range outputDatasets {
-		skOutputDatasets[i] = ds.Dataset
+	skOutputDatasets := make(map[string]skyhook.Dataset)
+	for name, ds := range outputDatasets {
+		skOutputDatasets[name] = ds.Dataset
 	}
 
 	// get parent datasets
 	// for ExecNode parents, get computed dataset
 	// in the future, we may need some recursive execution
-	parentDatasets := make([]*DBDataset, len(node.Parents))
-	for i, parent := range node.Parents {
-		if parent.Type == "n" {
-			n := GetExecNode(parent.ID)
-			dsList, _ := n.GetDatasets(false)
-			if dsList[parent.Index] == nil {
-				return fmt.Errorf("dataset for parent node %s[%d] is missing", n.Name, parent.Index)
+	parentDatasets := make(map[string][]*DBDataset)
+	for name, plist := range node.GetParents() {
+		parentDatasets[name] = make([]*DBDataset, len(plist))
+		for i, parent := range plist {
+			if parent.Type == "n" {
+				n := GetExecNode(parent.ID)
+				dsList, _ := n.GetDatasets(false)
+				if dsList[parent.Name] == nil {
+					return fmt.Errorf("dataset for parent node %s[%s] is missing", n.Name, parent.Name)
+				}
+				parentDatasets[name][i] = dsList[parent.Name]
+			} else {
+				parentDatasets[name][i] = GetDataset(parent.ID)
 			}
-			parentDatasets[i] = dsList[parent.Index]
-		} else {
-			parentDatasets[i] = GetDataset(parent.ID)
 		}
 	}
 
 	// get items in parent datasets
-	items := make([][]skyhook.Item, len(parentDatasets))
-	for i, ds := range parentDatasets {
-		for _, item := range ds.ListItems() {
-			items[i] = append(items[i], item.Item)
+	items := make(map[string][][]skyhook.Item)
+	for name, dslist := range parentDatasets {
+		items[name] = make([][]skyhook.Item, len(dslist))
+		for i, ds := range dslist {
+			var skItems []skyhook.Item
+			for _, item := range ds.ListItems() {
+				skItems = append(skItems, item.Item)
+			}
+			items[name][i] = skItems
 		}
 	}
 
@@ -209,7 +217,7 @@ func (node *DBExecNode) Incremental(n int) error {
 			if node.IsDone() {
 				datasets, _ := node.GetDatasets(false)
 				var keys []string
-				for _, item := range datasets[parent.Index].ListItems() {
+				for _, item := range datasets[parent.Name].ListItems() {
 					keys = append(keys, item.Key)
 				}
 				return keys, true
@@ -226,15 +234,18 @@ func (node *DBExecNode) Incremental(n int) error {
 			if computedOutputKeys[cur.ID] != nil {
 				continue
 			}
-			var inputs [][]string
+			inputs := make(map[string][][]string)
 			ready := true
-			for _, parent := range cur.Parents {
-				keys, ok := getKeys(parent)
-				if !ok {
-					ready = false
-					break
+			for name, plist := range cur.GetParents() {
+				inputs[name] = make([][]string, len(plist))
+				for i, parent := range plist {
+					keys, ok := getKeys(parent)
+					if !ok {
+						ready = false
+						break
+					}
+					inputs[name][i] = keys
 				}
-				inputs = append(inputs, keys)
 			}
 			if !ready {
 				continue
@@ -276,19 +287,21 @@ func (node *DBExecNode) Incremental(n int) error {
 		changed := false
 		for _, cur := range incrementalNodes {
 			neededInputs := skyhook.GetExecOpImpl(cur.Op).GetNeededInputs(cur.ExecNode, getNeededOutputsList(cur.ID))
-			for i, parent := range cur.Parents {
-				if parent.Type != "n" {
-					continue
-				}
-				if incrementalNodes[parent.ID] == nil {
-					continue
-				}
-				for _, key := range neededInputs[i] {
-					if neededOutputKeys[parent.ID][key] {
+			for name, plist := range cur.GetParents() {
+				for i, parent := range plist {
+					if parent.Type != "n" {
 						continue
 					}
-					changed = true
-					neededOutputKeys[parent.ID][key] = true
+					if incrementalNodes[parent.ID] == nil {
+						continue
+					}
+					for _, key := range neededInputs[name][i] {
+						if neededOutputKeys[parent.ID][key] {
+							continue
+						}
+						changed = true
+						neededOutputKeys[parent.ID][key] = true
+					}
 				}
 			}
 		}
@@ -303,15 +316,17 @@ func (node *DBExecNode) Incremental(n int) error {
 	for !nodesDone[node.ID] {
 		for _, cur := range incrementalNodes {
 			ready := true
-			for _, parent := range cur.Parents {
-				if parent.Type != "n" {
-					continue
+			for _, plist := range cur.GetParents() {
+				for _, parent := range plist {
+					if parent.Type != "n" {
+						continue
+					}
+					if incrementalNodes[parent.ID] == nil || nodesDone[parent.ID] {
+						continue
+					}
+					ready = false
+					break
 				}
-				if incrementalNodes[parent.ID] == nil || nodesDone[parent.ID] {
-					continue
-				}
-				ready = false
-				break
 			}
 			if !ready {
 				continue
@@ -349,7 +364,7 @@ func init() {
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
 			return
 		}
-		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.DataTypes, request.Workspace)
+		node := NewExecNode(request.Name, request.Op, request.Params, request.Inputs, request.Outputs, request.Parents, request.Workspace)
 		skyhook.JsonResponse(w, node)
 	}).Methods("POST")
 

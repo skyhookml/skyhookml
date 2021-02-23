@@ -7,42 +7,79 @@ import (
 	urllib "net/url"
 )
 
-func ParentsToDatasets(url string, parents []skyhook.ExecParent) ([]skyhook.Dataset, error) {
-	datasets := make([]skyhook.Dataset, len(parents))
-	for i, parent := range parents {
-		if parent.Type == "n" {
-			var parentDatasets []*skyhook.Dataset
-			err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d/datasets", parent.ID), &parentDatasets)
+func GetDataset(url string, id int) (skyhook.Dataset, error) {
+	var dataset skyhook.Dataset
+	err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d", id), &dataset)
+	if err != nil {
+		return skyhook.Dataset{}, fmt.Errorf("error getting dataset %d: %v", id, err)
+	}
+	return dataset, nil
+}
+
+func ParentToDataset(url string, parent skyhook.ExecParent) (skyhook.Dataset, error) {
+	if parent.Type == "n" {
+		var parentDatasets map[string]*skyhook.Dataset
+		err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d/datasets", parent.ID), &parentDatasets)
+		if err != nil {
+			return skyhook.Dataset{}, fmt.Errorf("error getting datasets of parent node %d: %v", parent.ID, err)
+		}
+		if parentDatasets[parent.Name] == nil {
+			return skyhook.Dataset{}, fmt.Errorf("parent node %d missing dataset at name %s", parent.ID, parent.Name)
+		}
+		return *parentDatasets[parent.Name], nil
+	} else if parent.Type == "d" {
+		return GetDataset(url, parent.ID)
+	}
+	return skyhook.Dataset{}, fmt.Errorf("unknown parent type %s", parent.Type)
+}
+
+func ParentToDataType(url string, parent skyhook.ExecParent) (skyhook.DataType, error) {
+	if parent.Type == "n" {
+		var node skyhook.ExecNode
+		err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d", parent.ID), &node)
+		if err != nil {
+			return "", fmt.Errorf("error getting parent node %d: %v", parent.ID, err)
+		}
+		for _, output := range node.Outputs {
+			if output.Name == parent.Name {
+				return output.DataType, nil
+			}
+		}
+		return "", fmt.Errorf("parent node %d does not have any output named %s", parent.ID, parent.Name)
+	} else if parent.Type == "d" {
+		dataset, err := GetDataset(url, parent.ID)
+		if err != nil {
+			return "", err
+		}
+		return dataset.DataType, nil
+	}
+	return "", fmt.Errorf("unknown parent type %s", parent.Type)
+}
+
+func ParentsToDatasets(url string, parents map[string][]skyhook.ExecParent) (map[string][]skyhook.Dataset, error) {
+	datasets := make(map[string][]skyhook.Dataset)
+	for name, plist := range parents {
+		for _, parent := range plist {
+			dataset, err := ParentToDataset(url, parent)
 			if err != nil {
-				return nil, fmt.Errorf("error getting datasets of parent node %d: %v", parent.ID, err)
+				return nil, err
 			}
-			if parentDatasets[parent.Index] == nil {
-				return nil, fmt.Errorf("parent node %d missing dataset at index %d", parent.ID, parent.Index)
-			}
-			datasets[i] = *parentDatasets[parent.Index]
-		} else if parent.Type == "d" {
-			var dataset skyhook.Dataset
-			err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d", parent.ID), &dataset)
-			if err != nil {
-				return nil, fmt.Errorf("error getting parent dataset %d: %v", parent.ID, err)
-			}
-			datasets[i] = dataset
+			datasets[name] = append(datasets[name], dataset)
 		}
 	}
 	return datasets, nil
 }
 
-func GetParentDatasets(url string, node skyhook.ExecNode) ([]skyhook.Dataset, error) {
-	return ParentsToDatasets(url, node.Parents)
+func GetParentDatasets(url string, node skyhook.ExecNode) (map[string][]skyhook.Dataset, error) {
+	return ParentsToDatasets(url, node.GetParents())
 }
 
 func GetDatasets(url string, ids []int) ([]skyhook.Dataset, error) {
 	var datasets []skyhook.Dataset
 	for _, id := range ids {
-		var dataset skyhook.Dataset
-		err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d", id), &dataset)
+		dataset, err := GetDataset(url, id)
 		if err != nil {
-			return nil, fmt.Errorf("error getting dataset %d: %v", id, err)
+			return nil, err
 		}
 		datasets = append(datasets, dataset)
 	}
@@ -50,11 +87,17 @@ func GetDatasets(url string, ids []int) ([]skyhook.Dataset, error) {
 }
 
 func GetKeys(url string, node skyhook.ExecNode) (map[string]bool, error) {
-	datasets, err := ParentsToDatasets(url, node.Parents)
+	datasets, err := ParentsToDatasets(url, node.GetParents())
 	if err != nil {
 		return nil, fmt.Errorf("error getting parent datasets: %v", err)
 	}
-	items, err := GetItems(url, datasets)
+	var flatDatasets []skyhook.Dataset
+	for _, dslist := range datasets {
+		for _, ds := range dslist {
+			flatDatasets = append(flatDatasets, ds)
+		}
+	}
+	items, err := GetItems(url, flatDatasets)
 	if err != nil {
 		return nil, err
 	}
@@ -65,19 +108,28 @@ func GetKeys(url string, node skyhook.ExecNode) (map[string]bool, error) {
 	return keys, nil
 }
 
+func GetDatasetItems(url string, dataset skyhook.Dataset) (map[string]skyhook.Item, error) {
+	var rawItems []skyhook.Item
+	err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), &rawItems)
+	if err != nil {
+		return nil, fmt.Errorf("error getting items in dataset %d: %v", dataset.ID, err)
+	}
+	items := make(map[string]skyhook.Item)
+	for _, item := range rawItems {
+		items[item.Key] = item
+	}
+	return items, nil
+}
+
 func GetItems(url string, datasets []skyhook.Dataset) (map[string][]skyhook.Item, error) {
 	// fetch items
 	items := make([]map[string]skyhook.Item, len(datasets))
 	for i, dataset := range datasets {
-		var curItems []skyhook.Item
-		err := skyhook.JsonGet(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), &curItems)
+		curItems, err := GetDatasetItems(url, dataset)
 		if err != nil {
-			return nil, fmt.Errorf("error getting items in dataset %d: %v", dataset.ID, err)
+			return nil, err
 		}
-		items[i] = make(map[string]skyhook.Item)
-		for _, item := range curItems {
-			items[i][item.Key] = item
-		}
+		items[i] = curItems
 	}
 
 	// find shared keys across all datasets
@@ -104,64 +156,82 @@ func GetItems(url string, datasets []skyhook.Dataset) (map[string][]skyhook.Item
 }
 
 // group together items of the same key across the datasets
-// rawItems[i][j] is the jth item in the ith dataset
-// returns map from key to list of corresponding items in each dataset
+// rawItems[inp][i][j] is the jth item in the ith dataset for input "inp"
+// returns map: key -> input -> list of corresponding items in each dataset
 // items with keys that don't appear in all datasets are dropped
-func groupItems(rawItems [][]skyhook.Item) map[string][]skyhook.Item {
-	items := make([]map[string]skyhook.Item, len(rawItems))
-	for i, curItems := range rawItems {
-		items[i] = make(map[string]skyhook.Item)
-		for _, item := range curItems {
-			items[i][item.Key] = item
-		}
+func GroupItems(rawItems map[string][][]skyhook.Item) map[string]map[string][]skyhook.Item {
+	var numDatasets int = 0
+	for _, inputItems := range rawItems {
+		numDatasets += len(inputItems)
 	}
 
-	keys := make(map[string]bool)
-	for key := range items[0] {
-		keys[key] = true
-	}
-	for _, curItems := range items[1:] {
-		for key := range keys {
-			if _, ok := curItems[key]; !ok {
-				delete(keys, key)
+	keyHits := make(map[string]int)
+	// map from (name, key) -> items in each dataset
+	itemsByNameKey := make(map[[2]string][]skyhook.Item)
+	for name, inputItems := range rawItems {
+		for _, curItems := range inputItems {
+			keySet := make(map[string]bool)
+			for _, item := range curItems {
+				if keySet[item.Key] {
+					continue
+				}
+				keySet[item.Key] = true
+				k := [2]string{name, item.Key}
+				itemsByNameKey[k] = append(itemsByNameKey[k], item)
+			}
+			for key := range keySet {
+				keyHits[key]++
 			}
 		}
 	}
 
-	groupedItems := make(map[string][]skyhook.Item)
+	// only retain keys that appear in all the datasets
+	keys := make(map[string]bool)
+	for key, hits := range keyHits {
+		if hits < numDatasets {
+			continue
+		}
+		keys[key] = true
+	}
+
+	items := make(map[string]map[string][]skyhook.Item)
 	for key := range keys {
-		groupedItems[key] = make([]skyhook.Item, len(items))
-		for i := 0; i < len(items); i++ {
-			groupedItems[key][i] = items[i][key]
+		items[key] = make(map[string][]skyhook.Item)
+		for name := range rawItems {
+			items[key][name] = itemsByNameKey[[2]string{name, key}]
 		}
 	}
 
-	return groupedItems
+	return items
 }
 
 // make tasks by grouping items of same key across the datasets
-func SimpleTasks(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-	groupedItems := groupItems(rawItems)
+func SimpleTasks(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+	groupedItems := GroupItems(rawItems)
 	var tasks []skyhook.ExecTask
 	for key, curItems := range groupedItems {
+		taskItems := make(map[string][][]skyhook.Item)
+		for name, itemList := range curItems {
+			taskItems[name] = make([][]skyhook.Item, len(itemList))
+			for i, item := range itemList {
+				taskItems[name][i] = []skyhook.Item{item}
+			}
+		}
 		tasks = append(tasks, skyhook.ExecTask{
 			Key: key,
-			Items: curItems,
+			Items: taskItems,
 		})
 	}
 	return tasks, nil
 }
 
 // make a single task with all the input items
-func SingleTask(key string) func(string, skyhook.ExecNode, [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-	return func(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-		task := skyhook.ExecTask{Key: key}
-		for _, itemList := range rawItems {
-			for _, item := range itemList {
-				task.Items = append(task.Items, item)
-			}
-		}
-		return []skyhook.ExecTask{task}, nil
+func SingleTask(key string) func(string, skyhook.ExecNode, map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+	return func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		return []skyhook.ExecTask{{
+			Key: key,
+			Items: rawItems,
+		}}, nil
 	}
 }
 
@@ -181,34 +251,44 @@ func WriteItem(url string, dataset skyhook.Dataset, key string, data skyhook.Dat
 	return nil
 }
 
-func MapGetOutputKeys(node skyhook.ExecNode, inputs [][]string) []string {
+func MapGetOutputKeys(node skyhook.ExecNode, inputs map[string][][]string) []string {
 	// get shared keys across parents
-	keys := make(map[string]bool)
-	for _, key := range inputs[0] {
-		keys[key] = true
+	var numDatasets int = 0
+	for _, keyLists := range inputs {
+		numDatasets += len(keyLists)
 	}
-	for _, cur := range inputs[1:] {
-		curSet := make(map[string]bool)
-		for _, key := range cur {
-			curSet[key] = true
-		}
-		for key := range keys {
-			if !curSet[key] {
-				delete(keys, key)
+
+	keyHits := make(map[string]int)
+	for _, keyLists := range inputs {
+		for _, keyList := range keyLists {
+			keySet := make(map[string]bool)
+			for _, key := range keyList {
+				keySet[key] = true
+			}
+			for key := range keySet {
+				keyHits[key]++
 			}
 		}
 	}
-	var l []string
-	for key := range keys {
-		l = append(l, key)
+
+	var outputKeys []string
+	for key, hits := range keyHits {
+		if hits < numDatasets {
+			continue
+		}
+		outputKeys = append(outputKeys, key)
 	}
-	return l
+	return outputKeys
 }
 
-func MapGetNeededInputs(node skyhook.ExecNode, outputs []string) [][]string {
-	inputs := make([][]string, len(node.Parents))
-	for i := range inputs {
-		inputs[i] = outputs
+func MapGetNeededInputs(node skyhook.ExecNode, outputs []string) map[string][][]string {
+	// broadcast the output keys over all of the inputs for this node
+	needed := make(map[string][][]string)
+	for name, plist := range node.GetParents() {
+		needed[name] = make([][]string, len(plist))
+		for i := range plist {
+			needed[name][i] = outputs
+		}
 	}
-	return inputs
+	return needed
 }

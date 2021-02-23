@@ -11,21 +11,20 @@ import (
 	"sync"
 )
 
-func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 	var params Params
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
 
 	// load model path from first input dataset
-	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
+	dataset, err := exec_ops.ParentToDataset(url, node.GetParents()["model"][0])
 	if err != nil {
 		return nil, err
 	}
-	modelItems, err := exec_ops.GetItems(url, datasets)
+	modelItems, err := exec_ops.GetDatasetItems(url, dataset)
 	if err != nil {
 		return nil, err
 	}
-	modelItem := modelItems["model"][0]
-	strdata, err := modelItem.LoadData()
+	strdata, err := modelItems["model"].LoadData()
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 
 	return &Yolov3{
 		URL: url,
-		Dataset: outputDatasets[0],
+		Dataset: outputDatasets["detections"],
 		cmd: cmd,
 		stdin: cmd.Stdin(),
 		rd: bufio.NewReader(cmd.Stdout()),
@@ -69,7 +68,7 @@ func (e *Yolov3) Parallelism() int {
 }
 
 func (e *Yolov3) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items[0].LoadData()
+	data, err := task.Items["images"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
@@ -143,10 +142,9 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-			// the first input dataset in the model
-			// so we just provide the rest to SimpleTasks
-			return exec_ops.SimpleTasks(url, node, rawItems[1:])
+		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+			// we want to use only images for SimpleTasks, not model
+			return exec_ops.SimpleTasks(url, node, map[string][][]skyhook.Item{"images": rawItems["images"]})
 		},
 		Prepare: Prepare,
 		ImageName: func(url string, node skyhook.ExecNode) (string, error) {

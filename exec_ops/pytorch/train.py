@@ -162,5 +162,6 @@ while stop_count < 20:
 			print('set learning rate lower')
 			optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 			updated_lr = True
+			stop_count = 0
 
 	epoch += 1

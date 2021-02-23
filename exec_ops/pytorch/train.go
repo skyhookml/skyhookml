@@ -40,7 +40,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
-	datasetsArg := string(skyhook.JsonMarshal(datasets))
+	datasetsArg := string(skyhook.JsonMarshal(datasets["inputs"]))
 	fmt.Println(e.node.ID, paramsArg, archArg, compsArg, datasetsArg)
 	cmd := exec.Command(
 		"python3", "exec_ops/pytorch/train.py",
@@ -69,11 +69,11 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			op := &TrainOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets[0],
+				dataset: outputDatasets["model"],
 			}
 			return op, nil
 		},

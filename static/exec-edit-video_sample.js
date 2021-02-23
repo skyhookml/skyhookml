@@ -28,15 +28,8 @@ export default {
 				Length: parseInt(this.length),
 				Count: parseInt(this.count),
 			});
-			let dataTypes;
-			if(params.Length > 1) {
-				dataTypes = ['video'];
-			} else {
-				dataTypes = ['image'];
-			}
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: params,
-				DataTypes: dataTypes,
 			}));
 		},
 	},

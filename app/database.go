@@ -75,8 +75,9 @@ func init() {
 		name TEXT,
 		op TEXT,
 		params TEXT,
+		inputs TEXT,
+		outputs TEXT,
 		parents TEXT,
-		data_types TEXT,
 		workspace TEXT
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS exec_ds_refs (

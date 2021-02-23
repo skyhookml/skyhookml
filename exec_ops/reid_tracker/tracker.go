@@ -45,7 +45,7 @@ type Tracker struct {
 	rd *bufio.Reader
 }
 
-func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 	var params Params
 	// try to decode parameters, but it's okay if it's not configured
 	// since we have default settings
@@ -54,16 +54,15 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 	}
 
 	// get the model path from the first input dataset
-	datasets, err := exec_ops.ParentsToDatasets(url, node.Parents[0:1])
+	dataset, err := exec_ops.ParentToDataset(url, node.GetParents()["model"][0])
 	if err != nil {
 		return nil, err
 	}
-	modelItems, err := exec_ops.GetItems(url, datasets)
+	modelItems, err := exec_ops.GetDatasetItems(url, dataset)
 	if err != nil {
 		return nil, err
 	}
-	modelItem := modelItems["model"][0]
-	strdata, err := modelItem.LoadData()
+	strdata, err := modelItems["model"].LoadData()
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset
 
 	return &Tracker{
 		URL: url,
-		Dataset: outputDatasets[0],
+		Dataset: outputDatasets["tracks"],
 		Params: params,
 		cmd: cmd,
 		stdin: cmd.Stdin(),
@@ -90,12 +89,12 @@ func (e *Tracker) Parallelism() int {
 }
 
 func (e *Tracker) Apply(task skyhook.ExecTask) error {
-	videoData, err := task.Items[0].LoadData()
+	videoData, err := task.Items["video"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
 
-	data1, err := task.Items[1].LoadData()
+	data1, err := task.Items["detections"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
@@ -245,10 +244,13 @@ func init() {
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems [][]skyhook.Item) ([]skyhook.ExecTask, error) {
-			// the first input dataset in the model
-			// so we just provide the rest to SimpleTasks
-			return exec_ops.SimpleTasks(url, node, rawItems[1:])
+		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+			// provide everything but the model to SimpleTasks
+			items := map[string][][]skyhook.Item{
+				"video": rawItems["video"],
+				"detections": rawItems["detections"],
+			}
+			return exec_ops.SimpleTasks(url, node, items)
 		},
 		Prepare: Prepare,
 		Incremental: true,

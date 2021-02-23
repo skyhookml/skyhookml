@@ -256,11 +256,11 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			op := &TrainOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets[0],
+				dataset: outputDatasets["model"],
 			}
 			return op, nil
 		},

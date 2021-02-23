@@ -36,11 +36,30 @@ export default {
 				}
 			} catch(e) {}
 
-			if(!this.node.Parents) {
-				this.node.Parents = [];
+			// given an array of objects, get index of the object in the array
+			// that has a certain value at some key
+			let getIndexByKeyValue = function(array, key, value) {
+				let index = -1;
+				array.forEach((obj, i) => {
+					if(obj[key] != value) {
+						return;
+					}
+					index = i;
+				});
+				return index;
+			};
+
+			let inputs = [];
+			if(this.node.Parents) {
+				// get Parents['inputs'], but Parents is array
+				// really the index should always be 0 for pytorch_train node
+				let index = getIndexByKeyValue(this.node.Inputs, 'Name', 'inputs');
+				if(index >= 0) {
+					inputs = this.node.Parents[index];
+				}
 			}
 			this.parents = [];
-			this.node.Parents.forEach((parent, idx) => {
+			inputs.forEach((parent, idx) => {
 				this.parents.push({
 					Name: 'unknown',
 					DataType: 'unknown',
@@ -48,7 +67,8 @@ export default {
 				if(parent.Type == 'n') {
 					utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
 						this.parents[idx].Name = node.Name;
-						this.parents[idx].DataType = node.DataTypes[parent.Index];
+						let index = getIndexByKeyValue(node.Outputs, 'Name', parent.Name);
+						this.parents[idx].DataType = node.Outputs[index].DataType;
 					});
 				} else if(parent.Type == 'd') {
 					utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {

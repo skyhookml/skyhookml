@@ -173,7 +173,7 @@ func (e *Tracker) Parallelism() int {
 }
 
 func (e *Tracker) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items[0].LoadData()
+	data, err := task.Items["detections"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			var params Params
 			// try to decode parameters, but it's okay if it's not configured
 			// since we have default settings
@@ -260,7 +260,7 @@ func init() {
 				log.Printf("[simple_tracker] warning: error decoding parameters: %v", err)
 			}
 
-			op := &Tracker{url, node, outputDatasets[0], params}
+			op := &Tracker{url, node, outputDatasets["tracks"], params}
 			return op, nil
 		},
 		Incremental: true,

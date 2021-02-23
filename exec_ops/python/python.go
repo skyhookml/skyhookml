@@ -35,7 +35,8 @@ type ResponsePacket struct {
 type PythonOp struct {
 	url string
 	node skyhook.ExecNode
-	datasets []skyhook.Dataset
+	inputDatasets []skyhook.Dataset
+	outputDatasets []skyhook.Dataset
 
 	cmd *skyhook.Cmd
 	stdin io.WriteCloser
@@ -65,10 +66,11 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, inputDatas
 		Code string
 	}
 	metaPacket.Code = node.Params
-	metaPacket.OutputTypes = node.DataTypes
-
 	for _, ds := range inputDatasets {
 		metaPacket.InputTypes = append(metaPacket.InputTypes, ds.DataType)
+	}
+	for _, ds := range outputDatasets {
+		metaPacket.OutputTypes = append(metaPacket.OutputTypes, ds.DataType)
 	}
 
 	if err := skyhook.WriteJsonData(metaPacket, stdin); err != nil {
@@ -78,7 +80,8 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, inputDatas
 	op := &PythonOp{
 		url: url,
 		node: node,
-		datasets: outputDatasets,
+		inputDatasets: inputDatasets,
+		outputDatasets: outputDatasets,
 		cmd: cmd,
 		stdin: stdin,
 		stdout: stdout,
@@ -105,9 +108,9 @@ func (e *PythonOp) readLoop() {
 
 		if resp.Type == "data_data" {
 			// read the datas
-			datas := make([]skyhook.Data, len(e.node.DataTypes))
-			for i, dtype := range e.node.DataTypes {
-				dtype = skyhook.DataImpls[dtype].ChunkType
+			datas := make([]skyhook.Data, len(e.outputDatasets))
+			for i, ds := range e.outputDatasets {
+				dtype := skyhook.DataImpls[ds.DataType].ChunkType
 				datas[i], err = skyhook.DataImpls[dtype].DecodeStream(e.stdout)
 				if err != nil {
 					break
@@ -121,9 +124,9 @@ func (e *PythonOp) readLoop() {
 			e.mu.Lock()
 			pk := e.pending[resp.Key]
 			if pk.builders[resp.OutputKey] == nil {
-				pk.builders[resp.OutputKey] = make([]skyhook.ChunkBuilder, len(e.node.DataTypes))
-				for i, dtype := range e.node.DataTypes {
-					pk.builders[resp.OutputKey][i] = skyhook.DataImpls[dtype].Builder()
+				pk.builders[resp.OutputKey] = make([]skyhook.ChunkBuilder, len(e.outputDatasets))
+				for i, ds := range e.outputDatasets {
+					pk.builders[resp.OutputKey][i] = skyhook.DataImpls[ds.DataType].Builder()
 				}
 			}
 			for i, builder := range pk.builders[resp.OutputKey] {
@@ -139,7 +142,7 @@ func (e *PythonOp) readLoop() {
 		} else if resp.Type == "data_finish" {
 			e.mu.Lock()
 			pk := e.pending[resp.Key]
-			pk.outputs[resp.OutputKey] = make([]skyhook.Data, len(e.node.DataTypes))
+			pk.outputs[resp.OutputKey] = make([]skyhook.Data, len(e.outputDatasets))
 			for i, builder := range pk.builders[resp.OutputKey] {
 				pk.outputs[resp.OutputKey][i], err = builder.Close()
 				if err != nil {
@@ -200,9 +203,9 @@ func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
-	inputDatas := make([]skyhook.Data, len(task.Items))
-	for i, input := range task.Items {
-		data, err := input.LoadData()
+	inputDatas := make([]skyhook.Data, len(task.Items["inputs"]))
+	for i, input := range task.Items["inputs"] {
+		data, err := input[0].LoadData()
 		if err != nil {
 			return err
 		}
@@ -260,7 +263,7 @@ func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 	// write the outputs that were collected by readLoop
 	for key, datas := range pk.outputs {
 		for i := range datas {
-			err := exec_ops.WriteItem(e.url, e.datasets[i], key, datas[i])
+			err := exec_ops.WriteItem(e.url, e.outputDatasets[i], key, datas[i])
 			if err != nil {
 				return err
 			}
@@ -287,14 +290,19 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			inputDatasets, err := exec_ops.GetParentDatasets(url, node)
 			if err != nil {
 				return nil, fmt.Errorf("error getting parent datasets: %v", err)
 			}
 
+			var flatOutputs []skyhook.Dataset
+			for _, output := range node.Outputs {
+				flatOutputs = append(flatOutputs, outputDatasets[output.Name])
+			}
+
 			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
-			return NewPythonOp(cmd, url, node, inputDatasets, outputDatasets)
+			return NewPythonOp(cmd, url, node, inputDatasets["inputs"], flatOutputs)
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,

@@ -38,13 +38,15 @@ func GetNodeHash(node Node) []byte {
 
 func (node *DBExecNode) GraphParents() map[string]Node {
 	parents := make(map[string]Node)
-	for i, p := range node.Parents {
-		if p.Type == "n" {
-			k := fmt.Sprintf("%d-n[%d]", i, p.Index)
-			parents[k] = GetExecNode(p.ID)
-		} else if p.Type == "d" {
-			k := fmt.Sprintf("%d-d", i)
-			parents[k] = GetDataset(p.ID)
+	for name, plist := range node.GetParents() {
+		for i, parent := range plist {
+			if parent.Type == "n" {
+				k := fmt.Sprintf("%s-%d-n[%s]", name, i, parent.Name)
+				parents[k] = GetExecNode(parent.ID)
+			} else if parent.Type == "d" {
+				k := fmt.Sprintf("%s-%d-d", name, i)
+				parents[k] = GetDataset(parent.ID)
+			}
 		}
 	}
 

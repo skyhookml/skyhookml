@@ -8,7 +8,7 @@ type WorkerInitRequest struct {
 // either coordinator->worker or worker->container
 type ExecBeginRequest struct {
 	Node ExecNode
-	OutputDatasets []Dataset
+	OutputDatasets map[string]Dataset
 
 	// only set for worker->container
 	CoordinatorURL string

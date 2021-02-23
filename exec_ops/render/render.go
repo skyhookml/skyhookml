@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"runtime"
 	"strconv"
 )
@@ -102,9 +103,9 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 }
 
 func (e *Render) Apply(task skyhook.ExecTask) error {
-	inputDatas := make([]skyhook.Data, len(task.Items))
-	for i, input := range task.Items {
-		data, err := input.LoadData()
+	inputDatas := make([]skyhook.Data, len(task.Items["inputs"]))
+	for i, input := range task.Items["inputs"] {
+		data, err := input[0].LoadData()
 		if err != nil {
 			return err
 		}
@@ -199,9 +200,25 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
-			op := &Render{url, node, outputDatasets[0]}
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+			op := &Render{url, node, outputDatasets["output"]}
 			return op, nil
+		},
+		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
+			// whether we output video or image depends on the first input
+			parents := node.GetParents()
+			if len(parents["inputs"]) == 0 {
+				return node.Outputs
+			}
+			inputType, err := exec_ops.ParentToDataType(url, parents["inputs"][0])
+			if err != nil {
+				log.Printf("[render] warning: unable to compute outputs: %v", err)
+				return node.Outputs
+			}
+			return []skyhook.ExecOutput{{
+				Name: "output",
+				DataType: inputType,
+			}}
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,

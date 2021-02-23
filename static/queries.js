@@ -181,11 +181,13 @@ const Queries = {
 			// (1) render the datasets
 			let neededDatasetIDs = {};
 			for(let nodeID in this.nodes) {
-				this.nodes[nodeID].Parents.forEach((parent) => {
-					if(parent.Type != 'd') {
-						return;
-					}
-					neededDatasetIDs[parent.ID] = true;
+				this.nodes[nodeID].Parents.forEach((plist) => {
+					plist.forEach((parent) => {
+						if(parent.Type != 'd') {
+							return;
+						}
+						neededDatasetIDs[parent.ID] = true;
+					});
 				});
 			}
 			let datasets = [];
@@ -269,36 +271,35 @@ const Queries = {
 			};
 			for(let nodeID in this.nodes) {
 				let node = this.nodes[nodeID];
-				if(!node.Parents) {
-					continue;
-				}
 				let dst = 'n'+nodeID;
-				node.Parents.forEach((parent) => {
-					let src;
-					if(parent.Type == 'n') {
-						src = 'n'+parent.ID;
-					} else if(parent.Type == 'd') {
-						src = 'd'+parent.ID;
-					}
-					let p1 = getClosestPoint(groups[src], groups[dst], false);
-					let p2 = getClosestPoint(groups[dst], groups[src], true);
-					let arrow = new Konva.Arrow({
-						points: [p1[0], p1[1], p2[0], p2[1]],
-						pointerLength: 10,
-						pointerWidth: 10,
-						fill: 'black',
-						stroke: 'black',
-						strokeWidth: 2,
+				node.Parents.forEach((plist) => {
+					plist.forEach((parent) => {
+						let src;
+						if(parent.Type == 'n') {
+							src = 'n'+parent.ID;
+						} else if(parent.Type == 'd') {
+							src = 'd'+parent.ID;
+						}
+						let p1 = getClosestPoint(groups[src], groups[dst], false);
+						let p2 = getClosestPoint(groups[dst], groups[src], true);
+						let arrow = new Konva.Arrow({
+							points: [p1[0], p1[1], p2[0], p2[1]],
+							pointerLength: 10,
+							pointerWidth: 10,
+							fill: 'black',
+							stroke: 'black',
+							strokeWidth: 2,
+						});
+						layer.add(arrow);
+						if(!(src in arrows)) {
+							arrows[src] = [];
+						}
+						if(!(dst in arrows)) {
+							arrows[dst] = [];
+						}
+						arrows[src].push(['src', arrow, dst]);
+						arrows[dst].push(['dst', arrow, src]);
 					});
-					layer.add(arrow);
-					if(!(src in arrows)) {
-						arrows[src] = [];
-					}
-					if(!(dst in arrows)) {
-						arrows[dst] = [];
-					}
-					arrows[src].push(['src', arrow, dst]);
-					arrows[dst].push(['dst', arrow, src]);
 				});
 			}
 
@@ -373,18 +374,20 @@ const Queries = {
 				this.update();
 			});
 		},
-		addParent: function(parent, key) {
-			let params = {};
-			params[key] = this.selectedNode[key].concat([parent]);
-			params = JSON.stringify(params);
+		addParent: function(inputIdx, parent) {
+			this.selectedNode.Parents[inputIdx].push(parent);
+			let params = JSON.stringify({
+				Parents: this.selectedNode.Parents,
+			});
 			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
 		},
-		removeParent: function(idx, key) {
-			let params = {};
-			params[key] = this.selectedNode[key].filter((parent, i) => i != idx);
-			params = JSON.stringify(params);
+		removeParent: function(inputIdx, idx) {
+			this.selectedNode.Parents[inputIdx] = this.selectedNode.Parents[inputIdx].filter((parent, i) => i != idx);
+			let params = JSON.stringify({
+				Parents: this.selectedNode.Parents,
+			});
 			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
 				this.update();
 			});
@@ -417,16 +420,17 @@ const Queries = {
 		<div v-if="selectedNode != null" class="my-2">
 			<div>Node {{ selectedNode.Name }}</div>
 			<div>
-				<exec-node-parents
-					:node="selectedNode"
-					pkey="Parents"
-					:nodes="nodes"
-					:datasets="datasets"
-					label="Parents"
-					v-on:add="addParent($event, 'Parents')"
-					v-on:remove="removeParent($event, 'Parents')"
-					>
-				</exec-node-parents>
+				<div v-for="(plist, inputIdx) in selectedNode.Parents">
+					<exec-node-parents
+						:node="selectedNode"
+						:inputIdx="inputIdx"
+						:nodes="nodes"
+						:datasets="datasets"
+						v-on:add="addParent(inputIdx, $event)"
+						v-on:remove="removeParent(inputIdx, $event)"
+						>
+					</exec-node-parents>
+				</div>
 			</div>
 			<div>
 				<form v-on:submit.prevent="compareTo" class="form-inline my-2">

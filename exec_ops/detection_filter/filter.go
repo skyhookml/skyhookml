@@ -28,7 +28,7 @@ func (e *DetectionFilter) Parallelism() int {
 }
 
 func (e *DetectionFilter) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items[0].LoadData()
+	data, err := task.Items["detections"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func init() {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets []skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -78,7 +78,7 @@ func init() {
 				URL: url,
 				Node: node,
 				Params: params,
-				Dataset: outputDatasets[0],
+				Dataset: outputDatasets["detections"],
 				categories: categories,
 			}
 			return op, nil
