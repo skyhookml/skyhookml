@@ -52,7 +52,7 @@ func ReadFfmpeg(fname string, dims [2]int, rate [2]int, start int, length int) *
 	}
 	args = append(args, []string{
 		"-c:v", "rawvideo", "-pix_fmt", "rgb24", "-f", "rawvideo",
-		"-vf", fmt.Sprintf("scale=%dx%d,fps=fps=%d/%d", dims[0], dims[1], rate[0], rate[1]),
+		"-vf", fmt.Sprintf("scale=%dx%d,fps=fps=%d/%d:round=up", dims[0], dims[1], rate[0], rate[1]),
 		"-",
 	}...)
 

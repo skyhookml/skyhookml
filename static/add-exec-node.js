@@ -44,6 +44,13 @@ export default {
 							],
 							Outputs: [{Name: "tracks", DataType: "detection"}],
 						},
+						{
+							ID: "resample",
+							Name: "Resample",
+							Description: "Resample sequence data at a different rate",
+							Inputs: [{Name: "inputs", Variable: true}],
+							Outputs: [],
+						},
 					],
 				},
 				{

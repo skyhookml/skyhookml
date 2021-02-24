@@ -82,3 +82,15 @@ var ItemProviders = make(map[string]ItemProvider)
 func DefaultItemProvider(item Item) (Data, error) {
 	return DecodeFile(item.Dataset.DataType, item.Format, item.Metadata, item.Fname())
 }
+
+// Supports items that reference another item, which may be in another dataset.
+// We currently implement the reference by filename.
+// Metadata is taken from the new item. So it could be different from the original metadata.
+func ReferenceItemProvider(item Item) (Data, error) {
+	filename := *item.ProviderInfo
+	return DecodeFile(item.Dataset.DataType, item.Format, item.Metadata, filename)
+}
+
+func init() {
+	ItemProviders["reference"] = ReferenceItemProvider
+}
