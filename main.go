@@ -10,9 +10,11 @@ import (
 
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
+	app.Config.CoordinatorURL = os.Args[1]
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	skyhook.SeedRand()
 	server := socketio.NewServer(nil)

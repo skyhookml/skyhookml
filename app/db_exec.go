@@ -158,7 +158,7 @@ func (node *DBExecNode) updateOutputs() {
 	// make sure the current expected outputs match the actual outputs
 	impl := skyhook.GetExecOpImpl(node.Op)
 	if impl.GetOutputs != nil {
-		expectedOutputs := impl.GetOutputs("http://127.0.0.1:8080", node.ExecNode)
+		expectedOutputs := impl.GetOutputs(Config.CoordinatorURL, node.ExecNode)
 		if skyhook.ExecOutputsToString(expectedOutputs) != skyhook.ExecOutputsToString(node.Outputs) {
 			db.Exec("UPDATE exec_nodes SET outputs = ? WHERE id = ?", skyhook.ExecOutputsToString(expectedOutputs), node.ID)
 			DeleteBrokenReferences(node, expectedOutputs)

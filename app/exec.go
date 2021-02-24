@@ -72,7 +72,7 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 
 	// get tasks
 	opImpl := skyhook.GetExecOpImpl(node.Op)
-	tasks, err := opImpl.GetTasks("http://127.0.0.1:8080", node.ExecNode, items)
+	tasks, err := opImpl.GetTasks(Config.CoordinatorURL, node.ExecNode, items)
 	if err != nil {
 		return err
 	}
