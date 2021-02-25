@@ -35,7 +35,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 	cmd := skyhook.Command(
 		fmt.Sprintf("yolov3-exec-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/yolov3/run.py",
-		fmt.Sprintf("%d", modelPath),
+		modelPath,
 		fmt.Sprintf("%d", batchSize),
 		fmt.Sprintf("%d", params.InputSize[0]), fmt.Sprintf("%d", params.InputSize[1]),
 	)
@@ -115,7 +115,7 @@ func (e *Yolov3) Apply(task skyhook.ExecTask) error {
 		line = strings.TrimSpace(line[len(signature):])
 		var batchDetections [][]skyhook.Detection
 		skyhook.JsonUnmarshal([]byte(line), &batchDetections)
-		detections = append(detections, batchDetections...)
+		detections = append(detections, batchDetections[0:len(images)]...)
 	}
 
 	output := skyhook.DetectionData{

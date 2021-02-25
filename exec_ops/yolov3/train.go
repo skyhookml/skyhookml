@@ -53,11 +53,14 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// export the images and detections to a new folder in darknet format
 	log.Println("[yolov3-train] exporting examples")
-	datasets, err := exec_ops.GetDatasets(e.url, []int{params.ImageDatasetID, params.DetectionDatasetID})
+	datasets, err := exec_ops.GetParentDatasets(e.url, e.node)
 	if err != nil {
 		return err
 	}
-	items, err := exec_ops.GetItems(e.url, datasets)
+	imageDataset := datasets["images"][0]
+	detectionDataset := datasets["detections"][0]
+	flatDatasets := []skyhook.Dataset{imageDataset, detectionDataset}
+	items, err := exec_ops.GetItems(e.url, flatDatasets)
 	if err != nil {
 		return err
 	}
@@ -241,7 +244,7 @@ backup=%s
 		return fmt.Errorf("error running darknet")
 	}
 
-	skyhook.CopyFile(exportPath+"yolov3_best.weights", trainPath+"yolov3.weights")
+	skyhook.CopyFile(filepath.Join(exportPath, "yolov3_best.weights"), filepath.Join(trainPath, "yolov3.weights"))
 
 	// add filename to the string dataset
 	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.node.ID)}}

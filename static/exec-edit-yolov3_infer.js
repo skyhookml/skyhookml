@@ -7,7 +7,6 @@ export default {
 			params: {
 				inputWidth: '',
 				inputHeight: '',
-				configPath: '',
 			},
 		};
 	},
@@ -21,9 +20,6 @@ export default {
 					this.params.inputWidth = s.InputSize[0];
 					this.params.inputHeight = s.InputSize[1];
 				}
-				if(s.ConfigPath) {
-					this.params.configPath = s.ConfigPath;
-				}
 			} catch(e) {}
 		});
 	},
@@ -31,7 +27,6 @@ export default {
 		save: function() {
 			let params = {
 				InputSize: [parseInt(this.params.inputWidth), parseInt(this.params.inputHeight)],
-				ConfigPath: this.params.configPath,
 			};
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: JSON.stringify(params),
@@ -51,12 +46,6 @@ export default {
 			<label class="col-sm-2 col-form-label">Input Height</label>
 			<div class="col-sm-10">
 				<input v-model="params.inputHeight" type="text" class="form-control">
-			</div>
-		</div>
-		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Config Path</label>
-			<div class="col-sm-10">
-				<input v-model="params.configPath" type="text" class="form-control">
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>

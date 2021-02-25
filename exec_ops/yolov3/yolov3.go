@@ -11,9 +11,6 @@ import (
 type Params struct {
 	InputSize [2]int
 	ConfigPath string
-
-	ImageDatasetID int
-	DetectionDatasetID int
 }
 
 func (p Params) GetConfigPath() string {

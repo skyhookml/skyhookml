@@ -165,7 +165,7 @@ func (e *Render) Apply(task skyhook.ExecTask) error {
 		}
 
 		if perFrameErr != nil {
-			return err
+			return perFrameErr
 		}
 
 		output := skyhook.VideoData{

@@ -21,7 +21,7 @@ import ExecPython from './exec-edit-python.js';
 import ExecPytorchTrain from './exec-edit-pytorch_train.js';
 import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
 import ExecYolov3Train from './exec-edit-yolov3_train.js';
-import ExecYolov3Infer from './exec-edit-yolov3_train.js';
+import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
 import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 import Compare from './compare.js';
