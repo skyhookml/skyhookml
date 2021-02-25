@@ -93,6 +93,22 @@ func init() {
 		workspace TEXT,
 		UNIQUE(dataset_id, workspace)
 	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS jobs (
+		id INTEGER PRIMARY KEY ASC,
+		name TEXT,
+		-- e.g. 'execnode'
+		type TEXT,
+		-- how to process the job output and render the job
+		op TEXT,
+		metadata TEXT,
+		start_time TIMESTAMP,
+		state TEXT DEFAULT '',
+		done INTEGER DEFAULT 0,
+		error TEXT DEFAULT ''
+	)`)
+
+	// mark jobs that are still running as error
+	db.Exec("UPDATE jobs SET error = 'terminated' WHERE done = 0")
 }
 
 func (this *Database) Query(q string, args ...interface{}) *Rows {

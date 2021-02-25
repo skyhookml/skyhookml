@@ -34,6 +34,10 @@ type ExecOpImpl struct {
 
 	// Docker image name
 	ImageName func(url string, node ExecNode) (string, error)
+
+	// Optional system to provide customized state to store in ExecNode jobs.
+	// For example, when training a model, we may want to store the loss history.
+	GetJobOp func(url string, node ExecNode) JobOp
 }
 
 var ExecOpImpls = make(map[string]ExecOpImpl)

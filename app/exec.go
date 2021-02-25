@@ -89,6 +89,29 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		tasks = ntasks
 	}
 
+	// initialize job
+	// if the node doesn't provide a custom JobOp, we use the default
+	// otherwise the name of the JobOp is the ExecOp's name
+	var nodeJobOp skyhook.JobOp
+	jobOpName := "execnode"
+	if opImpl.GetJobOp != nil {
+		nodeJobOp = opImpl.GetJobOp(Config.CoordinatorURL, node.ExecNode)
+		jobOpName = node.Op
+	}
+	job := NewJob(
+		fmt.Sprintf("Exec Node %s", node.Name),
+		"execnode",
+		jobOpName,
+		fmt.Sprintf("%d", node.ID),
+	)
+	jobOp := &ExecJobOp{
+		Job: job,
+		NumTasks: len(tasks),
+		TailOp: &skyhook.TailJobOp{},
+		NodeJobOp: nodeJobOp,
+	}
+	job.AttachOp(jobOp)
+
 	// prepare op
 	log.Printf("[exec-node %s] [run] acquiring worker", node.Name)
 	workerURL := AcquireWorker()
@@ -98,9 +121,11 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	beginRequest := skyhook.ExecBeginRequest{
 		Node: node.ExecNode,
 		OutputDatasets: skOutputDatasets,
+		JobID: &job.ID,
 	}
 	var beginResponse skyhook.ExecBeginResponse
 	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
+		job.SetDone(err.Error())
 		return err
 	}
 	defer func() {
@@ -141,15 +166,24 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 					mu.Unlock()
 					break
 				}
+
+				mu.Lock()
+				jobOp.Completed(task.Key)
+				mu.Unlock()
 			}
 		}()
 	}
 	wg.Wait()
 
+	// make sure job state reflects the latest updates
+	job.UpdateState(string(skyhook.JsonMarshal(jobOp.Encode())))
+
 	if applyErr != nil {
+		job.SetDone(applyErr.Error())
 		return applyErr
 	}
 
+	job.SetDone("")
 	log.Printf("[exec-node %s] [run] done", node.Name)
 	return nil
 }

@@ -9,6 +9,7 @@ type WorkerInitRequest struct {
 type ExecBeginRequest struct {
 	Node ExecNode
 	OutputDatasets map[string]Dataset
+	JobID *int
 
 	// only set for worker->container
 	CoordinatorURL string
@@ -20,6 +21,11 @@ type ExecBeginResponse struct {
 	// filled in by worker for response back to coordinator
 	UUID string
 	BaseURL string
+}
+
+type JobUpdate struct {
+	JobID int
+	Lines []string
 }
 
 type EndRequest struct {

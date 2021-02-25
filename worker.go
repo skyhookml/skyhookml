@@ -14,7 +14,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 )
+
+var coordinatorURL string
 
 func main() {
 	if len(os.Args) < 4 {
@@ -24,7 +27,7 @@ func main() {
 	}
 	myIP := os.Args[1]
 	myPort := skyhook.ParseInt(os.Args[2])
-	coordinatorURL := os.Args[3]
+	coordinatorURL = os.Args[3]
 
 	mode := "docker"
 	if len(os.Args) >= 5 {
@@ -59,7 +62,7 @@ func main() {
 	}
 
 	// Returns (container base URL, uuid, error)
-	startContainer := func(imageName string) (string, string, error) {
+	startContainer := func(imageName string, jobID *int) (string, string, error) {
 		uuid := gouuid.New().String()
 
 		mu.Lock()
@@ -93,7 +96,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		cmd.Stderr = os.Stderr
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			panic(err)
+		}
 		if err := cmd.Start(); err != nil {
 			panic(err)
 		}
@@ -104,20 +110,14 @@ func main() {
 		mu.Unlock()
 
 		// wait for container to be ready
-		rd := bufio.NewReader(stdout)
-		_, err = rd.ReadString('\n')
+		stdoutRd := bufio.NewReader(stdout)
+		_, err = stdoutRd.ReadString('\n')
 		if err != nil {
 			panic(err)
 		}
-		go func() {
-			for {
-				line, err := rd.ReadString('\n')
-				if err != nil {
-					break
-				}
-				log.Printf("[container %s] %s", uuid, line)
-			}
-		}()
+
+		// read stdout/stderr, and if JobID is set then pass the output lines to the coordinator
+		readContainerOutput(uuid, stdoutRd, bufio.NewReader(stderr), jobID)
 
 		return containerBaseURL, uuid, nil
 	}
@@ -139,7 +139,7 @@ func main() {
 			panic(err)
 		}
 
-		containerBaseURL, uuid, err := startContainer(imageName)
+		containerBaseURL, uuid, err := startContainer(imageName, request.JobID)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -206,5 +206,64 @@ func main() {
 	log.Printf("starting on :%d", myPort)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", myPort), nil); err != nil {
 		panic(err)
+	}
+}
+
+func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader, jobID *int) {
+	// Read lines from stdout and stderr simultaneously, printing to our output
+	// Every second, accumulate the lines (if any) and forward to coordinator (if jobID is set).
+	var mu sync.Mutex
+	var pending int = 0
+	var lines []string
+	readLines := func(rd *bufio.Reader) {
+		pending++
+		go func() {
+			for {
+				line, err := rd.ReadString('\n')
+				if err != nil {
+					break
+				}
+				log.Printf("[container %s] %s", uuid, line)
+				if jobID != nil {
+					mu.Lock()
+					lines = append(lines, line)
+					mu.Unlock()
+				}
+			}
+			mu.Lock()
+			pending--
+			mu.Unlock()
+		}()
+	}
+	readLines(stdout)
+	readLines(stderr)
+	if jobID != nil {
+		go func() {
+			for {
+				time.Sleep(time.Second)
+				mu.Lock()
+				curLines := lines
+				lines = nil
+				curPending := pending
+				mu.Unlock()
+
+				if len(curLines) == 0 && curPending == 0 {
+					break
+				}
+				if len(curLines) == 0 {
+					continue
+				}
+
+				// forward to coordinator
+				request := skyhook.JobUpdate{
+					JobID: *jobID,
+					Lines: curLines,
+				}
+				err := skyhook.JsonPost(coordinatorURL, "/worker/job-update", request, nil)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}()
 	}
 }
