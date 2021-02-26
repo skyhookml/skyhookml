@@ -1,0 +1,17 @@
+{
+	"Module": {"BuiltInModule": "yolov3"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Outputs": {
+		"detections": "detection"
+	},
+	"Layers": [
+		"pred"
+	],
+	"Losses": [
+		"loss"
+	],
+	"Repositories": [
+		{"URL":"https://github.com/ultralytics/yolov3.git"}
+	]
+}

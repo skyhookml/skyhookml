@@ -1,9 +1,11 @@
+import hashlib
+import importlib.util
 import json
 import torchvision
 import torch.optim
 import torch.nn
-
 import sys
+
 def eprint(s):
 	sys.stderr.write(str(s) + "\n")
 	sys.stderr.flush()
@@ -37,9 +39,27 @@ class Net(torch.nn.Module):
 			if comp_spec['Params']:
 				cur_params = json.loads(comp_spec['Params'])
 
-			locals = {}
-			exec(comp['Code'], None, locals)
-			m = locals['M'](cur_params, cur_inputs)
+			module_spec = comp.get('Module')
+			if module_spec.get('BuiltInModule', None):
+				module = importlib.import_module('skyhook_components.' + module_spec['BuiltInModule'], package='skyhook_components')
+				m = module.M(cur_params, cur_inputs)
+			elif module_spec.get('RepositoryModule', None):
+				repo = module_spec['Repository']
+				repo_id = repo['URL']
+				if repo.get('Commit', None):
+					repo_id += '@' + repo['Commit']
+				expected_path = os.path.join('.', 'models', hashlib.sha256(repo_id.encode()).hexdigest(), module_spec['RepositoryModule']+'.py')
+				module_name = 'comp{}.{}'.format(comp['ID'], module_spec['RepositoryModule'])
+				spec = importlib.util.spec_from_file_location(module_name, expected_path)
+				module = importlib.util.module_from_spec(spec)
+				m = module.M(cur_params, cur_inputs)
+			elif module_spec.get('Code', None):
+				locals = {}
+				exec(module_spec['Code'], None, locals)
+				m = locals['M'](cur_params, cur_inputs)
+			else:
+				raise Exception('invalid module {}: none of BuiltInModule, RepositoryModule, or Code are set'.format(comp['ID']))
+
 			self.mlist.append(m)
 			example_layers[comp_idx] = m(*cur_inputs)
 

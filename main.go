@@ -8,15 +8,34 @@ import (
 
 	"github.com/googollee/go-socket.io"
 
+	"flag"
 	"log"
+	"net"
 	"net/http"
-	"os"
+	"strconv"
+	"strings"
 )
 
 func main() {
-	app.Config.CoordinatorURL = os.Args[1]
+	addr := flag.String("addr", ":8080", "bind address")
+	coordinatorURL := flag.String("url", "http://127.0.0.1:PORT", "coordinator URL")
+	initdb := flag.Bool("initdb", false, "initialize the database before starting up")
+	flag.Parse()
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
+	if err != nil {
+		panic(err)
+	}
+
+	app.Config.CoordinatorURL = strings.ReplaceAll(*coordinatorURL, "PORT", strconv.Itoa(tcpAddr.Port))
+
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	skyhook.SeedRand()
+
+	if *initdb {
+		app.InitDB()
+	}
+
 	server := socketio.NewServer(nil)
 	server.OnConnect("/", func(s socketio.Conn) error {
 		return nil
@@ -29,8 +48,8 @@ func main() {
 	defer server.Close()
 	http.Handle("/socket.io/", server)
 	http.Handle("/", app.Router)
-	log.Printf("starting on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Printf("starting on %s", *addr)
+	if err := http.ListenAndServe(*addr, nil); err != nil {
 		panic(err)
 	}
 }

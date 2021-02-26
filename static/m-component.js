@@ -4,7 +4,7 @@ export default {
 	data: function() {
 		return {
 			comp: null,
-			code: '',
+			module: null,
 			numInputs: '',
 			numTargets: '',
 			outputs: {},
@@ -21,7 +21,7 @@ export default {
 		utils.request(this, 'GET', '/pytorch/components/'+compID, null, (comp) => {
 			this.comp = comp;
 			var params = this.comp.Params;
-			this.code = params.Code;
+			this.module = params.Module;
 			this.numInputs = params.NumInputs;
 			this.numTargets = params.NumTargets;
 			if(params.Outputs) {
@@ -51,7 +51,7 @@ export default {
 		},
 		save: function() {
 			let params = {
-				Code: this.code,
+				Module: this.module,
 				NumInputs: parseInt(this.numInputs),
 				NumTargets: parseInt(this.numTargets),
 				Outputs: this.outputs,
@@ -99,9 +99,33 @@ export default {
 <div class="small-container m-2">
 	<template v-if="comp != null">
 		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Built-in Module</label>
+			<div class="col-sm-10">
+				<input v-model="module.BuiltInModule" type="text" class="form-control">
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Repository Module</label>
+			<div class="col-sm-10">
+				<input v-model="module.RepositoryModule" type="text" class="form-control">
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Repository URL</label>
+			<div class="col-sm-10">
+				<input v-model="module.Repository.URL" type="text" class="form-control">
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Repository Commit</label>
+			<div class="col-sm-10">
+				<input v-model="module.Repository.Commit" type="text" class="form-control">
+			</div>
+		</div>
+		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Code</label>
 			<div class="col-sm-10">
-				<textarea v-model="code" class="form-control" rows="10"></textarea>
+				<textarea v-model="module.Code" class="form-control" rows="10"></textarea>
 			</div>
 		</div>
 		<div class="form-group row">

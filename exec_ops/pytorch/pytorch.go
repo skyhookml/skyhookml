@@ -3,8 +3,6 @@ package pytorch
 import (
 	"../../skyhook"
 
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -37,14 +35,7 @@ func GetTrainArgs(url string, archID int) (*skyhook.PytorchArch, map[int]*skyhoo
 
 // Download this repository to the models/ folder if it doesn't already exist
 func EnsureRepository(repo skyhook.PytorchRepository) error {
-	// first compute hash as sha256(url[@commit])
-	h := sha256.New()
-	h.Write([]byte(repo.URL))
-	if repo.Commit != "" {
-		h.Write([]byte("@"+repo.Commit))
-	}
-	bytes := h.Sum(nil)
-	hash := hex.EncodeToString(bytes)
+	hash := repo.Hash()
 
 	// does it already exist?
 	path := filepath.Join("models", hash)

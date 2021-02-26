@@ -1,5 +1,10 @@
 package skyhook
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+)
+
 // A git repository that's used as a library in some component.
 type PytorchRepository struct {
 	URL string
@@ -8,11 +13,33 @@ type PytorchRepository struct {
 	Commit string
 }
 
+func (repo PytorchRepository) Hash() string {
+	// compute hash as sha256(url[@commit])
+	h := sha256.New()
+	h.Write([]byte(repo.URL))
+	if repo.Commit != "" {
+		h.Write([]byte("@"+repo.Commit))
+	}
+	bytes := h.Sum(nil)
+	hash := hex.EncodeToString(bytes)
+	return hash
+}
+
 type PytorchComponentParams struct {
-	// code defining a pytorch nn.Module called "M"
-	// forward pass takes some inputs, potentially some targets
-	// and it returns a dict mapping names to tensors
-	Code string
+	// the module can be defined one of three ways:
+	// - a built-in module in exec_ops/pytorch/models/X.py
+	// - a module X in a git repository Y
+	// - hardcoded
+	// only one of BuiltInModule, RepositoryModule, and Code should be set
+	// if RepositoryModule is set, Repository must be as well
+	Module struct {
+		BuiltInModule string
+
+		Repository PytorchRepository
+		RepositoryModule string
+
+		Code string
+	}
 
 	// inputs/targets are provided as arguments to forward pass
 	NumInputs int

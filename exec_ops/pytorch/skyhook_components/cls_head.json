@@ -1,0 +1,15 @@
+{
+	"Module": {"BuiltInModule": "cls_head"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Outputs": {
+		"out": "int"
+	},
+	"Layers": [
+		"pre_out",
+		"out"
+	],
+	"Losses": [
+		"loss"
+	]
+}
