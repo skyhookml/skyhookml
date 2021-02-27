@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-type DBDataset struct {skyhook.Dataset}
+type DBDataset struct {
+	skyhook.Dataset
+	Done bool
+}
 type DBAnnotateDataset struct {
 	skyhook.AnnotateDataset
 	loaded bool
@@ -18,13 +21,13 @@ type DBItem struct {
 	loaded bool
 }
 
-const DatasetQuery = "SELECT id, name, type, data_type, hash FROM datasets"
+const DatasetQuery = "SELECT id, name, type, data_type, hash, done FROM datasets"
 
 func datasetListHelper(rows *Rows) []*DBDataset {
 	datasets := []*DBDataset{}
 	for rows.Next() {
 		var ds DBDataset
-		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType, &ds.Hash)
+		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType, &ds.Hash, &ds.Done)
 		datasets = append(datasets, &ds)
 	}
 	return datasets
@@ -247,6 +250,10 @@ func (ds *DBDataset) DeleteExecRef(nodeID int) {
 	ds.Delete()
 }
 
+func (ds *DBDataset) SetDone(done bool) {
+	db.Exec("UPDATE datasets SET done = ? WHERE id = ?", done, ds.ID)
+}
+
 func (item *DBItem) Delete() {
 	db := (&DBDataset{Dataset: item.Dataset}).getDB()
 	db.Exec("DELETE FROM items WHERE k = ?", item.Key)
@@ -276,7 +283,8 @@ func (item *DBItem) SetMetadata() error {
 }
 
 func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) *DBDataset {
-	res := db.Exec("INSERT INTO datasets (name, type, data_type, hash) VALUES (?, ?, ?, ?)", name, t, dataType, hash)
+	done := t != "completed"
+	res := db.Exec("INSERT INTO datasets (name, type, data_type, hash, done) VALUES (?, ?, ?, ?, ?)", name, t, dataType, hash, done)
 	id := res.LastInsertId()
 	log.Printf("[dataset %d-%s] created new dataset, data_type=%v", id, name, dataType)
 	return GetDataset(id)

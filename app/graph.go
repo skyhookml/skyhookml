@@ -63,9 +63,16 @@ func (node *DBExecNode) GraphType() string {
 }
 
 func (node *DBExecNode) IsDone() bool {
-	_, ok := node.GetDatasets(false)
-	// TODO: make sure no datasets are only partially computed
-	return ok
+	datasets, ok := node.GetDatasets(false)
+	if !ok {
+		return false
+	}
+	for _, ds := range datasets {
+		if !ds.Done {
+			return false
+		}
+	}
+	return true
 }
 
 func (node *DBExecNode) GraphID() string {

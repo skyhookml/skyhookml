@@ -106,6 +106,8 @@ func (node *DBExecNode) GetDatasets(create bool) (map[string]*DBDataset, bool) {
 			ds.AddExecRef(node.ID)
 			datasets[output.Name] = ds
 			dsIDSet[ds.ID] = true
+		} else {
+			datasets[output.Name] = nil
 		}
 	}
 

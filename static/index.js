@@ -25,6 +25,7 @@ import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
 import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 import Compare from './compare.js';
+import Interactive from './interactive.js';
 
 import Jobs from './jobs.js';
 import JobExecNode from './job-exec_node.js';
@@ -58,6 +59,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/exec/unsupervised_reid/:nodeid', component: ExecUnsupervisedReid},
 		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
 		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
+		{path: '/ws/:ws/interactive/:nodeid', component: Interactive},
 
 		{path: '/ws/:ws/jobs', component: Jobs},
 		{path: '/ws/:ws/jobs/execnode/:jobid', component: JobExecNode},

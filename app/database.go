@@ -43,6 +43,7 @@ func init() {
 		data_type TEXT,
 		-- only set if computed
 		hash TEXT
+		done INTEGER DEFAULT 1
 	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS items (
 		id INTEGER PRIMARY KEY ASC,

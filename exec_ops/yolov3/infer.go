@@ -147,6 +147,16 @@ func init() {
 			return exec_ops.SimpleTasks(url, node, map[string][][]skyhook.Item{"images": rawItems["images"]})
 		},
 		Prepare: Prepare,
+		Incremental: true,
+		GetOutputKeys: func(node skyhook.ExecNode, inputs map[string][][]string) []string {
+			inputs = map[string][][]string{"images": inputs["images"]}
+			return exec_ops.MapGetOutputKeys(node, inputs)
+		},
+		GetNeededInputs: func(node skyhook.ExecNode, outputs []string) map[string][][]string {
+			neededInputs := exec_ops.MapGetNeededInputs(node, outputs)
+			neededInputs["model"] = [][]string{{"model"}}
+			return neededInputs
+		},
 		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
 			return "skyhookml/yolov3", nil
 		},

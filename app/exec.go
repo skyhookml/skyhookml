@@ -2,6 +2,7 @@ package app
 
 import (
 	"../skyhook"
+	"../exec_ops"
 
 	"fmt"
 	"log"
@@ -12,10 +13,37 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// Helper function to compute the keys already computed at a node.
+// This only works for incremental nodes, which must produce the same keys across all output datasets.
+func (node *DBExecNode) GetComputedKeys() map[string]bool {
+	outputDatasets, _ := node.GetDatasets(false)
+	outputItems := make(map[string][][]skyhook.Item)
+	for name, ds := range outputDatasets {
+		if ds == nil {
+			return nil
+		}
+		var skItems []skyhook.Item
+		for _, item := range ds.ListItems() {
+			skItems = append(skItems, item.Item)
+		}
+		outputItems[name] = [][]skyhook.Item{skItems}
+	}
+	groupedItems := exec_ops.GroupItems(outputItems)
+	keySet := make(map[string]bool)
+	for key := range groupedItems {
+		keySet[key] = true
+	}
+	return keySet
+}
+
 // Run this node.
 type ExecRunOptions struct {
 	// If force, we run even if outputs were already available.
 	Force bool
+
+	// Whether to try incremental execution at this node.
+	// If false, we throw error if parent datasets are not done.
+	Incremental bool
 
 	// If set, limit execution to these keys.
 	// Only supported by incremental ops.
@@ -23,14 +51,23 @@ type ExecRunOptions struct {
 }
 func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	// create datasets for this op if needed
-	outputDatasets, outputsOK := node.GetDatasets(true)
-	if outputsOK && !opts.Force {
-		return nil
-	}
-	for _, ds := range outputDatasets {
-		// TODO: for now we clear the output datasets before running
-		// but in the future, ops may support incremental execution
-		ds.Clear()
+	outputDatasets, _ := node.GetDatasets(true)
+
+	// if force, we clear the datasets first
+	// otherwise, check if the datasets are done already
+	if opts.Force {
+		for _, ds := range outputDatasets {
+			ds.Clear()
+			ds.SetDone(false)
+		}
+	} else {
+		done := true
+		for _, ds := range outputDatasets {
+			done = done && ds.Done
+		}
+		if done {
+			return nil
+		}
 	}
 	skOutputDatasets := make(map[string]skyhook.Dataset)
 	for name, ds := range outputDatasets {
@@ -41,16 +78,21 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	// for ExecNode parents, get computed dataset
 	// in the future, we may need some recursive execution
 	parentDatasets := make(map[string][]*DBDataset)
+	parentsDone := true // whether parent datasets are fully computed
 	for name, plist := range node.GetParents() {
 		parentDatasets[name] = make([]*DBDataset, len(plist))
 		for i, parent := range plist {
 			if parent.Type == "n" {
 				n := GetExecNode(parent.ID)
 				dsList, _ := n.GetDatasets(false)
-				if dsList[parent.Name] == nil {
+				ds := dsList[parent.Name]
+				if ds == nil {
 					return fmt.Errorf("dataset for parent node %s[%s] is missing", n.Name, parent.Name)
+				} else if !ds.Done && !opts.Incremental {
+					return fmt.Errorf("dataset for parent node %s[%s] is not done", n.Name, parent.Name)
 				}
-				parentDatasets[name][i] = dsList[parent.Name]
+				parentDatasets[name][i] = ds
+				parentsDone = parentsDone && ds.Done
 			} else {
 				parentDatasets[name][i] = GetDataset(parent.ID)
 			}
@@ -77,7 +119,27 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		return err
 	}
 
+	// if running incrementally, remove tasks that were already computed
+	// this is mostly so that we can see whether we will be done with this node after the current execution
+	// (i.e., we are done here if parentsDone and we execute all remaining tasks)
+	if opts.Incremental {
+		var ntasks []skyhook.ExecTask
+		completedKeys := node.GetComputedKeys()
+		for _, task := range tasks {
+			if completedKeys[task.Key] {
+				continue
+			}
+			ntasks = append(ntasks, task)
+		}
+		tasks = ntasks
+	}
+
 	// limit tasks to LimitOutputKeys if needed
+	// also determine whether this current execution will lead to all tasks being completed
+	willBeDone := true
+	if !parentsDone {
+		willBeDone = false
+	}
 	if opts.LimitOutputKeys != nil {
 		var ntasks []skyhook.ExecTask
 		for _, task := range tasks {
@@ -86,7 +148,10 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 			}
 			ntasks = append(ntasks, task)
 		}
-		tasks = ntasks
+		if len(ntasks) != len(tasks) {
+			tasks = ntasks
+			willBeDone = false
+		}
 	}
 
 	// initialize job
@@ -183,6 +248,13 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 		return applyErr
 	}
 
+	// update dataset states
+	if willBeDone {
+		for _, ds := range outputDatasets {
+			ds.SetDone(true)
+		}
+	}
+
 	job.SetDone("")
 	log.Printf("[exec-node %s] [run] done", node.Name)
 	return nil
@@ -190,6 +262,16 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 
 // Get some number of incremental outputs from this node.
 func (node *DBExecNode) Incremental(n int) error {
+	isIncremental := func(node *DBExecNode) bool {
+		return skyhook.GetExecOpImpl(node.Op).Incremental
+	}
+
+	if !isIncremental(node) {
+		return fmt.Errorf("can only incrementally run incremental nodes")
+	} else if node.IsDone() {
+		return nil
+	}
+
 	log.Printf("[exec-node %s] [incremental] begin execution of %d outputs", node.Name, n)
 	// identify all non-incremental ancestors of this node
 	// but stop the search at ExecNodes whose outputs have already been computed
@@ -213,7 +295,7 @@ func (node *DBExecNode) Incremental(n int) error {
 		}
 
 		execNode := cur.(*DBExecNode)
-		if !skyhook.GetExecOpImpl(execNode.Op).Incremental {
+		if !isIncremental(execNode) {
 			nonIncremental = append(nonIncremental, cur)
 			continue
 		}
@@ -292,14 +374,25 @@ func (node *DBExecNode) Incremental(n int) error {
 		}
 	}
 
-	// what output keys do we want to produce at the last node?
+	// what output keys haven't been computed yet at the last node?
 	allKeys := computedOutputKeys[node.ID]
-	wantedKeys := make(map[string]bool)
-	if len(allKeys) < n {
-		n = len(allKeys)
+	persistedKeys := node.GetComputedKeys()
+	var missingKeys []string
+	for _, key := range allKeys {
+		if persistedKeys[key] {
+			continue
+		}
+		missingKeys = append(missingKeys, key)
 	}
-	for _, idx := range rand.Perm(len(allKeys))[0:n] {
-		wantedKeys[allKeys[idx]] = true
+	log.Printf("[exec-node %s] [incremental] found %d total keys, %d already computed keys, and %d missing keys at this node", node.Name, len(allKeys), len(persistedKeys), len(missingKeys))
+
+	// what output keys do we want to produce at the last node?
+	wantedKeys := make(map[string]bool)
+	if len(missingKeys) < n {
+		n = len(missingKeys)
+	}
+	for _, idx := range rand.Perm(len(missingKeys))[0:n] {
+		wantedKeys[missingKeys[idx]] = true
 	}
 	log.Printf("[exec-node %s] [incremental] determined %d keys to produce at this node", node.Name, len(wantedKeys))
 
@@ -349,6 +442,10 @@ func (node *DBExecNode) Incremental(n int) error {
 	nodesDone := make(map[int]bool)
 	for !nodesDone[node.ID] {
 		for _, cur := range incrementalNodes {
+			if nodesDone[cur.ID] {
+				continue
+			}
+
 			ready := true
 			for _, plist := range cur.GetParents() {
 				for _, parent := range plist {
@@ -369,6 +466,7 @@ func (node *DBExecNode) Incremental(n int) error {
 			curOutputKeys := neededOutputKeys[cur.ID]
 			log.Printf("[exec-node %s] [incremental] computing %d output keys at node %s", node.Name, len(curOutputKeys), cur.Name)
 			err := cur.Run(ExecRunOptions{
+				Incremental: true,
 				LimitOutputKeys: curOutputKeys,
 			})
 			if err != nil {

@@ -88,6 +88,22 @@ func init() {
 			}
 			return outputs
 		},
+		Incremental: true,
+		GetOutputKeys: func(node skyhook.ExecNode, inputs map[string][][]string) []string {
+			inputsWithoutModel := make(map[string][][]string)
+			for name, value := range inputs {
+				if name == "model" {
+					continue
+				}
+				inputsWithoutModel[name] = value
+			}
+			return exec_ops.MapGetOutputKeys(node, inputsWithoutModel)
+		},
+		GetNeededInputs: func(node skyhook.ExecNode, outputs []string) map[string][][]string {
+			neededInputs := exec_ops.MapGetNeededInputs(node, outputs)
+			neededInputs["model"] = [][]string{{"model"}}
+			return neededInputs
+		},
 		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
 			return "skyhookml/pytorch", nil
 		},
