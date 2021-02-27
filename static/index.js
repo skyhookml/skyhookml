@@ -29,6 +29,7 @@ import Interactive from './interactive.js';
 
 import Jobs from './jobs.js';
 import JobExecNode from './job-exec_node.js';
+import JobPytorchTrain from './job-pytorch_train.js';
 
 const router = new VueRouter({
 	routes: [
@@ -63,6 +64,7 @@ const router = new VueRouter({
 
 		{path: '/ws/:ws/jobs', component: Jobs},
 		{path: '/ws/:ws/jobs/execnode/:jobid', component: JobExecNode},
+		{path: '/ws/:ws/jobs/pytorch_train/:jobid', component: JobPytorchTrain},
 	],
 });
 

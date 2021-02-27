@@ -128,8 +128,15 @@ updated_lr = False
 stop_count = 0
 epoch = 0
 
+def get_loss_avgs(losses):
+	loss_avgs = {}
+	for k in losses[0].keys():
+		loss_avgs[k] = numpy.mean([d[k] for d in losses])
+	return loss_avgs
+
 best_loss = None
 while stop_count < 20:
+	train_losses = []
 	net.train()
 	for inputs in train_loader:
 		util.inputs_to_device(inputs, device)
@@ -137,6 +144,7 @@ while stop_count < 20:
 		loss_dict, _ = net(*inputs[0:arch['NumInputs']], targets=inputs[arch['NumInputs']:])
 		loss_dict['loss'].backward()
 		optimizer.step()
+		train_losses.append({k: v.item() for k, v in loss_dict.items()})
 
 	val_losses = []
 	net.eval()
@@ -144,12 +152,17 @@ while stop_count < 20:
 		util.inputs_to_device(inputs, device)
 		loss_dict, _ = net(*inputs[0:arch['NumInputs']], targets=inputs[arch['NumInputs']:])
 		val_losses.append({k: v.item() for k, v in loss_dict.items()})
-	val_loss_avgs = {}
-	for k in val_losses[0].keys():
-		val_loss_avgs[k] = numpy.mean([d[k] for d in val_losses])
-	val_loss = val_loss_avgs['loss']
 
-	print(val_loss_avgs)
+	train_loss_avgs = get_loss_avgs(train_losses)
+	val_loss_avgs = get_loss_avgs(val_losses)
+
+	json_loss = json.dumps({
+		'train': train_loss_avgs,
+		'val': val_loss_avgs,
+	})
+	print('jsonloss' + json_loss)
+
+	val_loss = val_loss_avgs['loss']
 	print('val_loss={}/{}'.format(val_loss, best_loss))
 
 	if best_loss is None or val_loss < best_loss:

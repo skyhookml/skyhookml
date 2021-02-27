@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 type TrainOp struct {
@@ -63,6 +64,27 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 func (e *TrainOp) Close() {}
 
+// Save losses from "jsonloss" lines in the pytorch train output.
+type TrainJobOp struct {
+	state skyhook.ModelJobState
+}
+const LossSignature string = "jsonloss"
+func (op *TrainJobOp) Update(lines []string) interface{} {
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, LossSignature) {
+			continue
+		}
+		line = line[len(LossSignature):]
+		// map from train/val -> loss name -> loss value
+		var data map[string]map[string]float64
+		skyhook.JsonUnmarshal([]byte(line), &data)
+		op.state.TrainLoss = append(op.state.TrainLoss, data["train"]["loss"])
+		op.state.ValLoss = append(op.state.ValLoss, data["val"]["loss"])
+	}
+	return op.state
+}
+
 func init() {
 	skyhook.ExecOpImpls["pytorch_train"] = skyhook.ExecOpImpl{
 		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
@@ -79,6 +101,9 @@ func init() {
 		},
 		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
 			return "skyhookml/pytorch", nil
+		},
+		GetJobOp: func(url string, node skyhook.ExecNode) skyhook.JobOp {
+			return &TrainJobOp{}
 		},
 	}
 }

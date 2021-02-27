@@ -58,3 +58,8 @@ func (op *TailJobOp) Update(lines []string) interface{} {
 	}
 	return op.Lines
 }
+
+type ModelJobState struct {
+	TrainLoss []float64
+	ValLoss []float64
+}
