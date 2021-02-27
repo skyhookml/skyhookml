@@ -75,7 +75,7 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 			return err
 		}
 
-		if err := item.SetMetadata(); err != nil {
+		if err := item.SetMetadataFromFile(); err != nil {
 			return err
 		}
 	}

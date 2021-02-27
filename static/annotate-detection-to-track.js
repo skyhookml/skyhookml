@@ -5,6 +5,7 @@ export default AnnotateGenericUI({
 	data: function() {
 		return {
 			detections: null,
+			metadata: null,
 			nextTrackID: null,
 
 			// whether the current item has existing labels
@@ -26,17 +27,23 @@ export default AnnotateGenericUI({
 			format: 'json',
 			t: new Date().getTime(),
 		};
-		utils.request(this, 'GET', '/datasets/'+srcDataset.ID+'/items/'+this.response.Key+'/get', params, (data) => {
+		utils.request(this, 'GET', '/datasets/'+srcDataset.ID+'/items/'+this.response.Key+'/get?format=json', params, (data) => {
 			if(!this.itemHasExisting) {
 				this.detections = data;
 			}
 		});
+		utils.request(this, 'GET', '/datasets/'+srcDataset.ID+'/items/'+this.response.Key+'/get?format=meta', params, (data) => {
+			if(!this.itemHasExisting) {
+				this.metadata = data;
+			}
+		});
 	},
-	on_item_data: function(data) {
+	on_item_data: function(data, metadata) {
 		if(data.length == 0) {
 			return;
 		}
 		this.detections = data;
+		this.metadata = metadata;
 		this.itemHasExisting = true;
 
 		// next track ID should be one higher than the maximum
@@ -60,7 +67,7 @@ export default AnnotateGenericUI({
 		});
 	},
 	getAnnotateData: function() {
-		return this.detections;
+		return [this.detections, this.metadata];
 	},
 	methods: {
 		render: function() {

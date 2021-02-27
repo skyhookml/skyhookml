@@ -10,7 +10,7 @@ export default AnnotateGenericUI({
 			ints: [],
 		};
 	},
-	created: function() {
+	on_created_ready: function() {
 		let params;
 		try {
 			params = JSON.parse(this.annoset.Params);
@@ -56,12 +56,14 @@ export default AnnotateGenericUI({
 		this.ints = data.map((x) => x.toString());
 	},
 	getAnnotateData: function() {
-		return this.ints.map((str) => {
+		let data = this.ints.map((str) => {
 			if(isNaN(parseInt(str))) {
 				return -1;
 			}
 			return parseInt(str);
 		});
+		let metadata = null;
+		return [data, metadata];
 	},
 	methods: {
 		submitInput: function() {

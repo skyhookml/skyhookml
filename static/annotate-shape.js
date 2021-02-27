@@ -13,7 +13,7 @@ export default AnnotateGenericUI({
 			keyupHandler: null,
 		};
 	},
-	created: function() {
+	on_created_ready: function() {
 		let params;
 		try {
 			params = JSON.parse(this.annoset.Params);
@@ -60,9 +60,14 @@ export default AnnotateGenericUI({
 		});
 	},
 	getAnnotateData: function() {
-		return this.shapes.map((shapeList) => {
+		let data = this.shapes.map((shapeList) => {
 			return shapeList.map((shape) => this.encodeShape(shape))
 		});
+		let metadata = {
+			CanvasDims: [this.imageDims.Width, this.imageDims.Height],
+			Categories: this.params.Categories,
+		};
+		return [data, metadata];
 	},
 	methods: {
 		decodeShape: function(shape) {
@@ -106,7 +111,10 @@ export default AnnotateGenericUI({
 		},
 		saveParams: function() {
 			let request = {
-				Params: JSON.stringify(this.params),
+				Params: JSON.stringify({
+					Mode: this.params.Mode,
+					Categories: this.params.Categories,
+				}),
 			};
 			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, JSON.stringify(request));
 		},

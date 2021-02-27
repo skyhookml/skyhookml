@@ -169,6 +169,7 @@ func init() {
 			// new key
 			ds.WriteItem(request.Key, data)
 		} else {
+			item.SetMetadata(request.Format, request.Metadata)
 			item.UpdateData(data)
 		}
 	}).Methods("POST")

@@ -119,7 +119,7 @@ export default function(impl) {
 							};
 							utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items/'+this.response.Key+'/get', params, (data) => {
 								if(impl.on_item_data) {
-									impl.on_item_data.call(this, data);
+									impl.on_item_data.call(this, data, this.itemMeta);
 								}
 							});
 						}
@@ -176,11 +176,9 @@ export default function(impl) {
 				let data = impl.getAnnotateData.call(this);
 				let request = {
 					Key: this.response.Key,
-					Data: JSON.stringify(data),
+					Data: JSON.stringify(data[0]),
 					Format: 'json',
-					Metadata: JSON.stringify({
-						CanvasDims: [this.imageDims.Width, this.imageDims.Height],
-					}),
+					Metadata: JSON.stringify(data[1]),
 				};
 				utils.request(this, 'POST', this.url, JSON.stringify(request), () => {
 					if(this.keyList == null) {

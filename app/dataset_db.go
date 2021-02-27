@@ -269,17 +269,22 @@ func (item *DBItem) Load() {
 }
 
 // Set metadata based on the file.
-func (item *DBItem) SetMetadata() error {
+func (item *DBItem) SetMetadataFromFile() error {
 	item.Load()
-	db := (&DBDataset{Dataset: item.Dataset}).getDB()
 	format, metadata, err := skyhook.DataImpls[item.Dataset.DataType].GetDefaultMetadata(item.Fname())
 	if err != nil {
 		return err
 	}
+	item.SetMetadata(format, metadata)
+	return nil
+}
+
+func (item *DBItem) SetMetadata(format string, metadata string) {
+	item.Load()
 	item.Format = format
 	item.Metadata = metadata
-	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE k = ?", item.Format, item.Metadata, item.Key)
-	return nil
+	db := (&DBDataset{Dataset: item.Dataset}).getDB()
+	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE k = ?", format, metadata, item.Key)
 }
 
 func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) *DBDataset {
