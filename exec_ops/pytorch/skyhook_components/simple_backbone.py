@@ -38,5 +38,5 @@ class SimpleBackbone(torch.nn.Module):
 			outputs['layer{}'.format(i)] = x
 		return outputs
 
-def M(params, example_inputs):
-	return SimpleBackbone(params, example_inputs)
+def M(info):
+	return SimpleBackbone(info['params'], info['example_inputs'])

@@ -51,5 +51,5 @@ class ClsHead(torch.nn.Module):
 
 		return d
 
-def M(params, example_inputs):
-	return ClsHead(params, example_inputs)
+def M(info):
+	return ClsHead(info['params'], info['example_inputs'])

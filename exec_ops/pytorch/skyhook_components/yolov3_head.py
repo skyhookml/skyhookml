@@ -1,30 +1,35 @@
 import os.path
-import hashlib
 import math
 import skyhook_pylib as lib
-import sys
 import torch
 import yaml
 
-def M(params, example_inputs):
-	# from github.com/ultralytics/yolov3
-	expected_path = os.path.join('.', 'models', hashlib.sha256(b'https://github.com/ultralytics/yolov3.git').hexdigest())
-	sys.path.insert(1, expected_path)
-	import utils.general
-	import utils.loss
-	import utils.torch_utils
-	import utils.autoanchor
-	import models.yolo
+import skyhook_components.yolov3_common as yolov3_common
 
-	class Yolov3(torch.nn.Module):
-		def __init__(self, params, example_inputs):
-			super(Yolov3, self).__init__()
-			self.nc = 1
+def M(info):
+	with yolov3_common.ImportContext() as ctx:
+		import utils.general
+		import utils.loss
+		import utils.torch_utils
+		import utils.autoanchor
+		import models.yolo
 
-			assert example_inputs[0].shape[2] == 2*example_inputs[1].shape[2]
-			assert example_inputs[1].shape[2] == 2*example_inputs[2].shape[2]
+		class Yolov3(torch.nn.Module):
+			def __init__(self, info):
+				super(Yolov3, self).__init__()
+				detection_metadata = info['metadatas'][3]
+				if detection_metadata and 'Categories' in detection_metadata:
+					self.categories = detection_metadata['Categories']
+				else:
+					self.categories = ['object']
+				self.nc = len(self.categories)
+				lib.eprint('yolov3: set nc={}'.format(self.nc))
 
-			yolo_yaml = '''
+				example_inputs = info['example_inputs']
+				assert example_inputs[0].shape[2] == 2*example_inputs[1].shape[2]
+				assert example_inputs[1].shape[2] == 2*example_inputs[2].shape[2]
+
+				yolo_yaml = '''
 nc: 80
 depth_multiple: 1.0
 width_multiple: 1.0
@@ -60,114 +65,70 @@ head:
    [[19, 14, 7], 1, Detect, [nc, anchors]],   # Detect(P3, P4, P5)
   ]
 '''
-			yolo_cfg = yaml.load(yolo_yaml, Loader=yaml.FullLoader)
-			yolo_cfg['nc'] = self.nc
-			input_channels = [x.shape[1] for x in example_inputs]
-			self.model, _ = models.yolo.parse_model(yolo_cfg, [3]+input_channels)
+				yolo_cfg = yaml.load(yolo_yaml, Loader=yaml.FullLoader)
+				yolo_cfg['nc'] = self.nc
+				input_channels = [x.shape[1] for x in example_inputs[0:3]]
+				self.model, _ = models.yolo.parse_model(yolo_cfg, [3]+input_channels)
 
-			# attached hyperparameters (from train.py)
-			with open(os.path.join(expected_path, 'data/hyp.scratch.yaml'), 'r') as f:
-				hyp = yaml.load(f, Loader=yaml.FullLoader)
-			self.hyp = hyp
-			self.gr = 1.0
-			self.class_weights = torch.ones((1,), dtype=torch.float32)
-			self.names = ['item']
+				# attached hyperparameters (from train.py)
+				with open(os.path.join(ctx.expected_path, 'data/hyp.scratch.yaml'), 'r') as f:
+					hyp = yaml.load(f, Loader=yaml.FullLoader)
+				self.hyp = hyp
+				self.gr = 1.0
+				self.class_weights = torch.ones((self.nc,), dtype=torch.float32)
+				self.names = self.categories
 
-			# Build strides, anchors
-			m = self.model[-1]
-			s = 128  # 2x min stride
-			m.stride = torch.tensor([8.0, 16.0, 32.0])  # forward
-			m.anchors /= m.stride.view(-1, 1, 1)
-			utils.autoanchor.check_anchor_order(m)
-			self.stride = m.stride
-			self._initialize_biases()  # only run once
+				# Build strides, anchors
+				m = self.model[-1]
+				s = 128  # 2x min stride
+				m.stride = torch.tensor([8.0, 16.0, 32.0])  # forward
+				m.anchors /= m.stride.view(-1, 1, 1)
+				utils.autoanchor.check_anchor_order(m)
+				self.stride = m.stride
+				self._initialize_biases()  # only run once
 
-			utils.torch_utils.initialize_weights(self)
+				utils.torch_utils.initialize_weights(self)
 
+			def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
+				# https://arxiv.org/abs/1708.02002 section 3.3
+				# cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1.
+				m = self.model[-1]  # Detect() module
+				for mi, s in zip(m.m, m.stride):  # from
+					b = mi.bias.view(m.na, -1)  # conv.bias(255) to (3,85)
+					b[:, 4] += math.log(8 / (640 / s) ** 2)  # obj (8 objects per 640 image)
+					b[:, 5:] += math.log(0.6 / (m.nc - 0.99)) if cf is None else torch.log(cf / cf.sum())  # cls
+					mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
-		def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
-			# https://arxiv.org/abs/1708.02002 section 3.3
-			# cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1.
-			m = self.model[-1]  # Detect() module
-			for mi, s in zip(m.m, m.stride):  # from
-				b = mi.bias.view(m.na, -1)  # conv.bias(255) to (3,85)
-				b[:, 4] += math.log(8 / (640 / s) ** 2)  # obj (8 objects per 640 image)
-				b[:, 5:] += math.log(0.6 / (m.nc - 0.99)) if cf is None else torch.log(cf / cf.sum())  # cls
-				mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
+			def forward(self, x1, x2, x3, targets=None):
+				if targets is not None:
+					targets = yolov3_common.process_targets(targets[0])
 
-		def forward(self, x1, x2, x3, targets=None):
-			boxes = None
-			if targets is not None:
-				# first extract detection counts per image in the batch, and the boxes
-				if len(targets[0]) == 3:
-					# shape type
-					counts, _, points = targets[0]
-					boxes = points.reshape(-1, 4)
-					# need to make sure that first point is smaller than second point
-					boxes = torch.stack([
-						torch.minimum(boxes[:, 0], boxes[:, 2]),
-						torch.minimum(boxes[:, 1], boxes[:, 3]),
-						torch.maximum(boxes[:, 0], boxes[:, 2]),
-						torch.maximum(boxes[:, 1], boxes[:, 3]),
-					], dim=1)
-				elif len(targets[0]) == 2:
-					# detection type
-					counts, boxes = targets[0]
+				y = [x1, x2, x3]
+				x = x3
+				for m in self.model:
+					if m.f != -1:  # if not from previous layer
+						x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
 
-				# xyxy -> xywh
-				boxes = torch.stack([
-					(boxes[:, 0] + boxes[:, 2]) / 2,
-					(boxes[:, 1] + boxes[:, 3]) / 2,
-					boxes[:, 2] - boxes[:, 0],
-					boxes[:, 3] - boxes[:, 1],
-				], dim=1)
+					x = m(x)  # run
+					y.append(x)
 
-				# output: list of bbox with first column indicating image index
-				indices = torch.repeat_interleave(
-					torch.arange(counts.shape[0], dtype=torch.int32, device=counts.device).float(),
-					counts.long()
-				).reshape(-1, 1)
-				cls_labels = torch.zeros(indices.shape, dtype=torch.float32, device=counts.device)
-				boxes = torch.cat([indices, cls_labels, boxes], dim=1)
+				d = {}
 
-			y = [x1, x2, x3]
-			x = x3
-			for m in self.model:
-				if m.f != -1:  # if not from previous layer
-					x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+				if self.training:
+					d['pred'] = x
+					d['detections'] = None
+				else:
+					inf_out, d['pred'] = x
 
-				x = m(x)  # run
-				y.append(x)
+					conf_thresh = 0.1
+					iou_thresh = 0.5
+					detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
+					d['detections'] = yolov3_common.process_outputs((x1.shape[2]*8, x1.shape[1]*8), detections, self.categories)
 
-			d = {}
+				if targets is not None:
+					loss, _ = utils.loss.compute_loss(d['pred'], targets, self)
+					d['loss'] = torch.mean(loss)
 
-			if self.training:
-				d['pred'] = x
-				d['detections'] = None
-			else:
-				inf_out, d['pred'] = x
+				return d
 
-				conf_thresh = 0.1
-				iou_thresh = 0.5
-				d['detections'] = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
-
-			if boxes is not None:
-				loss, _ = utils.loss.compute_loss(d['pred'], boxes, self)
-				d['loss'] = torch.mean(loss)
-
-			return d
-
-	# reset sys.modules
-	for module_name in list(sys.modules.keys()):
-		if not hasattr(sys.modules[module_name], '__file__'):
-			continue
-		fname = sys.modules[module_name].__file__
-		if fname is None:
-			continue
-		if not fname.startswith(expected_path):
-			continue
-		#lib.eprint('clearing {}'.format(module_name))
-		del sys.modules[module_name]
-	sys.path.remove(expected_path)
-
-	return Yolov3(params, example_inputs)
+		return Yolov3(info)

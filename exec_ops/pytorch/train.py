@@ -58,6 +58,19 @@ class MyDataset(torch.utils.data.Dataset):
 
 		return inputs
 
+	def get_metadata(self, idx):
+		key = self.keys[idx]
+		items = self.items[key]
+
+		metadatas = []
+		for dataset in self.datasets:
+			item = items[dataset['ID']]
+			if not item['Metadata']:
+				metadatas.append(None)
+				continue
+			metadatas.append(json.loads(item['Metadata']))
+		return metadatas
+
 	def collate_fn(self, batch):
 		inputs = list(zip(*batch))
 		for i, dataset in enumerate(self.datasets):
@@ -107,8 +120,9 @@ train_set, val_set = get_datasets()
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4, collate_fn=train_set.collate_fn)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, shuffle=True, num_workers=4, collate_fn=val_set.collate_fn)
 
-example_inputs = train_set.collate_fn([train_set[0]])[0:arch['NumInputs']]
-net = model.Net(arch, comps, example_inputs)
+example_inputs = train_set.collate_fn([train_set[0]])
+example_metadatas = train_set.get_metadata(0)
+net = model.Net(arch, comps, example_inputs, example_metadatas)
 net.to(device)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 updated_lr = False

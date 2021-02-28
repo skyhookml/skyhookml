@@ -111,11 +111,7 @@ func main() {
 
 		// wait for container to be ready
 		stdoutRd := bufio.NewReader(stdout)
-		_, err = stdoutRd.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-
+		stdoutRd.ReadString('\n') // ignore error here since it'll be caught by readContainerOutput
 		// read stdout/stderr, and if JobID is set then pass the output lines to the coordinator
 		readContainerOutput(uuid, stdoutRd, bufio.NewReader(stderr), jobID)
 

@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -30,8 +32,23 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 	}
 	modelPath := strdata.(skyhook.StringData).Strings[0]
 
-	batchSize := 8
+	// load category names
+	var categories []string
+	trainPath := fmt.Sprintf("models/yolov3-%s/", modelPath)
+	bytes, err := ioutil.ReadFile(filepath.Join(trainPath, "obj.names"))
+	if err != nil {
+		return nil, fmt.Errorf("error reading obj.names: %v", err)
+	}
+	for _, line := range strings.Split(string(bytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		categories = append(categories, line)
+	}
 
+	// run yolov3 script
+	batchSize := 8
 	cmd := skyhook.Command(
 		fmt.Sprintf("yolov3-exec-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/yolov3/run.py",
@@ -48,6 +65,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 		rd: bufio.NewReader(cmd.Stdout()),
 		batchSize: batchSize,
 		dims: params.InputSize,
+		categories: categories,
 	}, nil
 }
 
@@ -61,6 +79,7 @@ type Yolov3 struct {
 	rd *bufio.Reader
 	batchSize int
 	dims [2]int
+	categories []string
 }
 
 func (e *Yolov3) Parallelism() int {
@@ -122,6 +141,7 @@ func (e *Yolov3) Apply(task skyhook.ExecTask) error {
 		Detections: detections,
 		Metadata: skyhook.DetectionMetadata{
 			CanvasDims: e.dims,
+			Categories: e.categories,
 		},
 	}
 	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
