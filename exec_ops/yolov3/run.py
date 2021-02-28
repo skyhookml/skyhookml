@@ -16,14 +16,30 @@ train_node_id = int(sys.argv[1])
 batch_size = int(sys.argv[2])
 width = int(sys.argv[3])
 height = int(sys.argv[4])
-threshold = 0.1
+threshold = 0.05
 
 train_dir = os.path.join(base_path, 'models', 'yolov3-{}'.format(train_node_id))
 config_path = os.path.join(train_dir, 'yolov3.cfg')
 meta_path = os.path.join(train_dir, 'obj.data')
 weight_path = os.path.join(train_dir, 'yolov3.weights')
 
-net, class_names, _ = darknet.load_network(config_path, meta_path, weight_path, batch_size=batch_size)
+# create a new config where the width/height are set correctly
+with open(config_path, 'r') as f:
+	tmp_config_buf = ''
+	for line in f.readlines():
+		line = line.strip()
+		if line.startswith('width='):
+			line = 'width={}'.format(width)
+		if line.startswith('height='):
+			line = 'height={}'.format(height)
+		tmp_config_buf += line + "\n"
+tmp_config_path = '/tmp/yolov3-{}.cfg'.format(os.getpid())
+with open(tmp_config_path, 'w') as f:
+	f.write(tmp_config_buf)
+
+net, class_names, _ = darknet.load_network(tmp_config_path, meta_path, weight_path, batch_size=batch_size)
+
+os.remove(tmp_config_path)
 
 stdin = sys.stdin.detach()
 while True:
@@ -32,8 +48,6 @@ while True:
 		break
 
 	arr = numpy.frombuffer(buf, dtype='uint8').reshape((batch_size, height, width, 3))
-	import skimage.io
-	skimage.io.imsave('/tmp/x.jpg', arr[0, :, :, :])
 	arr = arr.transpose((0, 3, 1, 2))
 	arr = numpy.ascontiguousarray(arr.flat, dtype='float32')/255.0
 	darknet_images = arr.ctypes.data_as(darknet.POINTER(darknet.c_float))
