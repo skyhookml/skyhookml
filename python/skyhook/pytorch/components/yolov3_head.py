@@ -1,10 +1,10 @@
 import os.path
 import math
-import skyhook_pylib as lib
+import skyhook.common as lib
 import torch
 import yaml
 
-import skyhook_components.yolov3_common as yolov3_common
+import skyhook.pytorch.components.yolov3_common as yolov3_common
 
 def M(info):
 	with yolov3_common.ImportContext() as ctx:

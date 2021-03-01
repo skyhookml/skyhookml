@@ -1,6 +1,6 @@
 import sys
-sys.path.append('./')
-import skyhook_pylib as lib
+sys.path.append('./python')
+import skyhook.common as lib
 
 import io
 import json

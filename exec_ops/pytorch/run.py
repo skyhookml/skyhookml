@@ -1,6 +1,6 @@
 import sys
-sys.path.append('./')
-import skyhook_pylib as lib
+sys.path.append('./python')
+import skyhook.common as lib
 
 import json
 import numpy
@@ -11,8 +11,8 @@ import skimage.io, skimage.transform
 
 import torch
 
-import model
-import util
+import skyhook.pytorch.model as model
+import skyhook.pytorch.util as util
 
 node_id = int(sys.argv[1])
 params_arg = sys.argv[2]

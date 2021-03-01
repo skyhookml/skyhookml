@@ -3,7 +3,7 @@ import numpy
 import skimage.io, skimage.transform
 import torch
 
-import skyhook_pylib as lib
+import skyhook.common as lib
 
 def read_input(t, path, metadata, format):
 	if t == 'image':

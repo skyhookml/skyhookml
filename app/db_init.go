@@ -87,7 +87,7 @@ func InitDB() {
 	db.Exec("UPDATE jobs SET error = 'terminated' WHERE done = 0")
 
 	// add missing pytorch components
-	componentPath := "exec_ops/pytorch/skyhook_components/"
+	componentPath := "python/skyhook/pytorch/components/"
 	files, err := ioutil.ReadDir(componentPath)
 	if err != nil {
 		panic(err)

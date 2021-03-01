@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./')
+sys.path.append('./python')
 
 import json
 import numpy
@@ -12,9 +12,8 @@ import sys
 
 import torch
 
-sys.path.append('./exec_ops/pytorch/')
-import model
-import util
+import skyhook.pytorch.model as model
+import skyhook.pytorch.util as util
 
 node_id = int(sys.argv[1])
 

@@ -1,7 +1,6 @@
 import sys
-sys.path.append('./')
-# needed by util.py
-import skyhook_pylib as lib
+sys.path.append('./python')
+import skyhook.common as lib
 
 import json
 import numpy
@@ -14,9 +13,8 @@ import torch
 import torch.optim
 import torch.utils
 
-sys.path.append('./exec_ops/pytorch/')
-import model
-import util
+import skyhook.pytorch.model as model
+import skyhook.pytorch.util as util
 
 MIN_PADDING = 4
 CROP_SIZE = 64

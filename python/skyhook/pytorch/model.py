@@ -6,9 +6,7 @@ import torch.optim
 import torch.nn
 import sys
 
-def eprint(s):
-	sys.stderr.write(str(s) + "\n")
-	sys.stderr.flush()
+import skyhook.common as lib
 
 class Net(torch.nn.Module):
 	def __init__(self, arch, comps, example_inputs, example_metadatas, output_datasets=None):
@@ -55,7 +53,7 @@ class Net(torch.nn.Module):
 
 			module_spec = comp.get('Module')
 			if module_spec.get('BuiltInModule', None):
-				module = importlib.import_module('skyhook_components.' + module_spec['BuiltInModule'], package='skyhook_components')
+				module = importlib.import_module('skyhook.pytorch.components.' + module_spec['BuiltInModule'], package='skyhook.pytorch.components')
 				m = module.M(cur_info)
 			elif module_spec.get('RepositoryModule', None):
 				repo = module_spec['Repository']

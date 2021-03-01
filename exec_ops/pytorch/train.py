@@ -1,21 +1,21 @@
 import sys
-sys.path.append('./')
-# needed by util.py
-import skyhook_pylib as lib
+sys.path.append('./python')
+import skyhook.common as lib
 
 import json
 import numpy
 import os, os.path
-import random
-import requests
 import skimage.io, skimage.transform
 
 import torch
 import torch.optim
 import torch.utils
 
-import model
-import util
+import skyhook.pytorch.model as model
+import skyhook.pytorch.util as util
+
+import skyhook.pytorch.dataset as skyhook_dataset
+import skyhook.pytorch.augment as skyhook_augment
 
 node_id = int(sys.argv[1])
 url = sys.argv[2]
@@ -32,114 +32,141 @@ datasets = json.loads(datasets_arg)
 arch = arch['Params']
 comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
 
-class MyDataset(torch.utils.data.Dataset):
-	def __init__(self, datasets, keys, items):
-		self.datasets = datasets
-		self.keys = keys
-		self.items = items
-
-	def __len__(self):
-		return len(self.keys)
-
-	def __getitem__(self, idx):
-		if torch.is_tensor(idx):
-			idx = idx.tolist()
-
-		key = self.keys[idx]
-		items = self.items[key]
-
-		inputs = []
-		for dataset in self.datasets:
-			item = items[dataset['ID']]
-			path = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
-			data = util.read_input(dataset['DataType'], path, item['Metadata'], item['Format'])
-			data = util.prepare_input(dataset['DataType'], data, dataset['Options'])
-			inputs.append(data)
-
-		return inputs
-
-	def get_metadata(self, idx):
-		key = self.keys[idx]
-		items = self.items[key]
-
-		metadatas = []
-		for dataset in self.datasets:
-			item = items[dataset['ID']]
-			if not item['Metadata']:
-				metadatas.append(None)
-				continue
-			metadatas.append(json.loads(item['Metadata']))
-		return metadatas
-
-	def collate_fn(self, batch):
-		inputs = list(zip(*batch))
-		for i, dataset in enumerate(self.datasets):
-			inputs[i] = util.collate(dataset['DataType'], inputs[i])
-		return inputs
-
-def get_datasets():
-	# add options to datasets
-	dataset_list = [ds.copy() for ds in datasets]
-	for ds in dataset_list:
-		ds['Options'] = {}
-	for spec in params['InputOptions']:
-		dataset_list[spec['Idx']]['Options'] = json.loads(spec['Value'])
-
-	# get items
-	# only fetch once per unique dataset
-	items = {}
-	unique_ds_ids = set([ds['ID'] for ds in datasets])
-	for ds_id in unique_ds_ids:
-		cur_items = requests.get(url+'/datasets/{}/items'.format(ds_id)).json()
-		for item in cur_items:
-			key = item['Key']
-			if key in items:
-				items[key][ds_id] = item
-			else:
-				items[key] = {ds_id: item}
-	# only keep keys that exist in all datasets
-	for key in list(items.keys()):
-		if len(items[key]) != len(unique_ds_ids):
-			del items[key]
-
-	keys = list(items.keys())
-	random.shuffle(keys)
-	num_val = len(keys)//5
-	val_keys = keys[0:num_val]
-	train_keys = keys[num_val:]
-
-	train_set = MyDataset(dataset_list, train_keys, items)
-	val_set = MyDataset(dataset_list, val_keys, items)
-
-	return train_set, val_set
-
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
 
-train_set, val_set = get_datasets()
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4, collate_fn=train_set.collate_fn)
-val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, shuffle=True, num_workers=4, collate_fn=val_set.collate_fn)
+# get train and val Datasets
+print('loading datasets')
+dataset_provider = skyhook_dataset.providers[params['Dataset']['Op']]
+dataset_params = json.loads(params['Dataset']['Params'])
+train_set, val_set = dataset_provider(url, datasets, dataset_params)
+datatypes = train_set.get_datatypes()
+
+# get data augmentation steps
+# this is a list of objects that provide forward() function
+# we will apply the forward function on batches from DataLoader
+print('loading data augmentations')
+augment_steps = []
+for spec in params['Augment']:
+	cls_func = skyhook_augment.augmentations[spec['Op']]
+	obj = cls_func(json.loads(spec['Params']), datatypes)
+	augment_steps.append(obj)
+
+# apply data augmentation on validation set
+# this is because some augmentations are random but we want a consistent validation set
+# here we assume the validation set fits in system memory, but not necessarily GPU memory
+# so we apply augmentation on CPU, whereas during training we will apply on GPU
+print('preparing validation set')
+val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, num_workers=4, collate_fn=val_set.collate_fn)
+val_batches = []
+for batch in val_loader:
+	for obj in augment_steps:
+		batch = obj.forward(batch)
+	val_batches.append(batch)
+
+print('initialize model')
+train_params = json.loads(params['Train']['Params'])
+train_loader = torch.utils.data.DataLoader(
+	train_set,
+	batch_size=train_params.get('BatchSize', 1),
+	shuffle=True,
+	num_workers=4,
+	collate_fn=train_set.collate_fn
+)
 
 example_inputs = train_set.collate_fn([train_set[0]])
-example_metadatas = train_set.get_metadata(0)
+example_metadatas = train_set.get_metadatas(0)
 net = model.Net(arch, comps, example_inputs, example_metadatas)
 net.to(device)
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+learning_rate = train_params.get('LearningRate', 1e-3)
+optimizer_name = train_params.get('Optimizer', 'adam')
+if optimizer_name == 'adam':
+	optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 updated_lr = False
 
-#optimizer = torch.optim.Adam(net.parameters(), lr=1e-3, betas=(0.937, 0.999))
+class StopCondition(object):
+	def __init__(self, params):
+		self.max_epochs = params.get('MaxEpochs', 0)
 
-#ckpt = torch.load('/home/ubuntu/skyhookml/yolov3/yolov3.pt')
-#state_dict = ckpt['model'].float().state_dict()
-#state_dict = {'mlist.0.model.'+k: v for k, v in state_dict.items()}
-#state_dict = {k: v for k, v in state_dict.items() if k in net.state_dict() and k not in ['anchor'] and not k.startswith('mlist.0.model.model.28.')}
-#net.load_state_dict(state_dict, strict=False)
+		# if score improves by less than score_epsilon for score_max_epochs epochs,
+		# then we stop
+		self.score_epsilon = params.get('ScoreEpsilon', 0)
+		self.score_max_epochs = params.get('ScoreMaxEpochs', 25)
 
-#for k, v in net.named_parameters():
-#	v.requires_grad = k.startswith('mlist.0.model.model.28.')
+		# last score seen where we reset the score_epochs
+		# this is less than the best_score only when score_epsilon > 0
+		# (if a higher score is within epsilon of the last reset score)
+		self.last_score = None
+		# best score seen ever
+		self.best_score = None
 
-# number of epochs with no improvement in loss
-stop_count = 0
+		self.epochs = 0
+		self.score_epochs = 0
+
+	def update(self, score):
+		print(
+			'epochs: {}/{} ... score: {}/{} (epochs since reset: {}/{}; best score: {})'.format(
+			self.epochs, self.max_epochs, score, self.last_score, self.score_epochs, self.max_score_epochs, self.best_score
+		))
+
+		self.epochs += 1
+		if self.max_epochs and self.epochs >= self.max_epochs:
+			return True
+
+		if self.best_score is None or score > self.best_score:
+			self.best_score = score
+
+		score_threshold = None
+		if self.last_score is not None:
+			score_threshold = self.last_score
+			if self.score_epsilon is not None:
+				score_threshold += self.score_epsilon
+		if score_threshold is None or score > score_threshold:
+			self.score_epochs = 0
+			self.last_score = self.best_score
+		else:
+			self.score_epochs += 1
+		if self.score_max_epochs and self.score_epochs >= self.score_max_epochs:
+			return True
+
+		return False
+
+class ModelSaver(object):
+	def __init__(self, params):
+		# either "latest" or "best"
+		self.mode = params.get('Mode', 'best')
+
+		self.best_score = None
+
+	def update(self, net, score):
+		should_save = False
+		if self.mode == 'latest':
+			should_save = True
+		elif self.mode == 'best':
+			if self.best_score is None or score > self.best_score:
+				self.best_score = score
+				should_save = True
+
+		if should_save:
+			torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
+
+stop_condition = StopCondition(train_params['StopCondition'])
+model_saver = ModelSaver(train_params['ModelSaver'])
+
+rate_decay_params = train_params['RateDecay']
+scheduler = None
+if rate_decay_params['Op'] == 'step':
+	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, rate_decay_params['StepSize'], gamma=rate_decay_params['StepGamma'])
+elif rate_decay_params['Op'] == 'plateau':
+	scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+		optimizer,
+		mode='max',
+		factor=rate_decay_params['PlateauFactor'],
+		patience=rate_decay_params['PlateauPatience'],
+		threshold=rate_decay_params['PlateauThreshold'],
+		min_lr=rate_decay_params['PlateauMin']
+	)
+
 epoch = 0
 
 def get_loss_avgs(losses):
@@ -148,12 +175,14 @@ def get_loss_avgs(losses):
 		loss_avgs[k] = numpy.mean([d[k] for d in losses])
 	return loss_avgs
 
-best_loss = None
-while stop_count < 20:
+print('begin training')
+while True:
 	train_losses = []
 	net.train()
 	for inputs in train_loader:
 		util.inputs_to_device(inputs, device)
+		for obj in augment_steps:
+			inputs = obj.forward(inputs)
 		optimizer.zero_grad()
 		loss_dict, _ = net(*inputs[0:arch['NumInputs']], targets=inputs[arch['NumInputs']:])
 		loss_dict['loss'].backward()
@@ -162,7 +191,7 @@ while stop_count < 20:
 
 	val_losses = []
 	net.eval()
-	for inputs in val_loader:
+	for inputs in val_batches:
 		util.inputs_to_device(inputs, device)
 		loss_dict, _ = net(*inputs[0:arch['NumInputs']], targets=inputs[arch['NumInputs']:])
 		val_losses.append({k: v.item() for k, v in loss_dict.items()})
@@ -177,18 +206,12 @@ while stop_count < 20:
 	print('jsonloss' + json_loss)
 
 	val_loss = val_loss_avgs['loss']
-	print('val_loss={}/{}'.format(val_loss, best_loss))
+	score = -val_loss
 
-	if best_loss is None or val_loss < best_loss:
-		best_loss = val_loss
-		stop_count = 0
-		torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
-	else:
-		stop_count += 1
-		if not updated_lr and stop_count > 10:
-			print('set learning rate lower')
-			optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
-			updated_lr = True
-			stop_count = 0
+	if stop_condition.update(score):
+		break
+	model_saver.update(net, score)
+	if scheduler is not None:
+		scheduler.step(score)
 
 	epoch += 1

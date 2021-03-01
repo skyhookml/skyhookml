@@ -107,13 +107,21 @@ type PytorchArch struct {
 type PytorchTrainParams struct {
 	ArchID int
 
-	// options for each input dataset
-	// the number of inputs connected to this node should be NumInputs+NumTargets
-	// (but we don't need options for all of them)
-	InputOptions []struct{
-		Idx int
-		// JSON-encoded; structure depends on data type
-		Value string
+	// dataset options
+	Dataset struct{
+		Op string
+		Params string
+	}
+
+	// data augmentation
+	Augment []struct{
+		Op string
+		Params string
+	}
+
+	Train struct {
+		Op string
+		Params string
 	}
 }
 
