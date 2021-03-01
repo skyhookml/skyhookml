@@ -13,32 +13,23 @@ export default {
 			let s = JSON.parse(this.value);
 			p = s;
 		} catch(e) {}
-		if(!p.LearningRate) {
-			p.LearningRate = 0.001;
-		}
-		if(!p.Optimizer) {
-			p.Optimizer = 'adam';
-		}
-		if(!p.BatchSize) {
-			p.BatchSize = 1;
-		}
-		if(!p.StopCondition) {
-			p.StopCondition = {
-				MaxEpochs: 0,
-				ScoreEpsilon: 0,
-				ScoreMaxEpochs: 25,
-			}
-		}
-		if(!p.ModelSaver) {
-			p.ModelSaver = {
-				Mode: 'best',
-			};
-		}
-		if(!p.RateDecay) {
-			p.RateDecay = {
-				Op: '',
-			}
-		}
+		if(!p.LearningRate) p.LearningRate = 0.001;
+		if(!p.Optimizer) p.Optimizer = 'adam';
+		if(!p.BatchSize) p.BatchSize = 1;
+		if(!p.StopCondition) p.StopCondition = {};
+		if(!p.StopCondition.MaxEpochs) p.StopCondition.MaxEpochs = 0;
+		if(!p.StopCondition.ScoreEpsilon) p.StopCondition.ScoreEpsilon = 0;
+		if(!p.StopCondition.ScoreMaxEpochs) p.StopCondition.ScoreMaxEpochs = 25;
+		if(!p.ModelSaver) p.ModelSaver = {};
+		if(!p.ModelSaver.Mode) p.ModelSaver.Mode = 'best';
+		if(!p.RateDecay) p.RateDecay = {};
+		if(!p.RateDecay.Op) p.RateDecay.Op = '';
+		if(!p.RateDecay.StepSize) p.RateDecay.StepSize = 1;
+		if(!p.RateDecay.StepGamma) p.RateDecay.StepGamma = 0.1;
+		if(!p.RateDecay.PlateauFactor) p.RateDecay.PlateauFactor = 0.1;
+		if(!p.RateDecay.PlateauPatience) p.RateDecay.PlateauPatience = 10;
+		if(!p.RateDecay.PlateauThreshold) p.RateDecay.PlateauThreshold = 0;
+		if(!p.RateDecay.PlateauMin) p.RateDecay.PlateauMin = 0.0001;
 		this.p = p;
 		this.update();
 	},
@@ -112,7 +103,74 @@ export default {
 	</div>
 
 	<h3>Rate Decay</h3>
-	<p>TODO</p>
+	<div class="form-group row">
+		<label class="col-sm-2 col-form-label">Rate Decay Mode</label>
+		<div class="col-sm-10">
+			<select v-model="p.RateDecay.Op" class="form-control" @change="update">
+				<option value="">None (constant learning rate)</option>
+				<option value="step">Step (reduce rate by a factor every few epochs)</option>
+				<option value="plateau">Plateau (reduce rate if score isn't improving)</option>
+			</select>
+		</div>
+	</div>
+	<template v-if="p.RateDecay.Op == 'step'">
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Step Size</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.StepSize" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					Reduce learning rate each time this many epochs have elapsed.
+				</small>
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Gamma</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.StepGamma" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					To reduce learning rate, multiply it by this factor.
+				</small>
+			</div>
+		</div>
+	</template>
+	<template v-if="p.RateDecay.Op == 'plateau'">
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Gamma</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.PlateauFactor" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					Multiply the learning rate by this factor when a plateau is detected.
+				</small>
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Patience</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.PlateauPatience" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					Wait for no improvement for this many epochs before reducing the learning rate.
+				</small>
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Plateau Epsilon</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.PlateauThreshold" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					Score improvements less than this threshold are still considered a plateau.
+				</small>
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Minimum Learning Rate</label>
+			<div class="col-sm-10">
+				<input v-model.number="p.RateDecay.PlateauMin" type="text" class="form-control" @change="update">
+				<small class="form-text text-muted">
+					Don't reduce the learning rate below this value.
+				</small>
+			</div>
+		</div>
+	</template>
 </div>
 	`,
 };

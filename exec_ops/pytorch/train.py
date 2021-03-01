@@ -106,7 +106,7 @@ class StopCondition(object):
 	def update(self, score):
 		print(
 			'epochs: {}/{} ... score: {}/{} (epochs since reset: {}/{}; best score: {})'.format(
-			self.epochs, self.max_epochs, score, self.last_score, self.score_epochs, self.max_score_epochs, self.best_score
+			self.epochs, self.max_epochs, score, self.last_score, self.score_epochs, self.score_max_epochs, self.best_score
 		))
 
 		self.epochs += 1
@@ -213,5 +213,6 @@ while True:
 	model_saver.update(net, score)
 	if scheduler is not None:
 		scheduler.step(score)
+		print('lr={}'.format(optimizer.param_groups[0]['lr']))
 
 	epoch += 1
