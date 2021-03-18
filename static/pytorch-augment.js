@@ -35,7 +35,8 @@ export default {
 				p.KeepRatio = false;
 				p.Multiple = 0;
 			} else if(op == 'crop') {
-
+				p.Width = '';
+				p.Height = '';
 			}
 			this.augment.push({
 				Op: op,
@@ -109,7 +110,25 @@ export default {
 			</div>
 		</template>
 		<template v-else-if="d.Op == 'crop'">
-			<h3>Cropping</h3>
+			<h3>Cropping <button type="button" class="btn btn-sm btn-danger" v-on:click="removeAugmentation(i)">Remove</button></h3>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">X Factor</label>
+				<div class="col-sm-10">
+					<input v-model="d.P.Width" type="text" class="form-control" @change="update">
+					<small class="form-text text-muted">
+						Crop width is image width multiplied by this factor. Express either as a fraction (e.g., 768/1024) or a decimal (e.g., 0.75).
+					</small>
+				</div>
+			</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Y Factor</label>
+				<div class="col-sm-10">
+					<input v-model="d.P.Height" type="text" class="form-control" @change="update">
+					<small class="form-text text-muted">
+						Crop height is image height multiplied by this factor. Express either as a fraction (e.g., 768/1024) or a decimal (e.g., 0.75).
+					</small>
+				</div>
+			</div>
 		</template>
 	</template>
 	<h3>Add Data Augmentation</h3>

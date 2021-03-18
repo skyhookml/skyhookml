@@ -123,7 +123,7 @@ head:
 					conf_thresh = 0.1
 					iou_thresh = 0.5
 					detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
-					d['detections'] = yolov3_common.process_outputs((x1.shape[2]*8, x1.shape[1]*8), detections, self.categories)
+					d['detections'] = yolov3_common.process_outputs((x1.shape[3]*8, x1.shape[2]*8), detections, self.categories)
 
 				if targets is not None:
 					loss, _ = utils.loss.compute_loss(d['pred'], targets, self)

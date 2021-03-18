@@ -18,6 +18,9 @@ class Dataset(torch.utils.data.Dataset):
 		self.keys = keys
 		self.items = items
 
+		# data augmentation steps
+		self.augments = []
+
 	def __len__(self):
 		return len(self.keys)
 
@@ -63,10 +66,18 @@ class Dataset(torch.utils.data.Dataset):
 			l.append(dataset['DataType'])
 		return l
 
+	def set_augments(self, augments):
+		self.augments = augments
+
 	def collate_fn(self, batch):
 		inputs = list(zip(*batch))
+
+		for augment in self.augments:
+			inputs = augment.forward(inputs)
+
 		for i, dataset in enumerate(self.datasets):
 			inputs[i] = util.collate(dataset['DataType'], inputs[i])
+
 		return inputs
 
 def get_datasets(url, datasets, params):

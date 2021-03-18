@@ -49,7 +49,7 @@ def callback_func(*inputs):
 		opts = input_options.get(i, {})
 		data = util.prepare_input(t, input, opts)
 		if canvas_dims is None and (t == 'image' or t == 'video'):
-			canvas_dims = [data.shape[1], data.shape[0]]
+			canvas_dims = [data.shape[2], data.shape[1]]
 		data = util.collate(t, [data])
 		datas.append(data)
 	if not canvas_dims:

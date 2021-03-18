@@ -46,11 +46,18 @@ datatypes = train_set.get_datatypes()
 # this is a list of objects that provide forward() function
 # we will apply the forward function on batches from DataLoader
 print('loading data augmentations')
-augment_steps = []
+ds_augments = []
+torch_augments = []
 for spec in params['Augment']:
 	cls_func = skyhook_augment.augmentations[spec['Op']]
 	obj = cls_func(json.loads(spec['Params']), datatypes)
-	augment_steps.append(obj)
+	if obj.pre_torch:
+		ds_augments.append(obj)
+	else:
+		torch_augments.append(obj)
+
+train_set.set_augments(ds_augments)
+val_set.set_augments(ds_augments)
 
 # apply data augmentation on validation set
 # this is because some augmentations are random but we want a consistent validation set
@@ -60,7 +67,7 @@ print('preparing validation set')
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, num_workers=4, collate_fn=val_set.collate_fn)
 val_batches = []
 for batch in val_loader:
-	for obj in augment_steps:
+	for obj in torch_augments:
 		batch = obj.forward(batch)
 	val_batches.append(batch)
 
@@ -181,7 +188,7 @@ while True:
 	net.train()
 	for inputs in train_loader:
 		util.inputs_to_device(inputs, device)
-		for obj in augment_steps:
+		for obj in torch_augments:
 			inputs = obj.forward(inputs)
 		optimizer.zero_grad()
 		loss_dict, _ = net(*inputs[0:arch['NumInputs']], targets=inputs[arch['NumInputs']:])

@@ -46,7 +46,7 @@ def M(info):
 					conf_thresh = 0.1
 					iou_thresh = 0.5
 					detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
-					d['detections'] = yolov3_common.process_outputs((x.shape[2], x.shape[1]), detections, self.categories)
+					d['detections'] = yolov3_common.process_outputs((x.shape[3], x.shape[2]), detections, self.categories)
 
 				if targets is not None:
 					loss, _ = utils.loss.compute_loss(d['pred'], targets, self.model)

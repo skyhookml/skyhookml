@@ -11,6 +11,7 @@ class RandomResize(object):
 		self.keep_ratio = params['KeepRatio']
 		self.multiple = params['Multiple']
 		self.data_types = data_types
+		self.pre_torch = False
 
 	def forward(self, batch):
 		for i, x in enumerate(batch):
@@ -31,6 +32,5 @@ class RandomResize(object):
 				width = (width + self.multiple - 1) // self.multiple * self.multiple
 				height = (height + self.multiple - 1) // self.multiple * self.multiple
 
-			print(width, height)
 			batch[i] = torchvision.transforms.functional.resize(x, size=[height, width])
 		return batch
