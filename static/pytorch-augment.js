@@ -37,6 +37,8 @@ export default {
 			} else if(op == 'crop') {
 				p.Width = '';
 				p.Height = '';
+			} else if(op == 'flip') {
+				p.Mode = 'both';
 			}
 			this.augment.push({
 				Op: op,
@@ -127,6 +129,19 @@ export default {
 					<small class="form-text text-muted">
 						Crop height is image height multiplied by this factor. Express either as a fraction (e.g., 768/1024) or a decimal (e.g., 0.75).
 					</small>
+				</div>
+			</div>
+		</template>
+		<template v-else-if="d.Op == 'flip'">
+			<h3>Flipping <button type="button" class="btn btn-sm btn-danger" v-on:click="removeAugmentation(i)">Remove</button></h3>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Mode</label>
+				<div class="col-sm-10">
+					<select v-model="d.P.Mode" class="form-control" @change="update">
+						<option value="both">Both</option>
+						<option value="horizontal">Horizontal Flip Only</option>
+						<option value="vertical">Vertical Flip Only</option>
+					</select>
 				</div>
 			</div>
 		</template>
