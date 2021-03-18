@@ -3,129 +3,144 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			parents: [],
-			inputOptions: [],
-			valPercent: 20,
+			augment: [],
+			addForm: {},
 		};
 	},
-	props: ['node', 'params'],
+	props: ['node', 'value'],
 	created: function() {
-		try {
-			let s = JSON.parse(this.params);
-			if(s.InputOptions) {
-				this.inputOptions = s.InputOptions;
-			}
-			if(s.ValPercent) {
-				this.valPercent = s.ValPercent;
-			}
-		} catch(e) {}
-
-		// fetch parents to get details on the datasets for which the user can configure input options
-
-		// given an array of objects, get index of the object in the array
-		// that has a certain value at some key
-		let getIndexByKeyValue = function(array, key, value) {
-			let index = -1;
-			array.forEach((obj, i) => {
-				if(obj[key] != value) {
-					return;
-				}
-				index = i;
-			});
-			return index;
-		};
-
-		// after figuring out the data type at input idx, add missing options for that type to inputOptions
-		let addMissingOptions = function(idx) {
-			let dtype = this.parents[idx].DataType;
-			if(dtype == 'image') {
-				if('Width' in this.inputOptions[idx] && 'Height' in this.inputOptions[idx]) {
-					return;
-				}
-				this.$set(this.inputOptions, idx, {
-					Width: 0,
-					Height: 0,
-				});
-			}
-		}
-
-		let inputs = [];
-		if(this.node.Parents) {
-			// get Parents['inputs'], but Parents is array
-			// really the index should always be 0 for pytorch_train node
-			let index = getIndexByKeyValue(this.node.Inputs, 'Name', 'inputs');
-			if(index >= 0) {
-				inputs = this.node.Parents[index];
-			}
-		}
-		this.parents = [];
-		inputs.forEach((parent, idx) => {
-			this.parents.push({
-				Name: 'unknown',
-				DataType: 'unknown',
-			});
-			if(!this.inputOptions[idx]) {
-				this.$set(this.inputOptions, idx, {});
-			}
-			if(parent.Type == 'n') {
-				utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
-					this.parents[idx].Name = node.Name;
-					let index = getIndexByKeyValue(node.Outputs, 'Name', parent.Name);
-					this.parents[idx].DataType = node.Outputs[index].DataType;
-					this.addMissingOptions(idx);
-				});
-			} else if(parent.Type == 'd') {
-				utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {
-					this.parents[idx].Name = ds.Name;
-					this.parents[idx].DataType = ds.DataType;
-					this.addMissingOptions(idx);
-				});
-			}
+		this.augment = this.value.map((el) => {
+			return {
+				Op: el.Op,
+				P: JSON.parse(el.Params),
+			};
 		});
+		this.resetAddForm();
 	},
 	methods: {
+		resetAddForm: function() {
+			this.addForm = {
+				op: '',
+			};
+		},
+		addAugmentation: function() {
+			let op = this.addForm.op;
+			this.resetAddForm();
+			let p = {};
+			if(op == 'random_resize') {
+				p.MinWidth = 0;
+				p.MinHeight = 0;
+				p.MaxWidth = 0;
+				p.MaxHeight = 0;
+				p.KeepRatio = false;
+				p.Multiple = 0;
+			} else if(op == 'crop') {
+
+			}
+			this.augment.push({
+				Op: op,
+				P: p,
+			});
+			this.update();
+		},
+		removeAugmentation: function(i) {
+			this.augment.splice(i, 1);
+			this.update();
+		},
 		update: function() {
-			this.$emit('input', JSON.stringify({
-				InputOptions: this.inputOptions,
-				valPercent: this.valPercent,
-			}));
+			let s = this.augment;
+			s = s.map((el) => {
+				return {
+					Op: el.Op,
+					Params: JSON.stringify(el.P),
+				};
+			});
+			this.$emit('input', s);
 		},
 	},
 	template: `
 <div class="small-container">
-	<div class="form-group row">
-		<label class="col-sm-2 col-form-label">Validation Percentage</label>
-		<div class="col-sm-10">
-			<input v-model.number="valPercent" type="text" class="form-control" @change="update">
-			<small class="form-text text-muted">
-				Use this percentage of the input data for validation. The rest will be used for training.
-			</small>
-		</div>
-	</div>
-	<h3>Input Options</h3>
-	<template v-for="(parent, idx) in parents">
-		<h4>{{ parent.Name }} ({{ parent.DataType }})</h4>
-		<template v-if="parent.DataType == 'image'">
+	<template v-for="(d, i) in augment">
+		<template v-if="d.Op == 'random_resize'">
+			<h3>Random Resize <button type="button" class="btn btn-sm btn-danger" v-on:click="removeAugmentation(i)">Remove</button></h3>
 			<div class="form-group row">
-				<label class="col-sm-2 col-form-label">Width</label>
+				<label class="col-sm-2 col-form-label">Minimum Width</label>
 				<div class="col-sm-10">
-					<input v-model.number="inputOptions[idx].Width" type="text" class="form-control" @change="update">
+					<input v-model.number="d.P.MinWidth" type="text" class="form-control" @change="update">
+				</div>
+			</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Minimum Height</label>
+				<div class="col-sm-10">
+					<input v-model.number="d.P.MinHeight" type="text" class="form-control" @change="update">
+				</div>
+			</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Maximum Width</label>
+				<div class="col-sm-10">
+					<input v-model.number="d.P.MaxWidth" type="text" class="form-control" @change="update">
+				</div>
+			</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Maximum Height</label>
+				<div class="col-sm-10">
+					<input v-model.number="d.P.MaxHeight" type="text" class="form-control" @change="update">
+				</div>
+			</div>
+			<div class="form-group row">
+				<div class="col-sm-2">Options</div>
+				<div class="col-sm-10">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" v-model="d.P.KeepRatio" @change="update">
+						<label class="form-check-label">
+							Keep aspect ratio the same when resizing. In this case, only min/max width are used.
+						</label>
+					</div>
+				</div>
+			</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Multiple</label>
+				<div class="col-sm-10">
+					<input v-model.number="d.P.Multiple" type="text" class="form-control" @change="update">
 					<small class="form-text text-muted">
-						Resize the image to this width. Leave as 0 to use the input image without resizing.
+						When resizing, round random width/height up to the next higher multiple of this number.
 					</small>
 				</div>
 			</div>
-				<div class="form-group row">
-					<label class="col-sm-2 col-form-label">Height</label>
-					<div class="col-sm-10">
-						<input v-model.number="inputOptions[idx].Height" type="text" class="form-control" @change="update">
-						<small class="form-text text-muted">
-							Resize the image to this height. Leave as 0 to use the input image without resizing.
-						</small>
-					</div>
-				</div>
+		</template>
+		<template v-else-if="d.Op == 'crop'">
+			<h3>Cropping</h3>
 		</template>
 	</template>
+	<h3>Add Data Augmentation</h3>
+	<fieldset class="form-group">
+		<div class="row">
+			<legend class="col-form-label col-sm-2 pt-0">Type</legend>
+			<div class="col-sm-10">
+				<div class="form-check">
+					<input class="form-check-input" type="radio" v-model="addForm.op" value="random_resize">
+					<label class="form-check-label">Random Resize</label>
+				</div>
+				<div class="form-check">
+					<input class="form-check-input" type="radio" v-model="addForm.op" value="crop">
+					<label class="form-check-label">Cropping</label>
+				</div>
+				<div class="form-check">
+					<input class="form-check-input" type="radio" v-model="addForm.op" value="flip">
+					<label class="form-check-label">Horizontal and Vertical Flipping</label>
+				</div>
+				<div class="form-check">
+					<input class="form-check-input" type="radio" v-model="addForm.op" value="rotate">
+					<label class="form-check-label">Random Rotation</label>
+				</div>
+			</div>
+		</div>
+	</fieldset>
+	<div class="form-group row">
+		<div class="col-sm-10">
+			<button type="button" class="btn btn-primary" v-on:click="addAugmentation">Add Augmentation</button>
+		</div>
+	</div>
 </div>
 	`,
 };

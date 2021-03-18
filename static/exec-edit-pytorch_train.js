@@ -83,16 +83,16 @@ export default {
 		</ul>
 		<div class="tab-content mx-1">
 			<div class="tab-pane fade show active" id="pytorch-model-panel" role="tabpanel">
-				<pytorch-model v-bind:node="node" v-model:archID="params.ArchID"></pytorch-model>
+				<pytorch-model v-bind:node="node" v-model="params.ArchID"></pytorch-model>
 			</div>
 			<div class="tab-pane fade" id="pytorch-dataset-panel" role="tabpanel">
-				<pytorch-dataset v-bind:node="node" v-model:params="params.Dataset.Params"></pytorch-dataset>
+				<pytorch-dataset v-bind:node="node" v-model="params.Dataset.Params"></pytorch-dataset>
 			</div>
 			<div class="tab-pane fade" id="pytorch-augment-panel" role="tabpanel">
-				<!--<pytorch-augment v-bind:node="node" v-model:augment="params.Augment"></pytorch-augment>-->
+				<pytorch-augment v-bind:node="node" v-model="params.Augment"></pytorch-augment>
 			</div>
 			<div class="tab-pane fade" id="pytorch-train-panel" role="tabpanel">
-				<pytorch-train v-bind:node="node" v-model:params="params.Train.Params"></pytorch-train>
+				<pytorch-train v-bind:node="node" v-model="params.Train.Params"></pytorch-train>
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>

@@ -8,6 +8,8 @@ class RandomResize(object):
 		self.min_height = params['MinHeight']
 		self.max_width = params['MaxWidth']
 		self.max_height = params['MaxHeight']
+		self.keep_ratio = params['KeepRatio']
+		self.multiple = params['Multiple']
 		self.data_types = data_types
 
 	def forward(self, batch):
@@ -17,6 +19,18 @@ class RandomResize(object):
 				# other data types like object detections are represented in a way that doesn't depend on scale
 				continue
 
-			width = random.randint(self.min_width, self.max_width)
-			height = random.randint(self.min_height, self.max_height)
-			batch[i] = torchvision.transforms.functional.resize(x, size=[width, height])
+			if self.keep_ratio:
+				width = random.randint(self.min_width, self.max_width)
+				factor = width / x.shape[3]
+				height = int(factor * x.shape[2])
+			else:
+				width = random.randint(self.min_width, self.max_width)
+				height = random.randint(self.min_height, self.max_height)
+
+			if self.multiple > 1:
+				width = (width + self.multiple - 1) // self.multiple * self.multiple
+				height = (height + self.multiple - 1) // self.multiple * self.multiple
+
+			print(width, height)
+			batch[i] = torchvision.transforms.functional.resize(x, size=[height, width])
+		return batch
