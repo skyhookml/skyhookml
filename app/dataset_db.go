@@ -288,7 +288,7 @@ func (item *DBItem) SetMetadata(format string, metadata string) {
 }
 
 func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) *DBDataset {
-	done := t != "completed"
+	done := t != "computed"
 	res := db.Exec("INSERT INTO datasets (name, type, data_type, hash, done) VALUES (?, ?, ?, ?, ?)", name, t, dataType, hash, done)
 	id := res.LastInsertId()
 	log.Printf("[dataset %d-%s] created new dataset, data_type=%v", id, name, dataType)
