@@ -213,7 +213,7 @@ while True:
 	print('jsonloss' + json_loss)
 
 	val_loss = val_loss_avgs['loss']
-	score = -val_loss
+	score = val_loss_avgs['score']
 
 	if stop_condition.update(score):
 		break

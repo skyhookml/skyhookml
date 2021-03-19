@@ -96,6 +96,11 @@ type PytorchArchParams struct {
 		Layer string
 		Weight float64
 	}
+	Scores []struct{
+		ComponentIdx int
+		Layer string
+		Weight float64
+	}
 }
 
 type PytorchArch struct {

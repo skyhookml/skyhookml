@@ -1,0 +1,8 @@
+{
+	"Module": {"BuiltInModule": "loss_cls_accuracy"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Losses": [
+		"accuracy"
+	]
+}

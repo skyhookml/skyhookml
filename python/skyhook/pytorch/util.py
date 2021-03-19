@@ -27,6 +27,18 @@ def read_input(t, path, metadata, format):
 		data = lib.data_index(t, data, 0)
 		return data
 
+# Image, video: represented as one tensor of size [batch, channels, height, width]
+# Integer: represented as integer tensor of size [batch, 1]
+# Floats: represented as float tensoro of size [batch, n]
+# Shape: {
+#   counts: [batch] number of shapes in each image
+#   infos: [sum(counts), 2] 0 is class, 1 is number of points in each shape
+#   points: [sum(infos[:, 1]), 2] x/y coordinates of points
+# }
+# Detection: {
+#   counts: [batch] number of detections in each shape
+#   detections: [sum(counts), 5] 0 is class, 1:4 is sx/sy/ex/ey
+# }
 def prepare_input(t, data, opt):
 	if t == 'image' or t == 'video':
 		im = data
@@ -34,7 +46,7 @@ def prepare_input(t, data, opt):
 			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype('uint8')
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
-		return numpy.array(data, dtype='int32')
+		return numpy.array(data, dtype='int64')
 	elif t == 'floats':
 		return numpy.array(data, dtype='float32')
 	elif t == 'shape':

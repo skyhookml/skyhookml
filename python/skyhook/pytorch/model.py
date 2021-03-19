@@ -41,7 +41,7 @@ class Net(torch.nn.Module):
 					cur_metadatas.append(example_metadatas[inp_spec['DatasetIdx']])
 
 			# extract params
-			cur_params = None
+			cur_params = {}
 			if comp_spec['Params']:
 				cur_params = json.loads(comp_spec['Params'])
 
@@ -136,6 +136,16 @@ class Net(torch.nn.Module):
 			layer = get_layer(loss_spec)
 			loss_dict['loss{}_{}'.format(i, loss_spec['Layer'])] = layer
 			loss_dict['loss'] += layer * loss_spec['Weight']
+
+		if not self.training:
+			loss_dict['score'] = 0
+			if self.arch['Scores']:
+				for i, score_spec in enumerate(self.arch['Scores']):
+					layer = get_layer(score_spec)
+					loss_dict['score{}_{}'.format(i, score_spec['Layer'])] = layer
+					loss_dict['score'] += layer * score_spec['Weight']
+			else:
+				loss_dict['score'] = -loss_dict['loss']
 
 		return (loss_dict, outputs)
 
