@@ -1,6 +1,7 @@
 package ops
 
 import (
+	_ "../exec_ops/cropresize"
 	_ "../exec_ops/detection_filter"
 	_ "../exec_ops/filter"
 	_ "../exec_ops/python"

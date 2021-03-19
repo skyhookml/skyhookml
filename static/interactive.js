@@ -8,6 +8,8 @@ export default {
 	data: function() {
 		return {
 			node: null,
+			interval: null,
+
 			datasets: null,
 			items: {},
 			limit: 0,
@@ -26,13 +28,15 @@ export default {
 				items[name] = [];
 			}
 			this.items = items;
-		});
 
-		this.fetchItems();
-		this.interval = setInterval(this.fetchItems, 1000);
+			this.fetchItems();
+			this.interval = setInterval(this.fetchItems, 1000);
+		});
 	},
 	destroyed: function() {
-		clearInterval(this.interval);
+		if(this.interval) {
+			clearInterval(this.interval);
+		}
 	},
 	methods: {
 		fetchItems: function() {
@@ -41,7 +45,13 @@ export default {
 			}
 			for(var name in this.datasets) {
 				let ds = this.datasets[name];
+				if(!ds) {
+					continue;
+				}
 				utils.request(this, 'GET', '/datasets/'+ds.ID+'/items', null, (items) => {
+					if(!items) {
+						return;
+					}
 					this.items[name] = items;
 				});
 			}

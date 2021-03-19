@@ -25,7 +25,7 @@ export default {
 		save: function() {
 			let params = JSON.stringify({
 				Categories: this.categories,
-				Score: parseFloat(this.score),
+				Score: this.score,
 			});
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: params,
@@ -71,7 +71,7 @@ export default {
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Score Threshold</label>
 			<div class="col-sm-10">
-				<input v-model="score" type="text" class="form-control">
+				<input v-model.number="score" type="text" class="form-control">
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>

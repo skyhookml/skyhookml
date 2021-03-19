@@ -131,6 +131,13 @@ export default {
 							Inputs: [{Name: "inputs", Variable: true}],
 							Outputs: [{Name: "output", DataType: "video"}],
 						},
+						{
+							ID: "cropresize",
+							Name: "Crop/Resize Video",
+							Description: "Crop video followed by optional resize",
+							Inputs: [{Name: "input", DataTypes: ["video"]}],
+							Outputs: [{Name: "output", DataType: "video"}],
+						},
 					],
 				},
 				{
@@ -187,7 +194,7 @@ export default {
 		addOutput: function() {
 			this.outputs.push({
 				Name: this.addOutputForm.name,
-				DataTypes: [this.addOutputForm.dataType],
+				DataType: this.addOutputForm.dataType,
 			});
 			this.resetForm();
 		},
@@ -260,7 +267,7 @@ export default {
 								<tbody>
 									<tr v-for="(output, i) in outputs">
 										<td>{{ output.Name }}</td>
-										<td>{{ output.DataTypes }}</td>
+										<td>{{ output.DataType }}</td>
 										<td v-if="!op.Outputs">
 											<button type="button" class="btn btn-danger" v-on:click="removeOutput(i)">Remove</button>
 										</td>

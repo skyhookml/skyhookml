@@ -13,6 +13,7 @@ import MArch from './m-architecture.js';
 import MComp from './m-component.js';
 
 import Queries from './queries.js';
+import ExecCropResize from './exec-edit-cropresize.js';
 import ExecDetectionFilter from './exec-edit-detection_filter.js';
 import ExecResample from './exec-edit-resample.js';
 import ExecSimpleTracker from './exec-edit-simple_tracker.js';
@@ -48,6 +49,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/models/comp/:compid', component: MComp},
 
 		{path: '/ws/:ws/queries', component: Queries},
+		{path: '/ws/:ws/exec/cropresize/:nodeid', component: ExecCropResize},
 		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
 		{path: '/ws/:ws/exec/simple_tracker/:nodeid', component: ExecSimpleTracker},
 		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
