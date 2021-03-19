@@ -34,8 +34,8 @@ export default AnnotateGenericUI({
 				return;
 			}
 			let label = parseInt(e.keyCode) - 48;
-			this.ints[this.frameidx] = label.toString();
-			this.getFrame((this.frameIdx+1)%this.numFrames);
+			this.ints[this.frameIdx] = label.toString();
+			this.finishFrame();
 		};
 		this.$parent.$on('keypress', this.keypressHandler);
 	},
@@ -74,7 +74,10 @@ export default AnnotateGenericUI({
 			this.finishFrame();
 		},
 		saveParams: function() {
-			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, {Params: JSON.stringify(this.params)});
+			let request = {
+				Params: JSON.stringify(this.params),
+			}
+			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, JSON.stringify(request));
 		},
 	},
 	template: {
