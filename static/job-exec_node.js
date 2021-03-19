@@ -43,11 +43,8 @@ export default {
 			</div>
 		</div>
 	</div>
-	<div class="plaintext-div">
-		<template v-for="line in lines">
-			{{ line }}<br />
-		</template>
-	</div>
+	<pre class="mx-2"><template v-for="line in lines">{{ line }}
+</template></pre>
 </div>
 	`,
 };

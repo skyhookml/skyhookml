@@ -36,7 +36,10 @@ func (node *DBExecNode) GetComputedKeys() map[string]bool {
 	return keySet
 }
 
-// Run this node.
+// Prepare to run this node.
+// Returns a RunData.
+// Or error on error.
+// Or nil RunData and error if the node is already done.
 type ExecRunOptions struct {
 	// If force, we run even if outputs were already available.
 	Force bool
@@ -49,7 +52,18 @@ type ExecRunOptions struct {
 	// Only supported by incremental ops.
 	LimitOutputKeys map[string]bool
 }
-func (node *DBExecNode) Run(opts ExecRunOptions) error {
+type RunData struct {
+	Node *DBExecNode
+	OutputDatasets map[string]skyhook.Dataset
+	Job *DBJob
+	JobOp *ExecJobOp
+	Tasks []skyhook.ExecTask
+
+	// whether we'll be done with the node after running Tasks
+	// i.e., whether Tasks contains all pending tasks at this node
+	WillBeDone bool
+}
+func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	// create datasets for this op if needed
 	outputDatasets, _ := node.GetDatasets(true)
 
@@ -66,7 +80,7 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 			done = done && ds.Done
 		}
 		if done {
-			return nil
+			return nil, nil
 		}
 	}
 	skOutputDatasets := make(map[string]skyhook.Dataset)
@@ -87,9 +101,9 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 				dsList, _ := n.GetDatasets(false)
 				ds := dsList[parent.Name]
 				if ds == nil {
-					return fmt.Errorf("dataset for parent node %s[%s] is missing", n.Name, parent.Name)
+					return nil, fmt.Errorf("dataset for parent node %s[%s] is missing", n.Name, parent.Name)
 				} else if !ds.Done && !opts.Incremental {
-					return fmt.Errorf("dataset for parent node %s[%s] is not done", n.Name, parent.Name)
+					return nil, fmt.Errorf("dataset for parent node %s[%s] is not done", n.Name, parent.Name)
 				}
 				parentDatasets[name][i] = ds
 				parentsDone = parentsDone && ds.Done
@@ -116,7 +130,7 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	opImpl := skyhook.GetExecOpImpl(node.Op)
 	tasks, err := opImpl.GetTasks(Config.CoordinatorURL, node.ExecNode, items)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// if running incrementally, remove tasks that were already computed
@@ -177,31 +191,43 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	}
 	job.AttachOp(jobOp)
 
+	return &RunData{
+		Node: node,
+		OutputDatasets: skOutputDatasets,
+		Job: job,
+		JobOp: jobOp,
+		Tasks: tasks,
+		WillBeDone: willBeDone,
+	}, nil
+}
+
+func (rd RunData) Run() error {
+	name := rd.Node.Name
 	// prepare op
-	log.Printf("[exec-node %s] [run] acquiring worker", node.Name)
+	log.Printf("[exec-node %s] [run] acquiring worker", name)
 	workerURL := AcquireWorker()
-	log.Printf("[exec-node %s] [run] ... acquired worker at %s", node.Name, workerURL)
+	log.Printf("[exec-node %s] [run] ... acquired worker at %s", name, workerURL)
 	defer ReleaseWorker(workerURL)
 
 	beginRequest := skyhook.ExecBeginRequest{
-		Node: node.ExecNode,
-		OutputDatasets: skOutputDatasets,
-		JobID: &job.ID,
+		Node: rd.Node.ExecNode,
+		OutputDatasets: rd.OutputDatasets,
+		JobID: &rd.Job.ID,
 	}
 	var beginResponse skyhook.ExecBeginResponse
 	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
-		job.SetDone(err.Error())
+		rd.Job.SetDone(err.Error())
 		return err
 	}
 	defer func() {
 		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
 		if err != nil {
-			log.Printf("[exec-node %s] [run] error ending exec container: %v", node.Name, err)
+			log.Printf("[exec-node %s] [run] error ending exec container: %v", name, err)
 		}
 	}()
 
 	nthreads := beginResponse.Parallelism
-	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", node.Name, len(tasks), nthreads)
+	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", name, len(rd.Tasks), nthreads)
 
 	counter := 0
 	var applyErr error
@@ -214,15 +240,15 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 			for {
 				// get next task
 				mu.Lock()
-				if counter >= len(tasks) || applyErr != nil {
+				if counter >= len(rd.Tasks) || applyErr != nil {
 					mu.Unlock()
 					break
 				}
-				task := tasks[counter]
+				task := rd.Tasks[counter]
 				counter++
 				mu.Unlock()
 
-				log.Printf("[exec-node %s] [run] apply on %s", node.Name, task.Key)
+				log.Printf("[exec-node %s] [run] apply on %s", name, task.Key)
 				err := skyhook.JsonPost(beginResponse.BaseURL, "/exec/task", skyhook.ExecTaskRequest{task}, nil)
 
 				if err != nil {
@@ -233,7 +259,7 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 				}
 
 				mu.Lock()
-				jobOp.Completed(task.Key)
+				rd.JobOp.Completed(task.Key)
 				mu.Unlock()
 			}
 		}()
@@ -241,23 +267,34 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	wg.Wait()
 
 	// make sure job state reflects the latest updates
-	job.UpdateState(string(skyhook.JsonMarshal(jobOp.Encode())))
+	rd.Job.UpdateState(string(skyhook.JsonMarshal(rd.JobOp.Encode())))
 
 	if applyErr != nil {
-		job.SetDone(applyErr.Error())
+		rd.Job.SetDone(applyErr.Error())
 		return applyErr
 	}
 
 	// update dataset states
-	if willBeDone {
-		for _, ds := range outputDatasets {
-			ds.SetDone(true)
+	if rd.WillBeDone {
+		for _, ds := range rd.OutputDatasets {
+			(&DBDataset{Dataset: ds}).SetDone(true)
 		}
 	}
 
-	job.SetDone("")
-	log.Printf("[exec-node %s] [run] done", node.Name)
+	rd.Job.SetDone("")
+	log.Printf("[exec-node %s] [run] done", name)
 	return nil
+}
+
+func (node *DBExecNode) Run(opts ExecRunOptions) error {
+	rd, err := node.PrepareRun(opts)
+	if err != nil {
+		return err
+	}
+	if rd == nil {
+		return nil
+	}
+	return rd.Run()
 }
 
 // Get some number of incremental outputs from this node.
@@ -554,12 +591,19 @@ func init() {
 			http.Error(w, "no such exec node", 404)
 			return
 		}
+		rd, err := node.PrepareRun(ExecRunOptions{Force: true})
+		if err != nil {
+			log.Printf("[exec node %s] error preparing run: %v", err)
+			http.Error(w, err.Error(), 400)
+			return
+		}
 		go func() {
-			err := node.Run(ExecRunOptions{Force: true})
+			err := rd.Run()
 			if err != nil {
 				log.Printf("[exec node %s] run error: %v", node.Name, err)
 			}
 		}()
+		skyhook.JsonResponse(w, rd.Job)
 	}).Methods("POST")
 
 	Router.HandleFunc("/exec-nodes/{node_id}/incremental", func(w http.ResponseWriter, r *http.Request) {

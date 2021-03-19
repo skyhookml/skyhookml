@@ -362,7 +362,9 @@ const Queries = {
 			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.selectedNode.Op+'/'+this.selectedNode.ID);
 		},
 		runNode: function() {
-			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run');
+			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run', null, (job) => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.Op+'/'+job.ID);
+			});
 		},
 		viewInteractive: function() {
 			this.$router.push('/ws/'+this.$route.params.ws+'/interactive/'+this.selectedNode.ID);

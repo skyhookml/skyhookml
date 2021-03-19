@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -222,7 +223,7 @@ func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader
 				log.Printf("[container %s] %s", uuid, line)
 				if jobID != nil {
 					mu.Lock()
-					lines = append(lines, line)
+					lines = append(lines, strings.TrimSpace(line))
 					mu.Unlock()
 				}
 			}
