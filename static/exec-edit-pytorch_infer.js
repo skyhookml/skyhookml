@@ -157,7 +157,7 @@ export default {
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Architecture</label>
 			<div class="col-sm-10">
-				<select v-model="params.archID" class="form-control">
+				<select v-model="params.archID" class="form-select">
 					<template v-for="arch in archs">
 						<option :key="arch.ID" :value="arch.ID">{{ arch.Name }}</option>
 					</template>
@@ -179,7 +179,7 @@ export default {
 							</tr>
 							<tr>
 								<td>
-									<select v-model="addForms.inputIdx" class="form-control">
+									<select v-model="addForms.inputIdx" class="form-select">
 										<template v-for="(parent, parentIdx) in parents">
 											<option :value="parentIdx">{{ parent.Name }} ({{ parent.DataType }})</option>
 										</template>
@@ -222,7 +222,7 @@ export default {
 							</tr>
 							<tr>
 								<td>
-									<select v-model="addForms.outputComponentIdx" class="form-control">
+									<select v-model="addForms.outputComponentIdx" class="form-select">
 										<template v-for="(compSpec, compIdx) in arch.Params.Components">
 											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">{{ comps[compSpec.ID].Name }}</option>
 										</template>
@@ -230,7 +230,7 @@ export default {
 								</td>
 								<td>
 									<template v-if="getComponent(addForms.outputComponentIdx)">
-										<select v-model="addForms.outputLayer" class="form-control">
+										<select v-model="addForms.outputLayer" class="form-select">
 											<template v-for="(_, layer) in getComponent(addForms.outputComponentIdx).Params.Outputs">
 												<option :key="layer" :value="layer">{{ layer }}</option>
 											</template>

@@ -277,7 +277,7 @@ export default {
 											<input type="text" class="form-control" v-model="addOutputForm.name" />
 										</td>
 										<td>
-											<select v-model="addOutputForm.dataType" class="form-control">
+											<select v-model="addOutputForm.dataType" class="form-select">
 												<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
 											</select>
 										</td>

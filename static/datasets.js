@@ -40,39 +40,40 @@ const Datasets = {
 	},
 	template: `
 <div>
-	<div class="my-1">
-		<button type="button" class="btn btn-primary" v-on:click="showAddDatasetModal">Add Dataset</button>
-		<div class="modal" tabindex="-1" role="dialog" ref="addDatasetModal">
-			<div class="modal-dialog" role="document">
-				<div class="modal-content">
-					<div class="modal-body">
-						<form v-on:submit.prevent="addDataset">
-							<div class="form-group row">
-								<label class="col-sm-4 col-form-label">Name</label>
-								<div class="col-sm-8">
-									<input class="form-control" type="text" v-model="addDatasetForm.name" />
-								</div>
+	<div class="border-bottom mb-3">
+		<h2>Datasets</h2>
+	</div>
+	<button type="button" class="btn btn-primary mb-2" v-on:click="showAddDatasetModal">Add Dataset</button>
+	<div class="modal" tabindex="-1" role="dialog" ref="addDatasetModal">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-body">
+					<form v-on:submit.prevent="addDataset">
+						<div class="row mb-2">
+							<label class="col-sm-4 col-form-label">Name</label>
+							<div class="col-sm-8">
+								<input class="form-control" type="text" v-model="addDatasetForm.name" />
 							</div>
-							<div class="form-group row">
-								<label class="col-sm-4 col-form-label">Data Type</label>
-								<div class="col-sm-8">
-									<select v-model="addDatasetForm.data_type" class="form-control">
-										<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
-									</select>
-								</div>
+						</div>
+						<div class="row mb-2">
+							<label class="col-sm-4 col-form-label">Data Type</label>
+							<div class="col-sm-8">
+								<select v-model="addDatasetForm.data_type" class="form-select">
+									<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
+								</select>
 							</div>
-							<div class="form-group row">
-								<div class="col-sm-8">
-									<button type="submit" class="btn btn-primary">Add Dataset</button>
-								</div>
+						</div>
+						<div class="row mb-2">
+							<div class="col-sm-8">
+								<button type="submit" class="btn btn-sm btn-primary">Add Dataset</button>
 							</div>
-						</form>
-					</div>
+						</div>
+					</form>
 				</div>
 			</div>
 		</div>
 	</div>
-	<table class="table">
+	<table class="table table-sm align-middle">
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -87,8 +88,8 @@ const Datasets = {
 				<td>{{ ds.Type }}</td>
 				<td>{{ ds.DataType }}</td>
 				<td>
-					<button v-on:click="selectDataset(ds)" class="btn btn-primary">Manage</button>
-					<button v-on:click="deleteDataset(ds.ID)" class="btn btn-danger">Delete</button>
+					<button v-on:click="selectDataset(ds)" class="btn btn-sm btn-primary">Manage</button>
+					<button v-on:click="deleteDataset(ds.ID)" class="btn btn-sm btn-danger">Delete</button>
 				</td>
 			</tr>
 		</tbody>

@@ -433,15 +433,15 @@ const Queries = {
 				</div>
 			</div>
 			<div>
-				<form v-on:submit.prevent="compareTo" class="form-inline my-2">
-					<label class="ml-1">Compare to:</label>
-					<select v-model="compareForm.workspace" @change="selectCompareWorkspace" class="form-control ml-1">
+				<form v-on:submit.prevent="compareTo" class="d-flex align-items-center">
+					<label class="mx-2">Compare to:</label>
+					<select v-model="compareForm.workspace" @change="selectCompareWorkspace" class="form-select mx-2">
 						<option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
 					</select>
-					<select v-model="compareForm.nodeID" class="form-control ml-1">
+					<select v-model="compareForm.nodeID" class="form-select mx-2">
 						<option v-for="node in wsNodes" :key="node.ID" :value="node.ID">{{ node.Name }}</option>
 					</select>
-					<button type="submit" class="btn btn-primary ml-1">Go</button>
+					<button type="submit" class="btn btn-primary mx-2">Go</button>
 				</form>
 			</div>
 		</div>

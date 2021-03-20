@@ -48,31 +48,29 @@ export default {
 	},
 	template: `
 <div>
-	<div class="my-1">
-		<button type="button" class="btn btn-primary" v-on:click="showAddModal">Add Architecture</button>
-		<div class="modal" tabindex="-1" role="dialog" ref="addModal">
-			<div class="modal-dialog" role="document">
-				<div class="modal-content">
-					<div class="modal-body">
-						<form v-on:submit.prevent="add">
-							<div class="form-group row">
-								<label class="col-sm-4 col-form-label">Name</label>
-								<div class="col-sm-8">
-									<input class="form-control" type="text" v-model="addForm.name" />
-								</div>
+	<button type="button" class="btn btn-primary my-1" v-on:click="showAddModal">Add Architecture</button>
+	<div class="modal" tabindex="-1" role="dialog" ref="addModal">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-body">
+					<form v-on:submit.prevent="add">
+						<div class="row mb-2">
+							<label class="col-sm-4 col-form-label">Name</label>
+							<div class="col-sm-8">
+								<input class="form-control" type="text" v-model="addForm.name" />
 							</div>
-							<div class="form-group row">
-								<div class="col-sm-8">
-									<button type="submit" class="btn btn-primary">Add Architecture</button>
-								</div>
+						</div>
+						<div class="row">
+							<div class="col-sm-8">
+								<button type="submit" class="btn btn-primary">Add Architecture</button>
 							</div>
-						</form>
-					</div>
+						</div>
+					</form>
 				</div>
 			</div>
 		</div>
 	</div>
-	<table class="table">
+	<table class="table table-sm">
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -83,8 +81,8 @@ export default {
 			<tr v-for="arch in archs">
 				<td>{{ arch.Name }}</td>
 				<td>
-					<button v-on:click="selectArch(arch)" class="btn btn-primary">Manage</button>
-					<button v-on:click="deleteArch(arch.ID)" class="btn btn-danger">Delete</button>
+					<button v-on:click="selectArch(arch)" class="btn btn-sm btn-primary">Manage</button>
+					<button v-on:click="deleteArch(arch.ID)" class="btn btn-sm btn-danger">Delete</button>
 				</td>
 			</tr>
 		</tbody>

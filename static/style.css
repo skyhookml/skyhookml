@@ -5,11 +5,12 @@ html, body {
 .flex-container {
 	height: 100%;
 	display: flex;
-	flex-flow: column;
+	flex-direction: column;
 }
 
 .flex-content {
 	flex-grow: 1;
+	min-height: 0px;
 }
 
 .table-row-select tr {
@@ -40,42 +41,18 @@ html, body {
 
 /* canvas on image */
 .canvas-container {
-	display: inline-block;
-	margin: 0;
 	position: relative;
 }
-.canvas-container img {
+/*.canvas-container img {
 	position: absolute;
-}
+}*/
 .canvas-container canvas {
 	position: absolute;
 }
 .canvas-container .konva {
 	position: absolute;
-}
-
-/* nodes panel */
-
-#n-div {
-	height: 100%;
-	display: grid;
-	grid-template-columns: 200px auto;
-}
-
-#n-organizer {
-	height: 100%;
-	float: left;
-	display: flex;
-	flex-flow: column;
-}
-
-#n-node-list {
-	flex-grow: 1;
-	border: 1px solid;
-}
-
-.n-btn-node {
-	width: 100%;
+	top: 0;
+	left: 0;
 }
 
 /* graph-based panel */
@@ -89,37 +66,7 @@ html, body {
 	flex-grow: 1;
 }
 
-.graph-edit-container {
-	height: 100%;
-	display: flex;
-	flex-flow: column;
-}
-
-.graph-edit-div {
-	flex-grow: 1;
-}
-
 /* explore panel */
-
-#explore-div {
-	height: 100%;
-	display: flex;
-	flex-flow: column;
-}
-
-#explore-exec-div {
-	display: flex;
-	flex-flow: row;
-	justify-content: space-evenly;
-}
-
-#explore-results-div {
-	flex-grow: 1;
-}
-
-#explore-test-btn, #explore-run-btn {
-	width: 100%;
-}
 
 .explore-results-row {
 	display: flex;
@@ -141,9 +88,13 @@ html, body {
 	background-color: #0099FF;
 }
 
-.explore-result-img {
+.fill-img {
+	width: 100%;
+	height: 100%;
 	max-width: 100%;
-	min-width: 50%;
+	max-height: 100%;
+	object-fit: contain;
+	object-position: left;
 }
 
 .el-big {

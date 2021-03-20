@@ -65,7 +65,7 @@ export default {
 		<div class="modal-dialog" role="document">
 			<div class="modal-content">
 				<div class="modal-body">
-					<ul class="nav nav-tabs">
+					<ul class="nav nav-tabs mb-2">
 						<li class="nav-item">
 							<a class="nav-link active" data-toggle="tab" href="#import-local-tab" role="tab">Local</a>
 						</li>
@@ -76,7 +76,7 @@ export default {
 					<div class="tab-content">
 						<div class="tab-pane show active" id="import-local-tab">
 							<form v-on:submit.prevent="submitLocal">
-								<div class="form-group row">
+								<div class="row mb-2">
 									<label class="col-sm-2 col-form-label">Path</label>
 									<div class="col-sm-10">
 										<input class="form-control" type="text" v-model="path" />
@@ -85,7 +85,7 @@ export default {
 										</small>
 									</div>
 								</div>
-								<div class="form-group row">
+								<div class="row">
 									<div class="col-sm-10">
 										<button type="submit" class="btn btn-primary">Import</button>
 									</div>
@@ -94,7 +94,7 @@ export default {
 						</div>
 						<div class="tab-pane" id="import-upload-tab">
 							<form v-on:submit.prevent="submitUpload">
-								<div class="form-group row">
+								<div class="row mb-2">
 									<label class="col-sm-2 col-form-label">File</label>
 									<div class="col-sm-10">
 										<input class="form-control" type="file" @change="onFileChange" />
@@ -103,7 +103,7 @@ export default {
 										</small>
 									</div>
 								</div>
-								<div class="form-group row">
+								<div class="row">
 									<div class="col-sm-10">
 										<button type="submit" class="btn btn-primary">Import</button>
 									</div>

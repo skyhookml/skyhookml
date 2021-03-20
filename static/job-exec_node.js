@@ -24,11 +24,17 @@ export default {
 					this.progress = parseInt(s.Progress);
 					this.lines = s.Lines;
 				} catch(e) {}
+
+				if(this.$refs.pre.scrollTop + this.$refs.pre.offsetHeight >= this.$refs.pre.scrollHeight) {
+					Vue.nextTick(() => {
+						this.$refs.pre.scrollTop = this.$refs.pre.scrollHeight;
+					});
+				}
 			});
 		},
 	},
 	template: `
-<div>
+<div class="flex-container">
 	<div>
 		<div class="progress">
 			<div
@@ -43,7 +49,7 @@ export default {
 			</div>
 		</div>
 	</div>
-	<pre class="mx-2"><template v-for="line in lines">{{ line }}
+	<pre class="mx-2 flex-content" ref="pre"><template v-for="line in lines">{{ line }}
 </template></pre>
 </div>
 	`,

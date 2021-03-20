@@ -82,26 +82,37 @@ export default AnnotateGenericUI({
 	},
 	template: {
 		params: `
-<form class="form-inline" v-on:submit.prevent="saveParams">
-	<label class="my-1 mx-1">Range</label>
-	<input type="text" class="form-control my-1 mx-1" v-model="params.Range" />
-
-	<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
+<form class="row g-1 align-items-center" v-on:submit.prevent="saveParams">
+	<div class="col-auto">
+		<label class="my-1 mx-1">Range</label>
+	</div>
+	<div class="col-auto">
+		<input type="text" class="form-control my-1 mx-1" v-model="params.Range" />
+	</div>
+	<div class="col-auto">
+		<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
+	</div>
 </form>
 		`,
 		im_below: `
-<div v-if="imageDims != null" class="form-row align-items-center">
-	<span v-if="ints[frameIdx] != ''">Current Label: {{ ints[frameIdx] }}</span>
+<div v-if="imageDims != null" class="row g-1 align-items-center mb-2">
+	<div class="col-auto">
+		<span v-if="ints[frameIdx] != ''">Current Label: {{ ints[frameIdx] }}</span>
+	</div>
 	<template v-if="parseInt(params.Range) > 0">
-		<div v-for="i in parseInt(params.Range)">
+		<div v-for="i in parseInt(params.Range)" class="col-auto">
 			<button v-on:click="submitButton(i-1)" type="button" class="btn btn-primary">{{ i-1 }}</button>
 		</div>
 	</template>
 	<template v-else>
 		<div class="col-auto">
-			<form class="form-inline" v-on:submit.prevent="submitInput">
-				<input type="text" class="form-control" v-model="ints[frameIdx]" />
-				<button type="submit" class="btn btn-primary">Label</button>
+			<form class="row g-1 align-items-center" v-on:submit.prevent="submitInput">
+				<div class="col-auto">
+					<input type="text" class="form-control" v-model="ints[frameIdx]" />
+				</div>
+				<div class="col-auto">
+					<button type="submit" class="btn btn-primary">Label</button>
+				</div>
 			</form>
 		</div>
 	</template>

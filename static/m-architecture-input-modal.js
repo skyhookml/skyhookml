@@ -61,7 +61,7 @@ export default {
 							<div class="form-group row">
 								<label class="col-sm-2 col-form-label">Component</label>
 								<div class="col-sm-10">
-									<select v-model="componentIdx" class="form-control">
+									<select v-model="componentIdx" class="form-select">
 										<template v-for="(comp, compIdx) in components">
 											<option :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ comp.Name }}</option>
 										</template>
@@ -72,7 +72,7 @@ export default {
 								<label class="col-sm-2 col-form-label">Layer</label>
 								<div class="col-sm-10">
 									<template v-if="componentIdx !== ''">
-										<select v-model="layer" class="form-control">
+										<select v-model="layer" class="form-select">
 											<template v-for="x in components[componentIdx].Params.Layers">
 												<option :key="x" :value="x">{{ x }}</option>
 											</template>

@@ -66,7 +66,7 @@ export default {
 		</tr>
 		<tr>
 			<td>
-				<select v-model="selected" class="form-control">
+				<select v-model="selected" class="form-select">
 					<template v-for="(option, i) in options">
 						<option :value="i">{{ option.Label }}</option>
 					</template>

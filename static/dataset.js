@@ -31,11 +31,13 @@ export default {
 	template: `
 <div>
 	<template v-if="dataset != null">
-		<h2>Dataset: {{ dataset.Name }}</h2>
+		<div class="border-bottom mb-3">
+			<h2>Dataset: {{ dataset.Name }}</h2>
+		</div>
 		<template v-if="viewingItem == null">
 			<p><import-modal v-bind:dataset="dataset"></import-modal>
 			<h4>Items</h4>
-			<table class="table">
+			<table class="table table-sm">
 				<thead>
 					<tr>
 						<th>Key</th>

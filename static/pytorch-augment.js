@@ -137,7 +137,7 @@ export default {
 			<div class="form-group row">
 				<label class="col-sm-2 col-form-label">Mode</label>
 				<div class="col-sm-10">
-					<select v-model="d.P.Mode" class="form-control" @change="update">
+					<select v-model="d.P.Mode" class="form-select" @change="update">
 						<option value="both">Both</option>
 						<option value="horizontal">Horizontal Flip Only</option>
 						<option value="vertical">Vertical Flip Only</option>

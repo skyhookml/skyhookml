@@ -11,6 +11,7 @@ export default AnnotateGenericUI({
 			selectedIdx: null,
 
 			keyupHandler: null,
+			resizeObserver: null,
 		};
 	},
 	on_created_ready: function() {
@@ -34,6 +35,7 @@ export default AnnotateGenericUI({
 	},
 	unmounted: function() {
 		this.setKeyupHandler(null);
+		this.disconnectResizeObserver();
 	},
 	on_update: function() {
 		this.shapes = [];
@@ -70,6 +72,12 @@ export default AnnotateGenericUI({
 		return [data, metadata];
 	},
 	methods: {
+		disconnectResizeObserver: function() {
+			if(this.resizeObserver) {
+				this.resizeObserver.disconnect();
+				this.resizeObserver = null;
+			}
+		},
 		decodeShape: function(shape) {
 			let shp = {};
 			if(this.dataType === 'shape') {
@@ -143,6 +151,42 @@ export default AnnotateGenericUI({
 				}
 			};
 
+			// we want annotations to be stored in coordinates based on image natural width/height
+			// but in the UI, image could be stretched to different width/height
+			// so here we need to stretch the stage in the same way
+			let getScale = () => {
+				return Math.min(
+					this.$refs.image.width / this.imageDims.Width,
+					this.$refs.image.height / this.imageDims.Height,
+				);
+			};
+			let rescaleLayer = () => {
+				if(!this.$refs.layer || !this.$refs.image) {
+					return;
+				}
+				let scale = getScale();
+				stage.width(parseInt(scale*this.imageDims.Width));
+				stage.height(parseInt(scale*this.imageDims.Height));
+				layer.scaleX(scale);
+				layer.scaleY(scale);
+				layer.draw();
+				if(resizeLayer) {
+					resizeLayer.scaleX(scale);
+					resizeLayer.scaleY(scale);
+					resizeLayer.draw();
+				}
+			};
+			this.disconnectResizeObserver();
+			this.resizeObserver = new ResizeObserver(rescaleLayer);
+			this.resizeObserver.observe(this.$refs.image);
+			rescaleLayer();
+			let getPointerPosition = () => {
+				let transform = layer.getAbsoluteTransform().copy();
+				transform.invert();
+				let pos = stage.getPointerPosition();
+				return transform.point(pos);
+			};
+
 			let konvaShapes = [];
 			// curShape is set if we are currently drawing a new shape
 			let curShape = null;
@@ -188,6 +232,8 @@ export default AnnotateGenericUI({
 					let handleResize = () => {
 						destroyResizeLayer()
 						resizeLayer = new Konva.Layer();
+						resizeLayer.scaleX(getScale());
+						resizeLayer.scaleY(getScale());
 						stage.add(resizeLayer);
 
 						// add circles at the four corners of the rectangle
@@ -345,7 +391,7 @@ export default AnnotateGenericUI({
 						return;
 					}
 
-					var pos = stage.getPointerPosition();
+					var pos = getPointerPosition();
 					if(curShape == null) {
 						curShape = new Konva.Rect({
 							x: pos.x,
@@ -382,7 +428,7 @@ export default AnnotateGenericUI({
 					if(curShape == null) {
 						return;
 					}
-					var pos = stage.getPointerPosition();
+					var pos = getPointerPosition();
 					updateRect(pos.x, pos.y);
 					layer.batchDraw();
 				});
@@ -408,7 +454,7 @@ export default AnnotateGenericUI({
 						return;
 					}
 
-					var pos = stage.getPointerPosition();
+					var pos = getPointerPosition();
 					if(curShape == null) {
 						curShape = new Konva.Line({
 							points: [pos.x, pos.y, pos.x+1, pos.y+1],
@@ -442,7 +488,7 @@ export default AnnotateGenericUI({
 					if(curShape == null) {
 						return;
 					}
-					var pos = stage.getPointerPosition();
+					var pos = getPointerPosition();
 					updateLine(pos.x, pos.y);
 					layer.batchDraw();
 				});
@@ -485,40 +531,45 @@ export default AnnotateGenericUI({
 	},
 	template: {
 		params: `
-<form class="form-inline" v-on:submit.prevent="saveParams">
-	<label class="my-1 mx-1">Mode</label>
-	<select class="form-control my-1 mx-1" v-model="params.Mode" @change="render">
-		<option value="box">Box</option>
-		<option value="point">Point</option>
-		<option value="line">Line</option>
-		<option value="polygon">Polygon</option>
-	</select>
-
-	<label class="my-1 mx-1">Categories (comma-separated)</label>
-	<input class="form-control my-1 mx-1" type="text" v-model="params.CategoriesStr" @change="updateCategories">
-
-	<button type="submit" class="btn btn-primary my-1 mx-1">Save Settings</button>
+<form class="row g-1 align-items-center" v-on:submit.prevent="saveParams">
+	<div class="col-auto">
+		<label>Mode</label>
+	</div>
+	<div class="col-auto">
+		<select class="form-select" v-model="params.Mode" @change="render">
+			<option value="box">Box</option>
+			<option value="point">Point</option>
+			<option value="line">Line</option>
+			<option value="polygon">Polygon</option>
+		</select>
+	</div>
+	<div class="col-auto">
+		<label>Categories (comma-separated)</label>
+	</div>
+	<div class="col-auto">
+		<input class="form-control" type="text" v-model="params.CategoriesStr" @change="updateCategories">
+	</div>
+	<div class="col-auto">
+		<button type="submit" class="btn btn-primary">Save Settings</button>
+	</div>
 </form>
 		`,
 		im_after: `
 <div
 	v-if="imageDims != null"
 	ref="layer"
-	:style="{
-		width: imageDims.Width+'px',
-		height: imageDims.Height+'px',
-	}"
+	class="konva"
 	>
 </div>
 		`,
 		im_below: `
-<div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes[frameIdx].length">
+<div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes[frameIdx].length" class="mb-2">
 	<p><strong>Selection: {{ shapes[frameIdx][selectedIdx].Type }} ({{ shapes[frameIdx][selectedIdx].Points }})</strong></p>
 	<div class="small-container">
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Category</label>
 			<div class="col-sm-10">
-				<select class="form-control" v-model="shapes[frameIdx][selectedIdx].Category">
+				<select class="form-select" v-model="shapes[frameIdx][selectedIdx].Category">
 					<option :key="''" value="">None</option>
 					<template v-for="category in params.Categories">
 						<option :key="category" :value="category">{{ category }}</option>

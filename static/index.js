@@ -146,6 +146,19 @@ Promise.all([
 				this.error = error;
 			},
 		},
+		computed: {
+			wsPrefix: function() {
+				if(this.$route.params.ws) {
+					return '/ws/' + this.$route.params.ws;
+				} else if(this.selectedWorkspace) {
+					return '/ws' + this.selectedWorkspace;
+				} else if(this.workspaces.length > 0) {
+					return '/ws/' + this.workspaces[0];
+				} else {
+					return '/';
+				}
+			},
+		},
 		router: router,
 	});
 

@@ -21,7 +21,7 @@ const Jobs = {
 	},
 	template: `
 <div>
-	<table class="table">
+	<table class="table table-sm">
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -48,7 +48,7 @@ const Jobs = {
 					</template>
 				</td>
 				<td>
-					<button v-on:click="selectJob(job)" class="btn btn-primary">View</button>
+					<button v-on:click="selectJob(job)" class="btn btn-sm btn-primary">View</button>
 				</td>
 			</tr>
 		</tbody>

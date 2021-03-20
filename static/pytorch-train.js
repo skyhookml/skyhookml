@@ -50,7 +50,7 @@ export default {
 	<div class="form-group row">
 		<label class="col-sm-2 col-form-label">Optimizer</label>
 		<div class="col-sm-10">
-			<select v-model="p.Optimizer" class="form-control" @change="update">
+			<select v-model="p.Optimizer" class="form-select" @change="update">
 				<option value="adam">Adam</option>
 			</select>
 		</div>
@@ -95,7 +95,7 @@ export default {
 	<div class="form-group row">
 		<label class="col-sm-2 col-form-label">Saver Mode</label>
 		<div class="col-sm-10">
-			<select v-model="p.ModelSaver.Mode" class="form-control" @change="update">
+			<select v-model="p.ModelSaver.Mode" class="form-select" @change="update">
 				<option value="latest">Save the latest model</option>
 				<option value="best">Save the model with best validation score</option>
 			</select>
@@ -106,7 +106,7 @@ export default {
 	<div class="form-group row">
 		<label class="col-sm-2 col-form-label">Rate Decay Mode</label>
 		<div class="col-sm-10">
-			<select v-model="p.RateDecay.Op" class="form-control" @change="update">
+			<select v-model="p.RateDecay.Op" class="form-select" @change="update">
 				<option value="">None (constant learning rate)</option>
 				<option value="step">Step (reduce rate by a factor every few epochs)</option>
 				<option value="plateau">Plateau (reduce rate if score isn't improving)</option>

@@ -128,8 +128,8 @@ export default function(impl) {
 			},
 			imageLoaded: function() {
 				this.imageDims = {
-					Width: parseInt(this.$refs.image.width),
-					Height: parseInt(this.$refs.image.height),
+					Width: parseInt(this.$refs.image.naturalWidth),
+					Height: parseInt(this.$refs.image.naturalHeight),
 				};
 				if(impl.on_image_loaded) {
 					impl.on_image_loaded.call(this);
@@ -191,13 +191,13 @@ export default function(impl) {
 		},
 	};
 	let template = `
-	<div>
+	<div class="flex-container el-high">
 		<template v-if="annoset != null">
-			<div>
+			<div class="mb-2">
 				[PARAMS]
 			</div>
 
-			<div class="form-row align-items-center">
+			<div class="row align-items-center g-1 mb-2">
 				<div class="col-auto">
 					<button v-on:click="getOldItem(itemIdx-1)" type="button" class="btn btn-primary">Prev</button>
 				</div>
@@ -220,13 +220,13 @@ export default function(impl) {
 
 			[IM_ABOVE]
 
-			<div class="canvas-container">
+			<div class="my-2 flex-content canvas-container">
 				<template v-if="frameIdx != null">
 					<template v-if="sourceType == 'video'">
-						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get-video-frame?idx='+frameIdx" @load="imageLoaded" ref="image" />
+						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get-video-frame?idx='+frameIdx" class="fill-img" @load="imageLoaded" ref="image" />
 					</template>
 					<template v-else>
-						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" @load="imageLoaded" ref="image" />
+						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" class="fill-img" @load="imageLoaded" ref="image" />
 					</template>
 				</template>
 
@@ -235,7 +235,7 @@ export default function(impl) {
 
 			[IM_BELOW]
 
-			<div v-if="sourceType == 'video'" class="form-row align-items-center">
+			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
 				<div class="col-auto">
 					<button v-on:click="getFrame(frameIdx-1)" type="button" class="btn btn-primary">Prev Frame</button>
 				</div>
@@ -252,22 +252,6 @@ export default function(impl) {
 	</div>`;
 	for(var key in impl.methods) {
 		component.methods[key] = impl.methods[key];
-	}
-
-	// make sure canvas-container takes up the correct size
-	// TODO: maybe we should always do this below im_after,
-	//       and let the konva divs in shape/track annotation be relative or whatever
-	if(!impl.template.im_after) {
-		impl.template.im_after = `
-<div
-	v-if="imageDims != null"
-	:style="{
-		width: imageDims.Width+'px',
-		height: imageDims.Height+'px',
-	}"
-	>
-</div>
-		`;
 	}
 
 	template = template.replace('[PARAMS]', impl.template.params ? impl.template.params : '');

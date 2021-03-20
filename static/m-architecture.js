@@ -228,11 +228,15 @@ export default {
 					<textarea v-model="compSpec.Params" class="form-control" rows="5"></textarea>
 				</template>
 				<hr />
-				<form class="form-inline" v-on:submit.prevent="addComponent">
-					<select class="form-control my-1 mx-1" v-model="addComponentForm.componentID">
-						<option v-for="comp in comps" :key="comp.ID" :value="comp.ID">{{ comp.Name }}</option>
-					</select>
-					<button type="submit" class="btn btn-primary my-1 mx-1">Add Component</button>
+				<form class="row g-1 align-items-center" v-on:submit.prevent="addComponent">
+					<div class="col-auto">
+						<select class="form-select" v-model="addComponentForm.componentID">
+							<option v-for="comp in comps" :key="comp.ID" :value="comp.ID">{{ comp.Name }}</option>
+						</select>
+					</div>
+					<div class="col-auto">
+						<button type="submit" class="btn btn-primary my-1 mx-1">Add Component</button>
+					</div>
 				</form>
 			</div>
 		</div>
@@ -264,7 +268,7 @@ export default {
 							</tr>
 							<tr>
 								<td>
-									<select v-model="form.componentIdx" class="form-control">
+									<select v-model="form.componentIdx" class="form-select">
 										<template v-for="(compSpec, compIdx) in components">
 											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ comps[compSpec.ID].Name }}</option>
 										</template>
@@ -272,7 +276,7 @@ export default {
 								</td>
 								<td>
 									<template v-if="getComponent(form.componentIdx)">
-										<select v-model="form.layer" class="form-control">
+										<select v-model="form.layer" class="form-select">
 											<template v-for="layer in getComponent(form.componentIdx).Params.Losses">
 												<option :key="layer" :value="layer">{{ layer }}</option>
 											</template>
