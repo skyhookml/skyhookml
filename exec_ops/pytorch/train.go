@@ -69,7 +69,7 @@ type TrainJobOp struct {
 	state skyhook.ModelJobState
 }
 const LossSignature string = "jsonloss"
-func (op *TrainJobOp) Update(lines []string) interface{} {
+func (op *TrainJobOp) Update(lines []string) {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, LossSignature) {
@@ -82,7 +82,13 @@ func (op *TrainJobOp) Update(lines []string) interface{} {
 		op.state.TrainLoss = append(op.state.TrainLoss, data["train"]["loss"])
 		op.state.ValLoss = append(op.state.ValLoss, data["val"]["loss"])
 	}
-	return op.state
+}
+func (op *TrainJobOp) Encode() string {
+	return string(skyhook.JsonMarshal(op.state))
+}
+func (op *TrainJobOp) Stop() error {
+	// handled by ExecJobOp
+	return nil
 }
 
 func init() {

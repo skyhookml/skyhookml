@@ -1,6 +1,10 @@
 import utils from './utils.js';
+import JobConsole from './job-console.js';
 
 export default {
+	components: {
+		'job-console': JobConsole,
+	},
 	data: function() {
 		return {
 			jobID: null,
@@ -24,18 +28,12 @@ export default {
 					this.progress = parseInt(s.Progress);
 					this.lines = s.Lines;
 				} catch(e) {}
-
-				if(this.$refs.pre.scrollTop + this.$refs.pre.offsetHeight >= this.$refs.pre.scrollHeight) {
-					Vue.nextTick(() => {
-						this.$refs.pre.scrollTop = this.$refs.pre.scrollHeight;
-					});
-				}
 			});
 		},
 	},
 	template: `
 <div class="flex-container">
-	<div>
+	<div class="mb-2">
 		<div class="progress">
 			<div
 				class="progress-bar"
@@ -49,8 +47,9 @@ export default {
 			</div>
 		</div>
 	</div>
-	<pre class="mx-2 flex-content" ref="pre"><template v-for="line in lines">{{ line }}
-</template></pre>
+	<div class="flex-content">
+		<job-console :jobID="jobID" :lines="lines"></job-console>
+	</div>
 </div>
 	`,
 };

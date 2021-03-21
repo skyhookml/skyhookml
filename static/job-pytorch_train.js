@@ -1,6 +1,10 @@
 import utils from './utils.js';
+import JobConsole from './job-console.js';
 
 export default {
+	components: {
+		'job-console': JobConsole,
+	},
 	data: function() {
 		return {
 			jobID: null,
@@ -27,7 +31,11 @@ export default {
 					s = JSON.parse(job.State);
 				} catch(e) {}
 				if(s) {
-					this.updateChart(s.Metadata);
+					let metadata = null;
+					try {
+						metadata = JSON.parse(s.Metadata);
+					} catch(e) {}
+					this.updateChart(metadata);
 					this.lines = s.Lines;
 				}
 			});
@@ -67,7 +75,10 @@ export default {
 							borderColor: 'red',
 						}]
 					},
-					options: {},
+					options: {
+						responsive: true,
+						maintainAspectRatio: false,
+					},
 				};
 				let ctx = this.$refs.layer.getContext('2d');
 				this.chart = new Chart(ctx, config);
@@ -84,14 +95,12 @@ export default {
 		},
 	},
 	template: `
-<div>
-	<div>
+<div class="flex-container">
+	<div class="chartjs-container el-50h">
 		<canvas ref="layer"></canvas>
 	</div>
-	<div class="plaintext-div">
-		<template v-for="line in lines">
-			{{ line }}<br />
-		</template>
+	<div class="el-50h">
+		<job-console :jobID="jobID" :lines="lines"></job-console>
 	</div>
 </div>
 	`,

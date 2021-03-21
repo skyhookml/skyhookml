@@ -1,6 +1,7 @@
 package skyhook
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -21,17 +22,23 @@ type Job struct {
 }
 
 type JobOp interface {
-	// Returns an updated state given the newly received lines from the job output.
-	Update(lines []string) interface{}
+	// Update the job given the newly received lines from the job output.
+	Update(lines []string)
+	// Encode the current job state
+	Encode() string
+	// Stop this job.
+	Stop() error
 }
 
 // JobOp implementation that just keeps the latest 1000 lines of output
+// This is used as a helper not as an actual JobOp -- since it can't stop the job.
+// It is not thread-safe.
 const TailJobOpNumLines int = 1000
 type TailJobOp struct {
 	Lines []string
 	numLines int
 }
-func (op *TailJobOp) Update(lines []string) interface{} {
+func (op *TailJobOp) Update(lines []string) {
 	if op.numLines == 0 {
 		op.numLines = TailJobOpNumLines
 	}
@@ -56,7 +63,12 @@ func (op *TailJobOp) Update(lines []string) interface{} {
 		// and then insert
 		copy(op.Lines[len(op.Lines)-len(lines):], lines)
 	}
-	return op.Lines
+}
+func (op *TailJobOp) Encode() string {
+	return string(JsonMarshal(op.Lines))
+}
+func  (op *TailJobOp) Stop() error {
+	panic(fmt.Errorf("Stop should never be called on TailJobOp"))
 }
 
 type ModelJobState struct {

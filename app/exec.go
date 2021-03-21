@@ -189,6 +189,7 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 		TailOp: &skyhook.TailJobOp{},
 		NodeJobOp: nodeJobOp,
 	}
+	jobOp.cond = sync.NewCond(&jobOp.mu)
 	job.AttachOp(jobOp)
 
 	return &RunData{
@@ -216,15 +217,19 @@ func (rd RunData) Run() error {
 	}
 	var beginResponse skyhook.ExecBeginResponse
 	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
-		rd.Job.SetDone(err.Error())
+		rd.JobOp.SetDone(err.Error())
 		return err
 	}
-	defer func() {
+
+	// we add container de-allocation to jobop instead of deferring because:
+	// we want to call this not only when we exit from Run,
+	// but also in case the user wants to terminate this job early
+	rd.JobOp.AddCleanupFunc(func() {
 		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
 		if err != nil {
 			log.Printf("[exec-node %s] [run] error ending exec container: %v", name, err)
 		}
-	}()
+	})
 
 	nthreads := beginResponse.Parallelism
 	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", name, len(rd.Tasks), nthreads)
@@ -237,7 +242,7 @@ func (rd RunData) Run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for {
+			for !rd.JobOp.IsStopping() {
 				// get next task
 				mu.Lock()
 				if counter >= len(rd.Tasks) || applyErr != nil {
@@ -266,11 +271,8 @@ func (rd RunData) Run() error {
 	}
 	wg.Wait()
 
-	// make sure job state reflects the latest updates
-	rd.Job.UpdateState(string(skyhook.JsonMarshal(rd.JobOp.Encode())))
-
 	if applyErr != nil {
-		rd.Job.SetDone(applyErr.Error())
+		rd.JobOp.SetDone(applyErr.Error())
 		return applyErr
 	}
 
@@ -281,7 +283,7 @@ func (rd RunData) Run() error {
 		}
 	}
 
-	rd.Job.SetDone("")
+	rd.JobOp.SetDone("")
 	log.Printf("[exec-node %s] [run] done", name)
 	return nil
 }

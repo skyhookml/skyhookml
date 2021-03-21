@@ -3,6 +3,8 @@ package app
 import (
 	"../skyhook"
 
+	"fmt"
+	"log"
 	"net/http"
 	"sync"
 
@@ -72,10 +74,11 @@ func init() {
 			return
 		}
 		jobMu.Lock()
-		state := runningJobs[request.JobID].Update(request.Lines)
+		job := runningJobs[request.JobID]
 		jobMu.Unlock()
-		stateStr := string(skyhook.JsonMarshal(state))
-		(&DBJob{Job: skyhook.Job{ID: request.JobID}}).UpdateState(stateStr)
+		job.Update(request.Lines)
+		state := job.Encode()
+		(&DBJob{Job: skyhook.Job{ID: request.JobID}}).UpdateState(state)
 	})
 
 	Router.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
@@ -91,4 +94,21 @@ func init() {
 		}
 		skyhook.JsonResponse(w, job)
 	}).Methods("GET")
+
+	Router.HandleFunc("/jobs/{job_id}/stop", func(w http.ResponseWriter, r *http.Request) {
+		jobID := skyhook.ParseInt(mux.Vars(r)["job_id"])
+		jobMu.Lock()
+		job := runningJobs[jobID]
+		jobMu.Unlock()
+		if job == nil {
+			http.Error(w, "no such running job", 404)
+			return
+		}
+		err := job.Stop()
+		if err != nil {
+			log.Printf("[job-stop] error stopping job: %v", err)
+			http.Error(w, fmt.Sprintf("error stopping job: %v", err), 404)
+			return
+		}
+	}).Methods("POST")
 }

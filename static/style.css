@@ -109,3 +109,11 @@ html, body {
 .el-high {
 	height: 100%;
 }
+
+.chartjs-container {
+	position: relative;
+}
+
+.el-50h {
+	height: 50%;
+}
