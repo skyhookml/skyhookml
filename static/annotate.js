@@ -70,6 +70,13 @@ const Annotate = {
 			});
 		},
 	},
+	filters: {
+		// Format the Inputs of an annotation dataset.
+		niceInputs: function(inputs) {
+			let datasetNames = inputs.map((input) => input.Name);
+			return datasetNames.join(', ');
+		},
+	},
 	template: `
 <div>
 	<div class="border-bottom mb-3">
@@ -137,6 +144,7 @@ const Annotate = {
 			<tr>
 				<th>Name</th>
 				<th>Tool</th>
+				<th>Inputs</th>
 				<th>Data Type</th>
 				<th></th>
 			</tr>
@@ -145,6 +153,7 @@ const Annotate = {
 			<tr v-for="set in annosets">
 				<td>{{ set.Dataset.Name }}</td>
 				<td>{{ set.Tool }}</td>
+				<td>{{ set.Inputs | niceInputs }}</td>
 				<td>{{ set.Dataset.DataType }}</td>
 				<td>
 					<button v-on:click="selectAnnoset(set)" class="btn btn-sm btn-primary">Annotate</button>
