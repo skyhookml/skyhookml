@@ -161,6 +161,7 @@ Promise.all([
 		},
 		router: router,
 	});
+	globals.app = app;
 
 	$(document).ready(function() {
 		$('body').keypress(function(e) {

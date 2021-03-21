@@ -8,8 +8,8 @@ function request(comp, method, endpoint, params, successFunc, completeFunc, opts
 			}
 			if(comp.setError) {
 				comp.setError(errorMsg);
-			} else {
-				comp.$emit('error', errorMsg);
+			} else if(comp.$globals.app) {
+				comp.$globals.app.setError(errorMsg);
 			}
 		},
 	};
