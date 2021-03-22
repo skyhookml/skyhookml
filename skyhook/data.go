@@ -20,6 +20,7 @@ const (
 	ImListType = "imlist"
 	TextType = "text"
 	StringType = "string"
+	ArrayType = "array"
 )
 
 var DataTypes = map[string]DataType{

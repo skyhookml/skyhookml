@@ -51,6 +51,13 @@ export default {
 							Inputs: [{Name: "inputs", Variable: true}],
 							Outputs: [],
 						},
+						{
+							ID: "segmentation_mask",
+							Name: "Segmentation Mask",
+							Description: "Create segmentation mask from shapes or detections",
+							Inputs: [{Name: "input", DataTypes: ["detection", "shape"]}],
+							Outputs: [{Name: "output", DataType: "array"}],
+						},
 					],
 				},
 				{
@@ -208,13 +215,13 @@ export default {
 		<div class="modal-content">
 			<div class="modal-body">
 				<form v-on:submit.prevent="createNode">
-					<div class="form-group row">
+					<div class="row mb-2">
 						<label class="col-sm-2 col-form-label">Name</label>
 						<div class="col-sm-10">
 							<input v-model="name" class="form-control" type="text" />
 						</div>
 					</div>
-					<div class="form-group row">
+					<div class="row mb-2">
 						<label class="col-sm-2 col-form-label">Op</label>
 						<div class="col-sm-10">
 							<ul class="nav nav-tabs">
@@ -253,7 +260,7 @@ export default {
 							</div>
 						</div>
 					</div>
-					<div class="form-group row">
+					<div class="row mb-2">
 						<label class="col-sm-2 col-form-label">Outputs</label>
 						<div class="col-sm-10">
 							<table v-if="op != null" class="table">

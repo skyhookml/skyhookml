@@ -5,9 +5,20 @@ import torch
 
 import skyhook.common as lib
 
-def read_input(t, path, metadata, format):
-	if t == 'image':
-		return skimage.io.imread(path)
+# TODO: it's not clear why we have both read_input here and common.load_item
+# the only special case in load_item is for video which returns Ffmpeg object instead of the numpy array
+# so maybe we should separate that out so we can just use load_item + data_index here
+# (that way load_item will always return something that works with data_index, data_concat, etc.)
+def read_input(dataset, item):
+	t = dataset['DataType']
+	metadata, format = item['Metadata'], item['Format']
+	path = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
+
+	if t == 'image' or t == 'array':
+		data = lib.load_item(dataset, item)
+		if len(data.shape) == 4:
+			data = data[0, :, :, :]
+		return data
 	else:
 		with open(path, 'r') as f:
 			data = json.load(f)
@@ -40,10 +51,10 @@ def read_input(t, path, metadata, format):
 #   detections: [sum(counts), 5] 0 is class, 1:4 is sx/sy/ex/ey
 # }
 def prepare_input(t, data, opt):
-	if t == 'image' or t == 'video':
+	if t == 'image' or t == 'video' or t == 'array':
 		im = data
 		if 'Width' in opt and 'Height' in opt:
-			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype('uint8')
+			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype(im.dtype)
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
 		return numpy.array(data, dtype='int64')

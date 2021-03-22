@@ -57,7 +57,9 @@ export default {
 		save: function() {
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: this.code,
-			}));
+			}), () => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/queries');
+			});
 		},
 	},
 	template: `

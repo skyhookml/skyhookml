@@ -16,6 +16,7 @@ import Queries from './queries.js';
 import ExecCropResize from './exec-edit-cropresize.js';
 import ExecDetectionFilter from './exec-edit-detection_filter.js';
 import ExecResample from './exec-edit-resample.js';
+import ExecSegmentationMask from './exec-edit-segmentation_mask.js';
 import ExecSimpleTracker from './exec-edit-simple_tracker.js';
 import ExecReidTracker from './exec-edit-reid_tracker.js';
 import ExecPython from './exec-edit-python.js';
@@ -51,6 +52,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/queries', component: Queries},
 		{path: '/ws/:ws/exec/cropresize/:nodeid', component: ExecCropResize},
 		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
+		{path: '/ws/:ws/exec/segmentation_mask/:nodeid', component: ExecSegmentationMask},
 		{path: '/ws/:ws/exec/simple_tracker/:nodeid', component: ExecSimpleTracker},
 		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
 		{path: '/ws/:ws/exec/resample/:nodeid', component: ExecResample},

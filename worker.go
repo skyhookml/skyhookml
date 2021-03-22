@@ -223,7 +223,7 @@ func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader
 				log.Printf("[container %s] %s", uuid, line)
 				if jobID != nil {
 					mu.Lock()
-					lines = append(lines, strings.TrimSpace(line))
+					lines = append(lines, strings.Trim(line, "\n\r"))
 					mu.Unlock()
 				}
 			}

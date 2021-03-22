@@ -34,8 +34,7 @@ class Dataset(torch.utils.data.Dataset):
 		inputs = []
 		for dataset in self.datasets:
 			item = items[dataset['ID']]
-			path = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
-			data = util.read_input(dataset['DataType'], path, item['Metadata'], item['Format'])
+			data = util.read_input(dataset, item)
 			data = util.prepare_input(dataset['DataType'], data, dataset['Options'])
 			inputs.append(data)
 

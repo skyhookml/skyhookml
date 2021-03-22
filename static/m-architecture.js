@@ -76,7 +76,9 @@ export default {
 			};
 			utils.request(this, 'POST', '/pytorch/archs/'+this.arch.ID, JSON.stringify({
 				Params: params,
-			}));
+			}), () => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/models');
+			});
 		},
 		addComponent: function() {
 			this.components.push({

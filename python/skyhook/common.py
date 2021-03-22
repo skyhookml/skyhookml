@@ -30,7 +30,7 @@ def data_index(t, data, i):
 
 # stack a bunch of individual data (like data_index output)
 def data_stack(t, datas):
-	if t == 'image' or t == 'video':
+	if t == 'image' or t == 'video' or t == 'array':
 		return numpy.stack(datas)
 	elif t == 'shape':
 		return {
@@ -47,7 +47,7 @@ def data_stack(t, datas):
 
 # stack a bunch of regular data
 def data_concat(t, datas):
-	if t == 'image' or t == 'video':
+	if t == 'image' or t == 'video' or t == 'array':
 		return numpy.concatenate(datas, axis=0)
 	elif t == 'shape':
 		return {
@@ -78,6 +78,11 @@ def load_item(dataset, item):
 	elif t == 'video':
 		metadata = json.loads(item['Metadata'])
 		return ffmpeg.Ffmpeg(fname, metadata['Dims'], metadata['Framerate'])
+	elif t == 'array':
+		metadata = json.loads(item['Metadata'])
+		dt = numpy.dtype(metadata['Type'])
+		dt = dt.newbyteorder('>')
+		return numpy.fromfile(fname, dtype=dt).reshape(-1, metadata['Height'], metadata['Width'], metadata['Channels'])
 	else:
 		with open(fname, 'r') as f:
 			data = json.load(f)
@@ -142,17 +147,26 @@ def input_json():
 	json_data = stdin.read(hlen)
 	return json.loads(json_data.decode('utf-8'))
 
-def input_video():
+def input_array(channels=None, dt=None):
 	header = input_json()
-	size = header['Length']*header['Width']*header['Height']*3
+
+	if channels is None:
+		channels = header['Channels']
+	if dt is None:
+		dt = numpy.dtype(header['Type'])
+		dt = dt.newbyteorder('>')
+
+	size = header['Length']*header['Width']*header['Height']*channels*dt.itemsize
 	buf = stdin.read(size)
-	return numpy.frombuffer(buf, dtype='uint8').reshape((header['Length'], header['Height'], header['Width'], 3))
+	return numpy.frombuffer(buf, dtype=dt).reshape((header['Length'], header['Height'], header['Width'], channels))
 
 def input_datas():
 	datas = []
 	for t in meta['InputTypes']:
 		if t == 'image' or t == 'video':
-			datas.append(input_video())
+			datas.append(input_array(channels=3, dt='uint8'))
+		elif t == 'array':
+			datas.append(input_array())
 		else:
 			datas.append(input_json())
 	return datas
@@ -162,13 +176,17 @@ def output_json(x):
 	stdout.write(struct.pack('>I', len(s)))
 	stdout.write(s)
 
-def output_video(x):
+def output_array(x):
 	output_json({
 		'Length': x.shape[0],
 		'Width': x.shape[2],
 		'Height': x.shape[1],
+		'Channels': x.shape[3],
+		'Type': x.dtype.name,
 	})
-	stdout.write(x.tobytes())
+	dt = numpy.dtype(x.dtype.name)
+	dt = dt.newbyteorder('>')
+	stdout.write(x.astype(dt, copy=False).tobytes())
 
 def output_datas(in_key, key, l, datas):
 	output_json({
@@ -178,8 +196,8 @@ def output_datas(in_key, key, l, datas):
 		'Length': l,
 	})
 	for i, t in enumerate(meta['OutputTypes']):
-		if t == 'image' or t == 'video':
-			output_video(datas[i])
+		if t == 'image' or t == 'video' or t == 'array':
+			output_array(datas[i])
 		else:
 			output_json(datas[i])
 	stdout.flush()

@@ -48,7 +48,7 @@ def callback_func(*inputs):
 		t = meta['InputTypes'][i]
 		opts = input_options.get(i, {})
 		data = util.prepare_input(t, input, opts)
-		if canvas_dims is None and (t == 'image' or t == 'video'):
+		if canvas_dims is None and (t == 'image' or t == 'video' or t == 'array'):
 			canvas_dims = [data.shape[2], data.shape[1]]
 		data = util.collate(t, [data])
 		datas.append(data)
@@ -60,7 +60,7 @@ def callback_func(*inputs):
 	y_ = []
 	for i, t in enumerate(meta['OutputTypes']):
 		cur = y[i]
-		if t in ['image', 'video']:
+		if t in ['image', 'video', 'array']:
 			y_.append(cur[0].cpu().numpy().transpose(1, 2, 0))
 		elif t == 'detection':
 			# detections are represented as a dict

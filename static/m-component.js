@@ -61,7 +61,9 @@ export default {
 			};
 			utils.request(this, 'POST', '/pytorch/components/'+this.comp.ID, JSON.stringify({
 				Params: params,
-			}));
+			}), () => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/models');
+			});
 		},
 		addOutput: function() {
 			this.$set(this.outputs, this.addForm.outputLayer, this.addForm.outputType);

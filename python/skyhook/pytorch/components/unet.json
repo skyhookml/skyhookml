@@ -1,0 +1,22 @@
+{
+	"Module": {"BuiltInModule": "unet"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Outputs": {
+		"probs": "array",
+		"classes": "array"
+	},
+	"Layers": [
+		"scores",
+		"probs",
+		"down0",
+		"down1",
+		"down2",
+		"up0",
+		"up1",
+		"up2"
+	],
+	"Losses": [
+		"loss"
+	]
+}

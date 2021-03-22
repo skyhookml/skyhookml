@@ -595,7 +595,7 @@ func init() {
 		}
 		rd, err := node.PrepareRun(ExecRunOptions{Force: true})
 		if err != nil {
-			log.Printf("[exec node %s] error preparing run: %v", err)
+			log.Printf("[exec node %s] error preparing run: %v", node.Name, err)
 			http.Error(w, err.Error(), 400)
 			return
 		}

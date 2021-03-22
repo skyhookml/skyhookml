@@ -106,7 +106,9 @@ export default {
 			};
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: JSON.stringify(params),
-			}));
+			}), () => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/queries');
+			});
 		},
 		addInput: function() {
 			this.params.inputOptions.push({

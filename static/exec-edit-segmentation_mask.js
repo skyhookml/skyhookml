@@ -4,9 +4,7 @@ export default {
 	data: function() {
 		return {
 			node: null,
-			mode: 'uniform',
-			length: 1,
-			count: 1000,
+			dims: [0, 0],
 		};
 	},
 	created: function() {
@@ -15,18 +13,14 @@ export default {
 			this.node = node;
 			try {
 				let s = JSON.parse(this.node.Params);
-				this.mode = s.Mode;
-				this.length = s.Length;
-				this.count = s.Count;
+				this.dims = s.Dims;
 			} catch(e) {}
 		});
 	},
 	methods: {
 		save: function() {
 			let params = JSON.stringify({
-				Mode: this.mode,
-				Length: parseInt(this.length),
-				Count: parseInt(this.count),
+				Dims: this.dims,
 			});
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: params,
@@ -39,28 +33,15 @@ export default {
 <div class="small-container m-2">
 	<template v-if="node != null">
 		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Mode</label>
+			<label class="col-sm-2 col-form-label">Output Width</label>
 			<div class="col-sm-10">
-				<div class="form-check">
-					<input class="form-check-input" type="radio" v-model="mode" value="uniform">
-					<label class="form-check-label">Uniform</label>
-				</div>
-				<div class="form-check">
-					<input class="form-check-input" type="radio" v-model="mode" value="random">
-					<label class="form-check-label">Random</label>
-				</div>
+				<input v-model.number="dims[0]" type="text" class="form-control">
 			</div>
 		</div>
 		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Length</label>
+			<label class="col-sm-2 col-form-label">Output Height</label>
 			<div class="col-sm-10">
-				<input v-model="length" type="text" class="form-control">
-			</div>
-		</div>
-		<div class="form-group row">
-			<label class="col-sm-2 col-form-label">Count</label>
-			<div class="col-sm-10">
-				<input v-model="count" type="text" class="form-control">
+				<input v-model.number="dims[1]" type="text" class="form-control">
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>
