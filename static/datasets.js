@@ -59,7 +59,7 @@ const Datasets = {
 							<label class="col-sm-4 col-form-label">Data Type</label>
 							<div class="col-sm-8">
 								<select v-model="addDatasetForm.data_type" class="form-select">
-									<option v-for="(dt, name) in $globals.dataTypes" :value="dt">{{ name }}</option>
+									<option v-for="(name, dt) in $globals.dataTypes" :value="dt">{{ name }}</option>
 								</select>
 							</div>
 						</div>

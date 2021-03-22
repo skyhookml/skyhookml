@@ -23,16 +23,16 @@ const (
 	ArrayType = "array"
 )
 
-var DataTypes = map[string]DataType{
-	"Image": ImageType,
-	"Video": VideoType,
-	"Detection": DetectionType,
-	"Shape": ShapeType,
-	"Int": IntType,
-	"Floats": FloatsType,
-	"Image List": ImListType,
-	"Text": TextType,
-	"String": StringType,
+var DataTypes = map[DataType]string{
+	ImageType: "Image",
+	VideoType: "Video",
+	DetectionType: "Detection",
+	ShapeType: "Shape",
+	IntType: "Int",
+	FloatsType: "Floats",
+	ImListType: "Image List",
+	TextType: "Text",
+	StringType: "String",
 }
 
 func EncodeTypes(types []DataType) string {
