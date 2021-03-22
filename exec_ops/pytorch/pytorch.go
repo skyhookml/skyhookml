@@ -1,7 +1,7 @@
 package pytorch
 
 import (
-	"../../skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 
 	"fmt"
 	"log"

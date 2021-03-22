@@ -21,6 +21,7 @@ const (
 	TextType = "text"
 	StringType = "string"
 	ArrayType = "array"
+	FileType = "file"
 )
 
 var DataTypes = map[DataType]string{
@@ -33,6 +34,7 @@ var DataTypes = map[DataType]string{
 	ImListType: "Image List",
 	TextType: "Text",
 	StringType: "String",
+	FileType: "File",
 }
 
 func EncodeTypes(types []DataType) string {

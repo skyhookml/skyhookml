@@ -1,7 +1,7 @@
 package app
 
 import (
-	"../skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 
 	"log"
 	"net/http"

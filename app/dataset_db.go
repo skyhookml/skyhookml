@@ -1,7 +1,7 @@
 package app
 
 import (
-	"../skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 
 	"log"
 	"math/rand"
@@ -170,7 +170,31 @@ func itemListHelper(rows *Rows) []*DBItem {
 }
 
 func (ds *DBDataset) getDB() *Database {
-	return GetCachedDB(ds.DBFname())
+	return GetCachedDB(ds.DBFname(), func(db *Database) {
+		db.Exec(`CREATE TABLE IF NOT EXISTS items (
+			-- item key
+			k TEXT PRIMARY KEY,
+			ext TEXT,
+			format TEXT,
+			metadata TEXT,
+			-- set if LoadData call should go through non-default method, else NULL
+			provider TEXT,
+			provider_info TEXT
+		)`)
+		db.Exec(`CREATE TABLE IF NOT EXISTS datasets (
+			id INTEGER PRIMARY KEY ASC,
+			name TEXT,
+			-- 'data' or 'computed'
+			type TEXT,
+			data_type TEXT,
+			-- only set if computed
+			hash TEXT
+		)`)
+		db.Exec(
+			"INSERT OR REPLACE INTO datasets (id, name, type, data_type, hash) VALUES (1, ?, ?, ?, ?)",
+			ds.Name, ds.Type, ds.DataType, ds.Hash,
+		)
+	})
 }
 
 func (ds *DBDataset) ListItems() []*DBItem {

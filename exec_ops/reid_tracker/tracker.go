@@ -1,9 +1,9 @@
 package reid_tracker
 
 import (
-	"../../skyhook"
-	"../../exec_ops"
-	strack "../../exec_ops/simple_tracker"
+	"github.com/skyhookml/skyhookml/skyhook"
+	"github.com/skyhookml/skyhookml/exec_ops"
+	strack "github.com/skyhookml/skyhookml/exec_ops/simple_tracker"
 
 	"bufio"
 	"encoding/binary"

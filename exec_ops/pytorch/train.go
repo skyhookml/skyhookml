@@ -1,8 +1,8 @@
 package pytorch
 
 import (
-	"../../skyhook"
-	"../../exec_ops"
+	"github.com/skyhookml/skyhookml/skyhook"
+	"github.com/skyhookml/skyhookml/exec_ops"
 
 	"fmt"
 	"os"

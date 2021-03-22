@@ -15,8 +15,11 @@ import (
 	urllib "net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/rubenfonseca/fastimage"
 )
 
 func ReadTextFile(fname string) string {
@@ -310,5 +313,46 @@ func Clip(x, lo, hi int) int {
 		return hi
 	} else {
 		return x
+	}
+}
+
+func CopyOrSymlink(srcFname string, dstFname string, symlink bool) error {
+	if symlink {
+		// need to make sure srcFname is an absolute path
+		// since it may not be rooted relative to the directory of dstFname
+		var err error
+		srcFname, err = filepath.Abs(srcFname)
+		if err != nil {
+			return err
+		}
+		return os.Symlink(srcFname, dstFname)
+	} else {
+		return CopyFile(srcFname, dstFname)
+	}
+}
+
+func GetImageDimsFromFile(fname string) ([2]int, error) {
+	var dims [2]int
+	file, err := os.Open(fname)
+	if err != nil {
+		return dims, err
+	}
+	_, size, err := fastimage.DetectImageTypeFromReader(file)
+	if err != nil {
+		return dims, err
+	} else if size == nil {
+		return dims, fmt.Errorf("unknown image format")
+	}
+	dims = [2]int{int(size.Width), int(size.Height)}
+	return dims, nil
+}
+
+// Like filepath.Ext but doesn't include the ".".
+func Ext(fname string) string {
+	ext := filepath.Ext(fname)
+	if len(ext) == 0 || ext[0] != '.' {
+		return ext
+	} else {
+		return ext[1:]
 	}
 }

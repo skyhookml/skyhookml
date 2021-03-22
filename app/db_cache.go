@@ -12,26 +12,33 @@ import (
 var dbCache = make(map[string]*Database)
 var dbCacheMu sync.Mutex
 
-func GetCachedDB(fname string) *Database {
+// Get a cached database connection to the specified sqlite3 file.
+// If initFunc is set, we create the sqlite3 if it doesn't already exist, and
+//   call initFunc each time a new connection is opened.
+// Otherwise, we do not create new files, and instead return nil.
+func GetCachedDB(fname string, initFunc func(*Database)) *Database {
 	dbCacheMu.Lock()
 	defer dbCacheMu.Unlock()
 	if dbCache[fname] == nil {
-		os.Mkdir(filepath.Dir(fname), 0755)
-		sdb, err := sql.Open("sqlite3", fname)
-		if err != nil {
-			panic(err)
+		var db *Database
+		if initFunc == nil {
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				return nil
+			}
+			sdb, err := sql.Open("sqlite3", fname)
+			if err != nil {
+				panic(err)
+			}
+			db = &Database{db: sdb}
+		} else {
+			os.Mkdir(filepath.Dir(fname), 0755)
+			sdb, err := sql.Open("sqlite3", fname)
+			if err != nil {
+				panic(err)
+			}
+			db = &Database{db: sdb}
+			initFunc(db)
 		}
-		db := &Database{db: sdb}
-		db.Exec(`CREATE TABLE IF NOT EXISTS items (
-			-- item key
-			k TEXT PRIMARY KEY,
-			ext TEXT,
-			format TEXT,
-			metadata TEXT,
-			-- set if LoadData call should go through non-default method, else NULL
-			provider TEXT,
-			provider_info TEXT
-		)`)
 		dbCache[fname] = db
 	}
 	return dbCache[fname]

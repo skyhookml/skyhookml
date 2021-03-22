@@ -1,8 +1,8 @@
 package video_sample
 
 import (
-	"../../skyhook"
-	"../../exec_ops"
+	"github.com/skyhookml/skyhookml/skyhook"
+	"github.com/skyhookml/skyhookml/exec_ops"
 
 	"bytes"
 	"encoding/json"

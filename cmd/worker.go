@@ -1,10 +1,10 @@
 package main
 
 import (
-	"./skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 	gouuid "github.com/google/uuid"
 
-	_ "./ops"
+	_ "github.com/skyhookml/skyhookml/ops"
 
 	"bufio"
 	"fmt"
@@ -89,7 +89,7 @@ func main() {
 			)
 		} else if mode == "process" {
 			cmd = exec.Command(
-				"go", "run", "container.go", fmt.Sprintf(":%d", containerPort),
+				"go", "run", "cmd/container.go", fmt.Sprintf(":%d", containerPort),
 			)
 		}
 

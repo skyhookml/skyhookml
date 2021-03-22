@@ -1,9 +1,9 @@
 package main
 
 import (
-	"./skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 
-	_ "./ops"
+	_ "github.com/skyhookml/skyhookml/ops"
 
 	"fmt"
 	"log"

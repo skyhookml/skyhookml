@@ -1,10 +1,10 @@
 package main
 
 import (
-	"./app"
-	"./skyhook"
+	"github.com/skyhookml/skyhookml/app"
+	"github.com/skyhookml/skyhookml/skyhook"
 
-	_ "./ops"
+	_ "github.com/skyhookml/skyhookml/ops"
 
 	"github.com/googollee/go-socket.io"
 
@@ -32,11 +32,12 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	skyhook.SeedRand()
 
-	if *initdb {
-		app.InitDB()
-	}
+	app.InitDB(*initdb)
 
-	server := socketio.NewServer(nil)
+	server, err := socketio.NewServer(nil)
+	if err != nil {
+		panic(err)
+	}
 	server.OnConnect("/", func(s socketio.Conn) error {
 		return nil
 	})

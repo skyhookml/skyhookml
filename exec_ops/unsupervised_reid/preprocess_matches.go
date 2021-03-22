@@ -1,7 +1,7 @@
 package reid
 
 import (
-	"../../skyhook"
+	"github.com/skyhookml/skyhookml/skyhook"
 
 	"runtime"
 

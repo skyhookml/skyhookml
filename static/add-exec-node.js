@@ -159,6 +159,32 @@ export default {
 						},
 					],
 				},
+				{
+					ID: "convert",
+					Name: "Convert",
+					Ops: [
+						{
+							ID: "from_yolo",
+							Name: "From YOLO",
+							Description: "Convert from YOLO image/txt format to [image, detection] datasets",
+							Inputs: [{Name: "input", DataTypes: ["file"]}],
+							Outputs: [
+								{Name: "images", DataType: "image"},
+								{Name: "detections", DataType: "detection"},
+							],
+						},
+						{
+							ID: "to_yolo",
+							Name: "To YOLO",
+							Description: "Convert from [image, detection] datasets to YOLO image/txt format",
+							Inputs: [
+								{Name: "images", DataTypes: ["image"]},
+								{Name: "detections", DataTypes: ["detection"]},
+							],
+							Outputs: [{Name: "output", DataType: "file"}],
+						},
+					],
+				},
 			],
 		};
 	},

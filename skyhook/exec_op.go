@@ -1,10 +1,31 @@
 package skyhook
 
+import (
+	"runtime"
+)
+
 type ExecOp interface {
 	Parallelism() int
 	Apply(task ExecTask) error
 	Close()
 }
+
+// A wrapper for a simple exec op that needs no persistent state.
+// So the wrapper just wraps a function, along with desired parallelism.
+type SimpleExecOp struct {
+	ApplyFunc func(ExecTask) error
+	P int
+}
+func (e SimpleExecOp) Parallelism() int {
+	if e.P == 0 {
+		return runtime.NumCPU()
+	}
+	return e.P
+}
+func (e SimpleExecOp) Apply(task ExecTask) error {
+	return e.ApplyFunc(task)
+}
+func (e SimpleExecOp) Close() {}
 
 type ExecTask struct {
 	// For incremental operations, this must be the output key that will be created by this task.

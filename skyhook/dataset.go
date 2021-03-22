@@ -35,8 +35,12 @@ func (item Item) Fname() string {
 	return fmt.Sprintf("items/%d/%s.%s", item.Dataset.ID, item.Key, item.Ext)
 }
 
+func (ds Dataset) Mkdir() {
+	os.Mkdir(fmt.Sprintf("items/%d", ds.ID), 0755)
+}
+
 func (item Item) Mkdir() {
-	os.Mkdir(fmt.Sprintf("items/%d", item.Dataset.ID), 0755)
+	item.Dataset.Mkdir()
 }
 
 func (item Item) UpdateData(data Data) {
