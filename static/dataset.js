@@ -11,7 +11,6 @@ export default {
 		return {
 			dataset: null,
 			items: [],
-			viewingItem: null,
 		};
 	},
 	created: function() {
@@ -25,7 +24,7 @@ export default {
 	},
 	methods: {
 		viewItem: function(i) {
-			this.viewingItem = this.items[i];
+			this.$router.push('/ws/'+this.$route.params.ws+'/datasets/'+this.dataset.ID+'/items/'+this.items[i].Key);
 		},
 	},
 	template: `
@@ -34,27 +33,22 @@ export default {
 		<div class="border-bottom mb-3">
 			<h2>Dataset: {{ dataset.Name }}</h2>
 		</div>
-		<template v-if="viewingItem == null">
-			<p><import-modal v-bind:dataset="dataset"></import-modal>
-			<h4>Items</h4>
-			<table class="table table-sm">
-				<thead>
-					<tr>
-						<th>Key</th>
-						<th>Format</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr v-for="(item, i) in items">
-						<td><a href="#" v-on:click.prevent="viewItem(i)">{{ item.Key }}</a></td>
-						<td>{{ item.Format }}</td>
-					</tr>
-				</tbody>
-			</table>
-		</template>
-		<template v-else>
-			<render-item v-bind:dataType="dataset.DataType" v-bind:item="viewingItem"></render-item>
-		</template>
+		<p><import-modal v-bind:dataset="dataset"></import-modal>
+		<h4>Items</h4>
+		<table class="table table-sm">
+			<thead>
+				<tr>
+					<th>Key</th>
+					<th>Format</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr v-for="(item, i) in items">
+					<td><a href="#" v-on:click.prevent="viewItem(i)">{{ item.Key }}</a></td>
+					<td>{{ item.Format }}</td>
+				</tr>
+			</tbody>
+		</table>
 	</template>
 </div>
 	`,

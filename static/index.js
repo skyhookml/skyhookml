@@ -2,6 +2,7 @@ import utils from './utils.js';
 
 import Datasets from './datasets.js';
 import Dataset from './dataset.js';
+import RenderItem from './render-item.js';
 
 import Annotate from './annotate.js';
 import AnnotateInt from './annotate-int.js';
@@ -39,6 +40,7 @@ const router = new VueRouter({
 
 		{path: '/ws/:ws/datasets', component: Datasets},
 		{path: '/ws/:ws/datasets/:dsid', component: Dataset},
+		{path: '/ws/:ws/datasets/:dsid/items/:itemkey', component: RenderItem},
 
 		{path: '/ws/:ws/annotate', component: Annotate},
 		{path: '/ws/:ws/annotate/int/:setid', component: AnnotateInt},

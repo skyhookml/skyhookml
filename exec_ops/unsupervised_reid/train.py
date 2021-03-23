@@ -61,9 +61,9 @@ class MyDataset(torch.utils.data.Dataset):
 			print('loading from', key)
 			cur_items = self.items[key]
 			video_item, detection_item = cur_items[video_ds['ID']], cur_items[detection_ds['ID']]
-			detections = lib.load_item(detection_ds, detection_item)
+			detections = lib.load_item(detection_ds, detection_item)['Detections']
 			orig_dims = json.loads(detection_item['Metadata'])['CanvasDims']
-			for (frame_idx, im) in enumerate(lib.load_item(video_ds, video_item)):
+			for (frame_idx, im) in enumerate(lib.load_video(video_ds, video_item)):
 				if frame_idx >= len(detections):
 					continue
 

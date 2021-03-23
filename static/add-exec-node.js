@@ -185,6 +185,18 @@ export default {
 						},
 					],
 				},
+				{
+					ID: "debug",
+					Name: "Debug",
+					Ops: [
+						{
+							ID: "virtual_debug",
+							Name: "Virtual Debug",
+							Description: "Op implementing identity function with a virtual provider",
+							Inputs: [{Name: "inputs", Variable: true}],
+						},
+					],
+				},
 			],
 		};
 	},

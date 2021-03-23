@@ -5,38 +5,12 @@ import torch
 
 import skyhook.common as lib
 
-# TODO: it's not clear why we have both read_input here and common.load_item
-# the only special case in load_item is for video which returns Ffmpeg object instead of the numpy array
-# so maybe we should separate that out so we can just use load_item + data_index here
-# (that way load_item will always return something that works with data_index, data_concat, etc.)
+# Read one input item.
+# Currently we assume the input must be a single element of a sequence type.
 def read_input(dataset, item):
-	t = dataset['DataType']
-	metadata, format = item['Metadata'], item['Format']
-	path = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
-
-	if t == 'image' or t == 'array':
-		data = lib.load_item(dataset, item)
-		if len(data.shape) == 4:
-			data = data[0, :, :, :]
-		return data
-	else:
-		with open(path, 'r') as f:
-			data = json.load(f)
-
-		# transform to stream JSON format if needed
-		if t == 'shape':
-			data = {
-				'Shapes': data,
-				'Metadata': json.loads(metadata),
-			}
-		elif t == 'detection':
-			data = {
-				'Detections': data,
-				'Metadata': json.loads(metadata),
-			}
-
-		data = lib.data_index(t, data, 0)
-		return data
+	data = lib.load_item(dataset, item)
+	data = lib.data_index(dataset['DataType'], data, 0)
+	return data
 
 # Image, video: represented as one tensor of size [batch, channels, height, width]
 # Integer: represented as integer tensor of size [batch, 1]

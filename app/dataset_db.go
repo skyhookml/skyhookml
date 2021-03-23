@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
+	"fmt"
 	"log"
 	"math/rand"
 	"strings"
@@ -295,7 +296,11 @@ func (item *DBItem) Load() {
 // Set metadata based on the file.
 func (item *DBItem) SetMetadataFromFile() error {
 	item.Load()
-	format, metadata, err := skyhook.DataImpls[item.Dataset.DataType].GetDefaultMetadata(item.Fname())
+	fname := item.Fname()
+	if fname == "" {
+		return fmt.Errorf("could not set metadata from file in dataset not supporting filename")
+	}
+	format, metadata, err := skyhook.DataImpls[item.Dataset.DataType].GetDefaultMetadata(fname)
 	if err != nil {
 		return err
 	}

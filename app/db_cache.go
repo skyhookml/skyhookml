@@ -46,6 +46,12 @@ func GetCachedDB(fname string, initFunc func(*Database)) *Database {
 
 func UncacheDB(fname string) {
 	dbCacheMu.Lock()
-	delete(dbCache, fname)
+	db := dbCache[fname]
+	if db != nil {
+		delete(dbCache, fname)
+		dbCacheMu.Unlock()
+		db.Close()
+		return
+	}
 	dbCacheMu.Unlock()
 }

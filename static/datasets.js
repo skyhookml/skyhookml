@@ -37,6 +37,17 @@ const Datasets = {
 		selectDataset: function(dataset) {
 			this.$router.push('/ws/'+this.$route.params.ws+'/datasets/'+dataset.ID);
 		},
+		exportDataset: function(dataset) {
+			let endpoint;
+			if(dataset.DataType == 'file') {
+				endpoint = '/export-files';
+			} else {
+				endpoint = '/export';
+			}
+			utils.request(this, 'POST', '/datasets/'+dataset.ID+endpoint, null, (fname) => {
+				window.location.href = '/exports/'+fname;
+			});
+		},
 	},
 	template: `
 <div>
@@ -89,6 +100,7 @@ const Datasets = {
 				<td>{{ ds.DataType }}</td>
 				<td>
 					<button v-on:click="selectDataset(ds)" class="btn btn-sm btn-primary">Manage</button>
+					<button v-on:click="exportDataset(ds)" class="btn btn-sm btn-primary">Export</button>
 					<button v-on:click="deleteDataset(ds.ID)" class="btn btn-sm btn-danger">Delete</button>
 				</td>
 			</tr>

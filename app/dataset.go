@@ -3,9 +3,9 @@ package app
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -13,17 +13,13 @@ import (
 func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request) {
 	item.Load()
 
-	if format == item.Format {
-		http.ServeFile(w, r, item.Fname())
+	fname := item.Fname()
+	if format == item.Format && fname != "" {
+		http.ServeFile(w, r, fname)
 		return
 	}
 
-	file, err := os.Open(item.Fname())
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	data, err := skyhook.DecodeData(item.Dataset.DataType, item.Format, item.Metadata, file)
+	data, err := item.LoadData()
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +30,14 @@ func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request
 		w.Header().Set("Content-Type", "video/mp4")
 	} else if format == "json" {
 		w.Header().Set("Content-Type", "application/json")
+	} else if format == "file" {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		if data.Type() == skyhook.FileType {
+			fileData := data.(skyhook.FileData)
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=\"%s\"", fileData.Metadata.Filename))
+		}
 	}
+
 	if err := data.Encode(format, w); err != nil {
 		panic(err)
 	}
@@ -117,39 +120,37 @@ func init() {
 		skyhook.JsonResponse(w, item_)
 	}).Methods("POST")
 
-	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}", func(w http.ResponseWriter, r *http.Request) {
-		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
-		itemKey := mux.Vars(r)["item_key"]
+	// handle endpoints starting with /datasets/{ds_id}/items/{item_key}
+	handleItem := func(f func(http.ResponseWriter, *http.Request, *DBDataset, *DBItem)) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
+			itemKey := mux.Vars(r)["item_key"]
 
-		dataset := GetDataset(dsID)
-		if dataset == nil {
-			http.Error(w, "no such dataset", 404)
-			return
+			dataset := GetDataset(dsID)
+			if dataset == nil {
+				http.Error(w, "no such dataset", 404)
+				return
+			}
+			item := dataset.GetItem(itemKey)
+			if item == nil {
+				http.Error(w, "no such item", 404)
+				return
+			}
+			f(w, r, dataset, item)
 		}
-		item := dataset.GetItem(itemKey)
-		if item == nil {
-			http.Error(w, "no such item", 404)
-			return
-		}
+	}
+
+	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}", handleItem(func(w http.ResponseWriter, r *http.Request, dataset *DBDataset, item *DBItem) {
+		skyhook.JsonResponse(w, item)
+	})).Methods("GET")
+
+	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}", handleItem(func(w http.ResponseWriter, r *http.Request, dataset *DBDataset, item *DBItem) {
 		item.Delete()
-	}).Methods("DELETE")
+	})).Methods("DELETE")
 
-	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}/get", func(w http.ResponseWriter, r *http.Request) {
-		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
-		itemKey := mux.Vars(r)["item_key"]
+	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}/get", handleItem(func(w http.ResponseWriter, r *http.Request, dataset *DBDataset, item *DBItem) {
 		r.ParseForm()
 		format := r.Form.Get("format")
-
-		dataset := GetDataset(dsID)
-		if dataset == nil {
-			http.Error(w, "no such dataset", 404)
-			return
-		}
-		item := dataset.GetItem(itemKey)
-		if item == nil {
-			http.Error(w, "no matching item", 404)
-			return
-		}
 
 		if format == "meta" {
 			w.Header().Set("Content-Type", "application/json")
@@ -158,25 +159,14 @@ func init() {
 		}
 
 		item.Handle(format, w, r)
-	})
+	}))
 
-	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}/get-video-frame", func(w http.ResponseWriter, r *http.Request) {
-		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
-		itemKey := mux.Vars(r)["item_key"]
+	Router.HandleFunc("/datasets/{ds_id}/items/{item_key}/get-video-frame", handleItem(func(w http.ResponseWriter, r *http.Request, dataset *DBDataset, item *DBItem) {
 		r.ParseForm()
 		frameIdx := skyhook.ParseInt(r.Form.Get("idx"))
 
-		dataset := GetDataset(dsID)
-		if dataset == nil {
-			http.Error(w, "no such dataset", 404)
-			return
-		} else if dataset.DataType != skyhook.VideoType {
+		if dataset.DataType != skyhook.VideoType {
 			http.Error(w, "dataset is not video type", 404)
-			return
-		}
-		item := dataset.GetItem(itemKey)
-		if item == nil {
-			http.Error(w, "no matching item", 404)
 			return
 		}
 
@@ -195,5 +185,5 @@ func init() {
 		if err := imageData.Encode("jpeg", w); err != nil {
 			panic(err)
 		}
-	})
+	}))
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -75,29 +74,9 @@ func init() {
 				if err != nil {
 					return err
 				}
-				if inImageItem.Format == outImageFormat {
-					err = skyhook.CopyOrSymlink(inImageItem.Fname(), outImageItem.Fname(), params.Symlink)
-					if err != nil {
-						return err
-					}
-				} else {
-					inImageData, err := inImageItem.LoadData()
-					if err != nil {
-						return err
-					}
-					// re-encode the image into the output file
-					// we can't just write it directly since we want it as File type
-					err = func() error {
-						file, err := os.Create(outImageItem.Fname())
-						if err != nil {
-							return err
-						}
-						defer file.Close()
-						return inImageData.Encode(outImageFormat, file)
-					}()
-					if err != nil {
-						return err
-					}
+				err = inImageItem.CopyTo(outImageItem.Fname(), outImageFormat, params.Symlink)
+				if err != nil {
+					return err
 				}
 
 				// write the labels
@@ -227,10 +206,13 @@ func init() {
 				skyhook.JsonUnmarshal([]byte(task.Metadata), &categories)
 
 				// read first few bytes of image to get the dimensions
-				dims, err := skyhook.GetImageDimsFromFile(inImageItem.Fname())
-				if err != nil {
-					// default to 720p, anyway we store it in canvas dims
-					dims = [2]int{1280, 720}
+				// default to 720p, anyway we store it in canvas dims
+				dims := [2]int{1280, 720}
+				if inImageItem.Fname() != "" {
+					imDims, err := skyhook.GetImageDimsFromFile(inImageItem.Fname())
+					if err == nil {
+						dims = imDims
+					}
 				}
 
 				// convert the labels .txt file to skyhook detection format
@@ -292,7 +274,7 @@ func init() {
 				if err != nil {
 					return err
 				}
-				err = skyhook.CopyOrSymlink(inImageItem.Fname(), outImageItem.Fname(), params.Symlink)
+				err = inImageItem.CopyTo(outImageItem.Fname(), format, params.Symlink)
 				if err != nil {
 					return err
 				}

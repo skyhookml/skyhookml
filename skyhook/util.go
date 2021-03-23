@@ -356,3 +356,8 @@ func Ext(fname string) string {
 		return ext[1:]
 	}
 }
+
+func FileExists(fname string) bool {
+	_, err := os.Stat(fname)
+	return err == nil
+}

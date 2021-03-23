@@ -68,6 +68,11 @@ func (this *Database) Transaction(f func(tx Tx)) {
 	this.mu.Unlock()
 }
 
+func (this *Database) Close() {
+	err := this.db.Close()
+	checkErr(err)
+}
+
 type Rows struct {
 	db     *Database
 	locked bool

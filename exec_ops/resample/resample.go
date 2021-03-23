@@ -13,6 +13,18 @@ import (
 	urllib "net/url"
 )
 
+func init() {
+	// we use a virtual item provider for re-sampling video
+	// but only when video file is unavailable
+	skyhook.ItemProviders["resample_virtual"] = skyhook.VirtualProvider(func(item skyhook.Item, data skyhook.Data) (skyhook.Data, error) {
+		vdata := data.(skyhook.VideoData)
+		var metadata skyhook.VideoMetadata
+		skyhook.JsonUnmarshal([]byte(item.Metadata), &metadata)
+		vdata.Metadata = metadata
+		return vdata, nil
+	}, true)
+}
+
 type Params struct {
 	Fraction string
 }
@@ -46,17 +58,35 @@ func (e *Resample) Apply(task skyhook.ExecTask) error {
 	process := func(item skyhook.Item, dataset skyhook.Dataset) error {
 		if item.Dataset.DataType == skyhook.VideoType {
 			// all we need to do is update the framerate in the metadata
+
 			var metadata skyhook.VideoMetadata
 			skyhook.JsonUnmarshal([]byte(item.Metadata), &metadata)
 			metadata.Framerate = [2]int{metadata.Framerate[0]*fraction[0], metadata.Framerate[1]*fraction[1]}
-			return skyhook.JsonPostForm(e.URL, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
-				"key": {task.Key},
-				"ext": {"mp4"},
-				"format": {"mp4"},
-				"metadata": {string(skyhook.JsonMarshal(metadata))},
-				"provider": {"reference"},
-				"provider_info": {item.Fname()},
-			}, &item)
+
+			fname := item.Fname()
+			if fname != "" {
+				// if the filename is available, we can produce output as a reference
+				// with modified metadata to the original file
+				return skyhook.JsonPostForm(e.URL, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
+					"key": {task.Key},
+					"ext": {item.Ext},
+					"format": {item.Format},
+					"metadata": {string(skyhook.JsonMarshal(metadata))},
+					"provider": {"reference"},
+					"provider_info": {item.Fname()},
+				}, nil)
+			} else {
+				// if no filename is available, we need to stack a virtual operation
+				// on top of the input dataset
+				return skyhook.JsonPostForm(e.URL, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
+					"key": {task.Key},
+					"ext": {item.Ext},
+					"format": {item.Format},
+					"metadata": {string(skyhook.JsonMarshal(metadata))},
+					"provider": {"resample_virtual"},
+					"provider_info": {string(skyhook.JsonMarshal(item))},
+				}, nil)
+			}
 		}
 
 		// re-sample by building via slice method

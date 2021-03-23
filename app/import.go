@@ -94,6 +94,7 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 	}
 
 	// walk over all files
+	ds.Mkdir()
 	for _, root := range fnames {
 		// determine base directory for computing relative paths
 		var rootDir string
@@ -142,7 +143,6 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 				Format: "",
 				Metadata: string(skyhook.JsonMarshal(metadata)),
 			})
-			item.Mkdir()
 
 			err = skyhook.CopyOrSymlink(path, item.Fname(), symlink)
 			if err != nil {
@@ -178,6 +178,7 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 		}
 	}
 
+	ds.Mkdir()
 	for _, fname := range fnames {
 		key := GetKeyFromFilename(filepath.Base(fname))
 		ext := filepath.Ext(fname)
@@ -190,7 +191,6 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 			Format: "",
 			Metadata: "",
 		})
-		item.Mkdir()
 
 		// copy the file
 		if err := skyhook.CopyFile(fname, item.Fname()); err != nil {
@@ -284,8 +284,8 @@ func HandleUpload(w http.ResponseWriter, r *http.Request, f func(fname string, c
 func init() {
 	Router.HandleFunc("/import-dataset", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		mode := r.PostForm.Get("mode")
-		forceCopy := r.PostForm.Get("forcecopy") == "true"
+		mode := r.Form.Get("mode")
+		forceCopy := r.Form.Get("forcecopy") == "true"
 
 		importFunc := func(path string) {
 			err := func() error {
@@ -324,35 +324,7 @@ func init() {
 		}
 	}).Methods("POST")
 
-	Router.HandleFunc("/datasets/{ds_id}/import-upload", func(w http.ResponseWriter, r *http.Request) {
-		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
-		dataset := GetDataset(dsID)
-		if dataset == nil {
-			http.Error(w, "no such dataset", 404)
-			return
-		}
-
-		log.Printf("[import-upload] handling import from upload request")
-		HandleUpload(w, r, func(fname string, cleanup func()) error {
-			log.Printf("[import-upload] importing from upload request: %s", fname)
-
-			go func() {
-				defer cleanup()
-				var err error
-				if strings.HasSuffix(fname, ".zip") {
-					err = UnzipThen(fname, dataset.ImportDir)
-				} else {
-					err = dataset.ImportFiles([]string{fname})
-				}
-				if err != nil {
-					log.Printf("[import-upload] failed on %s: %v", fname, err)
-				}
-			}()
-			return nil
-		})
-	})
-
-	Router.HandleFunc("/datasets/{ds_id}/import-local", func(w http.ResponseWriter, r *http.Request) {
+	Router.HandleFunc("/datasets/{ds_id}/import", func(w http.ResponseWriter, r *http.Request) {
 		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
 		dataset := GetDataset(dsID)
 		if dataset == nil {
@@ -361,55 +333,43 @@ func init() {
 		}
 
 		r.ParseForm()
-		path := r.PostForm.Get("path")
+		mode := r.Form.Get("mode")
 
-		go func() {
+		importFunc := func(path string) {
 			var err error
 			if strings.HasSuffix(path, ".zip") {
-				log.Printf("[import-local] importing zip file [%s]", path)
+				log.Printf("[import] importing zip file [%s]", path)
 				err = UnzipThen(path, dataset.ImportDir)
 			} else {
 				if fi, statErr := os.Stat(path); statErr == nil && fi.IsDir() {
-					log.Printf("[import-local] importing directory [%s]", path)
+					log.Printf("[import] importing directory [%s]", path)
 					err = dataset.ImportDir(path)
 				} else {
-					log.Printf("[import-local] importing file [%s]", path)
+					log.Printf("[import] importing file [%s]", path)
 					err = dataset.ImportFiles([]string{path})
 				}
 			}
 
 			if err == nil {
-				log.Printf("[import-local] ... import from %s succeeded", path)
+				log.Printf("[import] ... import from %s succeeded", path)
 			} else {
-				log.Printf("[import-local] ... import from %s failed: %v", path, err)
+				log.Printf("[import] ... import from %s failed: %v", path, err)
 			}
-		}()
-	}).Methods("POST")
-
-	Router.HandleFunc("/datasets/{ds_id}/import-upload", func(w http.ResponseWriter, r *http.Request) {
-		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
-		dataset := GetDataset(dsID)
-		if dataset == nil {
-			http.Error(w, "no such dataset", 404)
-			return
 		}
 
-		log.Printf("[import-upload] handling import from upload request")
-		HandleUpload(w, r, func(fname string, cleanup func()) error {
-			log.Printf("[import-upload] importing from upload request: %s", fname)
-			go func() {
-				defer cleanup()
-				var err error
-				if strings.HasSuffix(fname, ".zip") {
-					err = UnzipThen(fname, dataset.ImportDir)
-				} else {
-					err = dataset.ImportFiles([]string{fname})
-				}
-				if err != nil {
-					log.Printf("[import-upload] failed on %s: %v", fname, err)
-				}
-			}()
-			return nil
-		})
-	})
+		if mode == "local" {
+			path := r.PostForm.Get("path")
+			go importFunc(path)
+		} else if mode == "upload" {
+			log.Printf("[import] handling import from upload request")
+			HandleUpload(w, r, func(fname string, cleanup func()) error {
+				log.Printf("[import] importing from upload request: %s", fname)
+				go func() {
+					importFunc(fname)
+					cleanup()
+				}()
+				return nil
+			})
+		}
+	}).Methods("POST")
 }

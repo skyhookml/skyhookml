@@ -25,7 +25,11 @@ export default {
 			this.file = event.target.files[0];
 		},
 		submitLocal: function() {
-			utils.request(this, 'POST', '/datasets/'+this.dataset.ID+'/import-local', {path: this.path});
+			let params = {
+				mode: 'local',
+				path: this.path,
+			};
+			utils.request(this, 'POST', '/datasets/'+this.dataset.ID+'/import?mode=local', params);
 			$(this.$refs.modal).modal('hide');
 		},
 		submitUpload: function() {
@@ -34,7 +38,7 @@ export default {
 			this.percent = null;
 			$.ajax({
 				type: 'POST',
-				url: '/datasets/'+this.dataset.ID+'/import-upload',
+				url: '/datasets/'+this.dataset.ID+'/import?mode=upload',
 				error: function(req, status, errorMsg) {
 					app.setError(errorMsg);
 				},
