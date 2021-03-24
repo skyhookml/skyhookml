@@ -105,7 +105,7 @@ func InitDB(init bool) {
 	// now run some database cleanup steps
 
 	// mark jobs that are still running as error
-	db.Exec("UPDATE jobs SET error = 'terminated' WHERE done = 0")
+	db.Exec("UPDATE jobs SET error = 'terminated', done = 1 WHERE done = 0")
 
 	// delete temporary datasetsTODO
 }

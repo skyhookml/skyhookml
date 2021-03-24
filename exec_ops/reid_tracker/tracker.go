@@ -45,7 +45,7 @@ type Tracker struct {
 	rd *bufio.Reader
 }
 
-func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	var params Params
 	// try to decode parameters, but it's okay if it's not configured
 	// since we have default settings
@@ -54,11 +54,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 	}
 
 	// get the model path from the first input dataset
-	dataset, err := exec_ops.ParentToDataset(url, node.GetParents()["model"][0])
-	if err != nil {
-		return nil, err
-	}
-	modelItems, err := exec_ops.GetDatasetItems(url, dataset)
+	modelItems, err := exec_ops.GetDatasetItems(url, node.InputDatasets["model"][0])
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +72,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 
 	return &Tracker{
 		URL: url,
-		Dataset: outputDatasets["tracks"],
+		Dataset: node.OutputDatasets["tracks"],
 		Params: params,
 		cmd: cmd,
 		stdin: cmd.Stdin(),
@@ -241,22 +237,22 @@ func (e *Tracker) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["reid_tracker"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// provide everything but the model to SimpleTasks
 			items := map[string][][]skyhook.Item{
 				"video": rawItems["video"],
 				"detections": rawItems["detections"],
 			}
-			return exec_ops.SimpleTasks(url, node, items)
+			return exec_ops.SimpleTasks(node, items)
 		},
 		Prepare: Prepare,
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/pytorch", nil
 		},
 	}

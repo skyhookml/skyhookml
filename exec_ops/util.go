@@ -206,7 +206,7 @@ func GroupItems(rawItems map[string][][]skyhook.Item) map[string]map[string][]sk
 }
 
 // make tasks by grouping items of same key across the datasets
-func SimpleTasks(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+func SimpleTasks(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 	groupedItems := GroupItems(rawItems)
 	var tasks []skyhook.ExecTask
 	for key, curItems := range groupedItems {
@@ -226,8 +226,8 @@ func SimpleTasks(url string, node skyhook.ExecNode, rawItems map[string][][]skyh
 }
 
 // make a single task with all the input items
-func SingleTask(key string) func(string, skyhook.ExecNode, map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
-	return func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+func SingleTask(key string) func(skyhook.Runnable, map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+	return func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 		return []skyhook.ExecTask{{
 			Key: key,
 			Items: rawItems,
@@ -301,4 +301,16 @@ func MapGetNeededInputs(node skyhook.ExecNode, outputs []string) map[string][][]
 		}
 	}
 	return needed
+}
+
+func GetOutputsSimilarToInputs(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
+	// output outputs0, outputs1, ... for each dataset in inputs
+	var outputs []skyhook.ExecOutput
+	for i, inputType := range inputTypes["inputs"] {
+		outputs = append(outputs, skyhook.ExecOutput{
+			Name: fmt.Sprintf("outputs%d", i),
+			DataType: inputType,
+		})
+	}
+	return outputs
 }

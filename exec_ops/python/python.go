@@ -34,7 +34,7 @@ type ResponsePacket struct {
 
 type PythonOp struct {
 	url string
-	node skyhook.ExecNode
+	node skyhook.Runnable
 	inputDatasets []skyhook.Dataset
 	outputDatasets []skyhook.Dataset
 
@@ -55,7 +55,7 @@ type PythonOp struct {
 	mu sync.Mutex
 }
 
-func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.ExecNode, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
+func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.Runnable, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
 	stdin := cmd.Stdin()
 	stdout := cmd.Stdout()
 
@@ -286,28 +286,23 @@ func (e *PythonOp) Close() {
 
 func init() {
 	skyhook.ExecOpImpls["python"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
-			inputDatasets, err := exec_ops.GetParentDatasets(url, node)
-			if err != nil {
-				return nil, fmt.Errorf("error getting parent datasets: %v", err)
-			}
-
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var flatOutputs []skyhook.Dataset
 			for _, output := range node.Outputs {
-				flatOutputs = append(flatOutputs, outputDatasets[output.Name])
+				flatOutputs = append(flatOutputs, node.OutputDatasets[output.Name])
 			}
 
 			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
-			return NewPythonOp(cmd, url, node, inputDatasets["inputs"], flatOutputs)
+			return NewPythonOp(cmd, url, node, node.InputDatasets["inputs"], flatOutputs)
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

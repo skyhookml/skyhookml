@@ -4,6 +4,7 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
 	"fmt"
+	"strings"
 )
 
 type DBExecNode struct {
@@ -80,16 +81,21 @@ func (node *DBExecNode) DatasetRefs() []int {
 
 // Get datasets for each output of this node.
 // If create=true, creates new datasets to cover missing ones.
-// Also returns true if all datasets already existed.
+// Also returns bool, which is true if all datasets exist.
 func (node *DBExecNode) GetDatasets(create bool) (map[string]*DBDataset, bool) {
-	// get the old exec-dataset references
-	// we'll need to update datasets that are no longer referenced
+	nodeHash := node.Hash()
+
+	// remove references to datasets that don't even start with the nodeHash
 	existingDS := node.DatasetRefs()
+	for _, id := range existingDS {
+		ds := GetDataset(id)
+		if !strings.HasPrefix(*ds.Hash, nodeHash) {
+			ds.DeleteExecRef(node.ID)
+		}
+	}
 
 	// find datasets that match current hash
-	nodeHash := node.Hash()
 	datasets := make(map[string]*DBDataset)
-	dsIDSet := make(map[int]bool)
 	ok := true
 	for _, output := range node.Outputs {
 		dsName := fmt.Sprintf("%s[%s]", node.Name, output.Name)
@@ -105,21 +111,43 @@ func (node *DBExecNode) GetDatasets(create bool) (map[string]*DBDataset, bool) {
 		if ds != nil {
 			ds.AddExecRef(node.ID)
 			datasets[output.Name] = ds
-			dsIDSet[ds.ID] = true
 		} else {
 			datasets[output.Name] = nil
 		}
 	}
 
-	// remove references
-	for _, id := range existingDS {
-		if dsIDSet[id] {
-			continue
-		}
-		GetDataset(id).DeleteExecRef(node.ID)
-	}
-
 	return datasets, ok
+}
+
+// Get dataset for a virtual node that comes from this node.
+// If the datasets don't exist already, we create them.
+func (node *DBExecNode) GetVirtualDatasets(vnode *skyhook.VirtualNode) map[string]*DBDataset {
+	nodeHash := node.Hash()
+	datasets := make(map[string]*DBDataset)
+	for _, output := range vnode.Outputs {
+		dsName := fmt.Sprintf("%s.%s[%s]", node.Name, vnode.VirtualKey, output.Name)
+		curHash := fmt.Sprintf("%s.%s[%s]", nodeHash, vnode.VirtualKey, output.Name)
+		ds := FindDataset(curHash)
+		if ds == nil {
+			ds = NewDataset(dsName, "computed", output.DataType, &curHash)
+		}
+		datasets[output.Name] = ds
+	}
+	return datasets
+}
+
+// Returns true if all the output datasets are done.
+func (node *DBExecNode) IsDone() bool {
+	datasets, ok := node.GetDatasets(false)
+	if !ok {
+		return false
+	}
+	for _, ds := range datasets {
+		if !ds.Done {
+			return false
+		}
+	}
+	return true
 }
 
 // delete parent references to a node when the node is deleted or its outputs have changed
@@ -156,16 +184,41 @@ func DeleteBrokenReferences(node *DBExecNode, newOutputs []skyhook.ExecOutput) {
 	}
 }
 
+func (node *DBExecNode) GetInputTypes() map[string][]skyhook.DataType {
+	inputTypes := make(map[string][]skyhook.DataType)
+	for i := range node.Parents {
+		name := node.Inputs[i].Name
+		inputTypes[name] = make([]skyhook.DataType, len(node.Parents[i]))
+		for idx, parent := range node.Parents[i] {
+			if parent.Type == "n" {
+				n := GetExecNode(parent.ID)
+				dt := n.GetOutputTypes()[parent.Name]
+				inputTypes[name][idx] = dt
+			} else if parent.Type == "d" {
+				inputTypes[name][idx] = GetDataset(parent.ID).DataType
+			}
+		}
+	}
+	return inputTypes
+}
+
 func (node *DBExecNode) updateOutputs() {
 	// make sure the current expected outputs match the actual outputs
 	impl := skyhook.GetExecOpImpl(node.Op)
-	if impl.GetOutputs != nil {
-		expectedOutputs := impl.GetOutputs(Config.CoordinatorURL, node.ExecNode)
-		if skyhook.ExecOutputsToString(expectedOutputs) != skyhook.ExecOutputsToString(node.Outputs) {
-			db.Exec("UPDATE exec_nodes SET outputs = ? WHERE id = ?", skyhook.ExecOutputsToString(expectedOutputs), node.ID)
-			DeleteBrokenReferences(node, expectedOutputs)
-			node.Outputs = expectedOutputs
-		}
+	if impl.GetOutputs == nil {
+		return
+	}
+
+	expectedOutputs := impl.GetOutputs(node.Params, node.GetInputTypes())
+	if expectedOutputs == nil {
+		// impl wasn't able to compute outputs
+		return
+	}
+
+	if skyhook.ExecOutputsToString(expectedOutputs) != skyhook.ExecOutputsToString(node.Outputs) {
+		db.Exec("UPDATE exec_nodes SET outputs = ? WHERE id = ?", skyhook.ExecOutputsToString(expectedOutputs), node.ID)
+		DeleteBrokenReferences(node, expectedOutputs)
+		node.Outputs = expectedOutputs
 	}
 }
 

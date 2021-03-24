@@ -36,7 +36,6 @@ func (params Params) OutputDims() [2]int {
 
 type CropResize struct {
 	URL string
-	Node skyhook.ExecNode
 	Params Params
 	OutputDataset skyhook.Dataset
 }
@@ -113,11 +112,11 @@ func (e *CropResize) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["cropresize"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -125,16 +124,15 @@ func init() {
 			}
 			op := &CropResize{
 				URL: url,
-				Node: node,
 				Params: params,
-				OutputDataset: outputDatasets["output"],
+				OutputDataset: node.OutputDatasets["output"],
 			}
 			return op, nil
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

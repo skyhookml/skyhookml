@@ -8,7 +8,6 @@ import (
 
 type FilterOp struct {
 	url string
-	node skyhook.ExecNode
 	dataset skyhook.Dataset
 }
 
@@ -49,19 +48,18 @@ func (e *FilterOp) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["filter"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			op := &FilterOp{
 				url: url,
-				node: node,
-				dataset: outputDatasets["output"],
+				dataset: node.OutputDatasets["output"],
 			}
 			return op, nil
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

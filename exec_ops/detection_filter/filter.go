@@ -16,7 +16,6 @@ type Params struct {
 
 type DetectionFilter struct {
 	URL string
-	Node skyhook.ExecNode
 	Params Params
 	Dataset skyhook.Dataset
 
@@ -57,11 +56,11 @@ func (e *DetectionFilter) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["detection_filter"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -76,9 +75,8 @@ func init() {
 			}
 			op := &DetectionFilter{
 				URL: url,
-				Node: node,
 				Params: params,
-				Dataset: outputDatasets["detections"],
+				Dataset: node.OutputDatasets["detections"],
 				categories: categories,
 			}
 			return op, nil
@@ -86,7 +84,7 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

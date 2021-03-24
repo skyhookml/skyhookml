@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	// check the ArchID just to make sure we have all git repositories
 	var params skyhook.PytorchInferParams
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
@@ -21,10 +21,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 		return nil, err
 	}
 
-	inputDatasets, err := exec_ops.ParentsToDatasets(url, node.GetParents())
-	if err != nil {
-		return nil, err
-	}
+	inputDatasets := node.InputDatasets
 
 	// get the model path from the model input dataset
 	modelItems, err := exec_ops.GetDatasetItems(url, inputDatasets["model"][0])
@@ -46,7 +43,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 
 	var flatOutputs []skyhook.Dataset
 	for _, output := range node.Outputs {
-		flatOutputs = append(flatOutputs, outputDatasets[output.Name])
+		flatOutputs = append(flatOutputs, node.OutputDatasets[output.Name])
 	}
 
 	return python.NewPythonOp(cmd, url, node, inputDatasets["inputs"], flatOutputs)
@@ -54,10 +51,10 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 
 func init() {
 	skyhook.ExecOpImpls["pytorch_infer"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// the model only has one dataset, we want to use all the other datasets
 			// should just be under "inputs"
 			items := make(map[string][][]skyhook.Item)
@@ -67,16 +64,16 @@ func init() {
 				}
 				items[name] = value
 			}
-			return exec_ops.SimpleTasks(url, node, items)
+			return exec_ops.SimpleTasks(node, items)
 		},
 		Prepare: Prepare,
-		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
+		GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
 			var params skyhook.PytorchInferParams
-			err := json.Unmarshal([]byte(node.Params), &params)
+			err := json.Unmarshal([]byte(rawParams), &params)
 			if err != nil {
 				// can't do anything if node isn't configured yet
 				// so we leave it unchanged
-				return node.Outputs
+				return nil
 			}
 
 			var outputs []skyhook.ExecOutput
@@ -104,7 +101,7 @@ func init() {
 			neededInputs["model"] = [][]string{{"model"}}
 			return neededInputs
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/pytorch", nil
 		},
 	}

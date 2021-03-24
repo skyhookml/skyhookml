@@ -13,21 +13,20 @@ import (
 
 type DBJob struct {skyhook.Job}
 
-const JobFastQuery = "SELECT id, name, type, op, metadata, start_time, done, error, '' FROM jobs"
-const JobQuery = "SELECT id, name, type, op, metadata, start_time, done, error, state FROM jobs"
+const JobQuery = "SELECT id, name, type, op, metadata, start_time, done, error FROM jobs"
 
 func jobListHelper(rows *Rows) []*DBJob {
 	jobs := []*DBJob{}
 	for rows.Next() {
 		var j DBJob
-		rows.Scan(&j.ID, &j.Name, &j.Type, &j.Op, &j.Metadata, &j.StartTime, &j.Done, &j.Error, &j.State)
+		rows.Scan(&j.ID, &j.Name, &j.Type, &j.Op, &j.Metadata, &j.StartTime, &j.Done, &j.Error)
 		jobs = append(jobs, &j)
 	}
 	return jobs
 }
 
 func ListJobs() []*DBJob {
-	rows := db.Query(JobFastQuery + " ORDER BY id DESC")
+	rows := db.Query(JobQuery + " ORDER BY id DESC")
 	return jobListHelper(rows)
 }
 
@@ -50,8 +49,13 @@ func NewJob(name string, t string, op string, metadata string) *DBJob {
 }
 
 func (j *DBJob) UpdateState(state string) {
-	j.State = state
 	db.Exec("UPDATE jobs SET state = ? WHERE id = ?", state, j.ID)
+}
+
+func (j *DBJob) GetState() string {
+	var state string
+	db.QueryRow("SELECT state FROM jobs WHERE id = ?", j.ID).Scan(&state)
+	return state
 }
 
 var runningJobs = make(map[int]skyhook.JobOp)
@@ -94,6 +98,34 @@ func init() {
 		}
 		skyhook.JsonResponse(w, job)
 	}).Methods("GET")
+
+	Router.HandleFunc("/jobs/{job_id}/state", func(w http.ResponseWriter, r *http.Request) {
+		jobID := skyhook.ParseInt(mux.Vars(r)["job_id"])
+		job := GetJob(jobID)
+		if job == nil {
+			http.Error(w, "no such job", 404)
+			return
+		}
+
+		if !job.Done {
+			jobMu.Lock()
+			jobOp := runningJobs[jobID]
+			jobMu.Unlock()
+			if jobOp != nil {
+				state := jobOp.Encode()
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(state))
+				return
+			}
+		}
+
+		state := job.GetState()
+		if state == "" {
+			state = "null"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(state))
+	}).Methods("POST")
 
 	Router.HandleFunc("/jobs/{job_id}/stop", func(w http.ResponseWriter, r *http.Request) {
 		jobID := skyhook.ParseInt(mux.Vars(r)["job_id"])

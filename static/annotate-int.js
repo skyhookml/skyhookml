@@ -39,7 +39,7 @@ export default AnnotateGenericUI({
 		};
 		this.$parent.$on('keypress', this.keypressHandler);
 	},
-	unmounted: function() {
+	destroyed: function() {
 		this.$parent.$off('keypress', this.keypressHandler);
 		this.keypressHandler = null;
 	},

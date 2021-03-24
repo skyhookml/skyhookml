@@ -1,9 +1,7 @@
 package skyhook
 
 import (
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -127,14 +125,6 @@ type ExecNode struct {
 	Parents [][]ExecParent
 }
 
-func (node ExecNode) LocalHash() []byte {
-	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("op=%s\n", node.Op)))
-	h.Write([]byte(fmt.Sprintf("params=%s\n", node.Params)))
-	h.Write([]byte(fmt.Sprintf("outputs=%s\n", ExecOutputsToString(node.Outputs))))
-	return h.Sum(nil)
-}
-
 // Transforms Parents into a map from the input name.
 func (node ExecNode) GetParents() map[string][]ExecParent {
 	parents := make(map[string][]ExecParent)
@@ -145,4 +135,22 @@ func (node ExecNode) GetParents() map[string][]ExecParent {
 		}
 	}
 	return parents
+}
+
+func (node ExecNode) GetOutputTypes() map[string]DataType {
+	outputTypes := make(map[string]DataType)
+	for _, output := range node.Outputs {
+		outputTypes[output.Name] = output.DataType
+	}
+	return outputTypes
+}
+
+type Runnable struct {
+	Name string
+	Op string
+	Params string
+	Inputs []ExecInput
+	Outputs []ExecOutput
+	InputDatasets map[string][]Dataset
+	OutputDatasets map[string]Dataset
 }

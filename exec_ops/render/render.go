@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"runtime"
 	"strconv"
 )
@@ -37,7 +36,6 @@ var Colors = [][3]uint8{
 
 type Render struct {
 	URL string
-	Node skyhook.ExecNode
 	Dataset skyhook.Dataset
 }
 
@@ -196,34 +194,28 @@ func (e *Render) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["render"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
-			op := &Render{url, node, outputDatasets["output"]}
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
+			op := &Render{url, node.OutputDatasets["output"]}
 			return op, nil
 		},
-		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
+		GetOutputs: func(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
 			// whether we output video or image depends on the first input
-			parents := node.GetParents()
-			if len(parents["inputs"]) == 0 {
-				return node.Outputs
-			}
-			inputType, err := exec_ops.ParentToDataType(url, parents["inputs"][0])
-			if err != nil {
-				log.Printf("[render] warning: unable to compute outputs: %v", err)
-				return node.Outputs
+			if len(inputTypes["inputs"]) == 0 {
+				return nil
 			}
 			return []skyhook.ExecOutput{{
 				Name: "output",
-				DataType: inputType,
+				DataType: inputTypes["inputs"][0],
 			}}
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

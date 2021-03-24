@@ -33,7 +33,7 @@ export default AnnotateGenericUI({
 		}
 		this.params = params;
 	},
-	unmounted: function() {
+	destroyed: function() {
 		this.setKeyupHandler(null);
 		this.disconnectResizeObserver();
 	},

@@ -7,8 +7,7 @@ type WorkerInitRequest struct {
 
 // either coordinator->worker or worker->container
 type ExecBeginRequest struct {
-	Node ExecNode
-	OutputDatasets map[string]Dataset
+	Node Runnable
 	JobID *int
 
 	// only set for worker->container

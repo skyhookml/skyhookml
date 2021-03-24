@@ -14,6 +14,13 @@ def eprint(s):
 	sys.stderr.write(str(s) + "\n")
 	sys.stderr.flush()
 
+# sometimes JSON that we input ends up containing null (=> None) entries instead of list
+# this helper restores lists where lists are expected
+def non_null_list(l):
+	if l is None:
+		return []
+	return l
+
 def data_index(t, data, i):
 	if t == 'shape':
 		return {
@@ -94,11 +101,13 @@ def load_item(dataset, item):
 
 		# transform to stream JSON format if needed
 		if t == 'shape':
+			data = [non_null_list(l) for l in data]
 			data = {
 				'Shapes': data,
 				'Metadata': json.loads(metadata),
 			}
 		elif t == 'detection':
+			data = [non_null_list(l) for l in data]
 			data = {
 				'Detections': data,
 				'Metadata': json.loads(metadata),

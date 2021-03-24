@@ -5,10 +5,7 @@ import (
 
 	"fmt"
 	"sync"
-	"time"
 )
-
-const ExecJobOpUpdateDelay time.Duration = time.Second
 
 // A JobOp for an ExecNode.
 // - track the percentage of tasks completed
@@ -19,9 +16,6 @@ type ExecJobOp struct {
 	NumTasks int
 	CompletedTasks int
 	TailOp *skyhook.TailJobOp
-
-	// last time we updated the db based on completed task
-	lastTime time.Time
 
 	// JobOp provided by the ExecNode, if any
 	NodeJobOp skyhook.JobOp
@@ -78,11 +72,6 @@ func (op *ExecJobOp) Completed(key string) {
 
 	op.CompletedTasks++
 	op.TailOp.Update([]string{fmt.Sprintf("finished applying on key [%s]", key)})
-
-	if time.Now().Sub(op.lastTime) > ExecJobOpUpdateDelay {
-		op.Job.UpdateState(op.encode())
-		op.lastTime = time.Now()
-	}
 }
 
 func (op *ExecJobOp) AddCleanupFunc(f func()) {
@@ -135,4 +124,51 @@ func (op *ExecJobOp) Stop() error {
 	}
 	op.mu.Unlock()
 	return nil
+}
+
+// A JobOp for running multiple ExecNodes.
+type MultiExecJobOp struct {
+	mu sync.Mutex
+
+	// current wrapped job (current ExecJob)
+	CurJob *skyhook.Job
+
+	// current execution plan
+	// the field can change but the slice itself must not
+	Plan []*skyhook.VirtualNode
+}
+
+type MultiExecJobState struct {
+	CurJob *skyhook.Job
+	Plan []*skyhook.VirtualNode
+}
+
+func (op *MultiExecJobOp) Encode() string {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	return string(skyhook.JsonMarshal(MultiExecJobState{
+		CurJob: op.CurJob,
+		Plan: op.Plan,
+	}))
+}
+
+func (op *MultiExecJobOp) Update(lines []string) {
+	panic(fmt.Errorf("Update should not be called on MultiExecJobOp"))
+}
+func (op *MultiExecJobOp) Stop() error {
+	panic(fmt.Errorf("Stop should not be called on MultiExecJobOp"))
+}
+
+// Set the plan.
+// The plan must be immutable.
+func (op *MultiExecJobOp) ChangePlan(plan []*skyhook.VirtualNode) {
+	op.mu.Lock()
+	op.Plan = plan
+	op.mu.Unlock()
+}
+
+func (op *MultiExecJobOp) ChangeJob(job skyhook.Job) {
+	op.mu.Lock()
+	op.CurJob = &job
+	op.mu.Unlock()
 }

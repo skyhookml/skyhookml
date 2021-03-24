@@ -7,13 +7,12 @@ export default {
 	},
 	data: function() {
 		return {
-			jobID: null,
 			progress: 0,
 			lines: [],
 		};
 	},
+	props: ['jobID'],
 	created: function() {
-		this.jobID = this.$route.params.jobid;
 		this.fetch();
 		this.interval = setInterval(this.fetch, 1000);
 	},
@@ -22,12 +21,12 @@ export default {
 	},
 	methods: {
 		fetch: function() {
-			utils.request(this, 'GET', '/jobs/'+this.jobID, null, (job) => {
-				try {
-					let s = JSON.parse(job.State);
-					this.progress = parseInt(s.Progress);
-					this.lines = s.Lines;
-				} catch(e) {}
+			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (state) => {
+				if(!state) {
+					return;
+				}
+				this.progress = parseInt(state.Progress);
+				this.lines = state.Lines;
 			});
 		},
 	},

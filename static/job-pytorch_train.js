@@ -7,37 +7,31 @@ export default {
 	},
 	data: function() {
 		return {
-			jobID: null,
 			modelState: null,
 			lines: [],
 			chart: null,
 		};
 	},
+	props: ['jobID'],
 	created: function() {
-		this.jobID = this.$route.params.jobid;
-	},
-	mounted: function() {
 		this.fetch();
 		this.interval = setInterval(this.fetch, 1000);
 	},
-	unmounted: function() {
+	destroyed: function() {
 		clearInterval(this.interval);
 	},
 	methods: {
 		fetch: function() {
-			utils.request(this, 'GET', '/jobs/'+this.jobID, null, (job) => {
-				let s = null;
-				try {
-					s = JSON.parse(job.State);
-				} catch(e) {}
-				if(s) {
-					let metadata = null;
-					try {
-						metadata = JSON.parse(s.Metadata);
-					} catch(e) {}
-					this.updateChart(metadata);
-					this.lines = s.Lines;
+			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (state) => {
+				if(!state) {
+					return;
 				}
+				let metadata = null;
+				try {
+					metadata = JSON.parse(state.Metadata);
+				} catch(e) {}
+				this.updateChart(metadata);
+				this.lines = state.Lines;
 			});
 		},
 		updateChart: function(modelState) {

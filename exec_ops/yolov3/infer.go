@@ -13,15 +13,12 @@ import (
 	"sync"
 )
 
-func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	var params Params
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
 
 	// load model path from first input dataset
-	dataset, err := exec_ops.ParentToDataset(url, node.GetParents()["model"][0])
-	if err != nil {
-		return nil, err
-	}
+	dataset := node.InputDatasets["model"][0]
 	modelItems, err := exec_ops.GetDatasetItems(url, dataset)
 	if err != nil {
 		return nil, err
@@ -50,7 +47,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 	// run yolov3 script
 	batchSize := 8
 	cmd := skyhook.Command(
-		fmt.Sprintf("yolov3-exec-%s", node.Name), skyhook.CommandOptions{},
+		"yolov3-exec", skyhook.CommandOptions{},
 		"python3", "exec_ops/yolov3/run.py",
 		modelPath,
 		fmt.Sprintf("%d", batchSize),
@@ -59,7 +56,7 @@ func Prepare(url string, node skyhook.ExecNode, outputDatasets map[string]skyhoo
 
 	return &Yolov3{
 		URL: url,
-		Dataset: outputDatasets["detections"],
+		Dataset: node.OutputDatasets["detections"],
 		cmd: cmd,
 		stdin: cmd.Stdin(),
 		rd: bufio.NewReader(cmd.Stdout()),
@@ -159,12 +156,12 @@ func (e *Yolov3) Close() {
 
 func init() {
 	skyhook.ExecOpImpls["yolov3_infer"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// we want to use only images for SimpleTasks, not model
-			return exec_ops.SimpleTasks(url, node, map[string][][]skyhook.Item{"images": rawItems["images"]})
+			return exec_ops.SimpleTasks(node, map[string][][]skyhook.Item{"images": rawItems["images"]})
 		},
 		Prepare: Prepare,
 		Incremental: true,
@@ -177,7 +174,7 @@ func init() {
 			neededInputs["model"] = [][]string{{"model"}}
 			return neededInputs
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/yolov3", nil
 		},
 	}

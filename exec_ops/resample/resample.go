@@ -6,7 +6,6 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -42,7 +41,6 @@ func (params Params) GetFraction() [2]int {
 
 type Resample struct {
 	URL string
-	Node skyhook.ExecNode
 	Params Params
 	Datasets map[string]skyhook.Dataset
 }
@@ -125,11 +123,11 @@ func (e *Resample) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["resample"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -137,40 +135,13 @@ func init() {
 			}
 			op := &Resample{
 				URL: url,
-				Node: node,
 				Params: params,
-				Datasets: outputDatasets,
+				Datasets: node.OutputDatasets,
 			}
 			return op, nil
 		},
-		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
-			// output outputs0, outputs1, ... for each dataset in inputs
-
-			// return empty string on error
-			getOutputType := func(parent skyhook.ExecParent) skyhook.DataType {
-				dataType, err := exec_ops.ParentToDataType(url, parent)
-				if err != nil {
-					log.Printf("[render] warning: unable to compute outputs: %v", err)
-					return ""
-				}
-				return dataType
-			}
-
-			parents := node.GetParents()
-			var outputs []skyhook.ExecOutput
-			for i, parent := range parents["inputs"] {
-				dataType := getOutputType(parent)
-				if dataType == "" {
-					return node.Outputs
-				}
-				outputs = append(outputs, skyhook.ExecOutput{
-					Name: fmt.Sprintf("outputs%d", i),
-					DataType: dataType,
-				})
-			}
-			return outputs
-		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

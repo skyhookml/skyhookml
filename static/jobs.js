@@ -16,7 +16,7 @@ const Jobs = {
 			});
 		},
 		selectJob: function(job) {
-			this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.Op+'/'+job.ID);
+			this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 		},
 	},
 	template: `

@@ -23,7 +23,6 @@ type Params struct {
 
 type VideoSample struct {
 	URL string
-	Node skyhook.ExecNode
 	Params Params
 	Datasets map[string]skyhook.Dataset
 }
@@ -38,7 +37,7 @@ func (e *VideoSample) Apply(task skyhook.ExecTask) error {
 	var samples [][2]int
 	skyhook.JsonUnmarshal([]byte(task.Metadata), &samples)
 
-	log.Printf("[video_sample %s] extracting %d samples from %s", e.Node.Name, len(samples), task.Key)
+	log.Printf("extracting %d samples from %s", len(samples), task.Key)
 
 	processVideo := func(vdata skyhook.VideoData) (map[string]skyhook.Data, error) {
 		// create map of where samples start
@@ -206,10 +205,10 @@ func (e *VideoSample) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["video_sample"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, allItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, allItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -292,7 +291,7 @@ func init() {
 			}
 			return tasks, nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
@@ -300,31 +299,27 @@ func init() {
 			}
 			op := &VideoSample{
 				URL: url,
-				Node: node,
 				Params: params,
-				Datasets: outputDatasets,
+				Datasets: node.OutputDatasets,
 			}
 			return op, nil
 		},
-		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
+		GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
 			// we always output samples, which is image if params.Length == 1 and video otherwise
 			// but then output others0, others1, ... for each others input (which borrows type from its input)
 
 			var params Params
-			err := json.Unmarshal([]byte(node.Params), &params)
+			err := json.Unmarshal([]byte(rawParams), &params)
 			if err != nil {
 				// can't do anything if node isn't configured yet
 				// so we leave it unchanged
-				return node.Outputs
+				return nil
 			}
 
-			// return empty string on error
-			getOutputType := func(parent skyhook.ExecParent) skyhook.DataType {
-				inputType, err := exec_ops.ParentToDataType(url, parent)
-				if err != nil {
-					log.Printf("[render] warning: unable to compute outputs: %v", err)
-					return ""
-				}
+			// If input is neither video nor image, we copy the input type.
+			// For video, it is video output unless sample length = 1 in which case it's image.
+			// Image input always yields image output.
+			getOutputType := func(inputType skyhook.DataType) skyhook.DataType {
 				if inputType != skyhook.VideoType {
 					return inputType
 				}
@@ -335,32 +330,25 @@ func init() {
 				}
 			}
 
-			parents := node.GetParents()
-			if len(parents["video"]) == 0 {
-				return node.Outputs
-			}
-			samplesType := getOutputType(parents["video"][0])
-			if samplesType == "" {
-				return node.Outputs
+			// first add samples type (based on whether video input is image or video)
+			if len(inputTypes["video"]) == 0 {
+				return nil
 			}
 			outputs := []skyhook.ExecOutput{{
 				Name: "samples",
-				DataType: samplesType,
+				DataType: getOutputType(inputTypes["video"][0]),
 			}}
 
-			for i, parent := range parents["others"] {
-				outputType := getOutputType(parent)
-				if outputType == "" {
-					return node.Outputs
-				}
+			// now add others, which copies the type of each one
+			for i, inputType := range inputTypes["others"] {
 				outputs = append(outputs, skyhook.ExecOutput{
 					Name: fmt.Sprintf("others%d", i),
-					DataType: outputType,
+					DataType: getOutputType(inputType),
 				})
 			}
 			return outputs
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

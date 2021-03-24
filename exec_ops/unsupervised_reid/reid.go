@@ -15,7 +15,7 @@ import (
 
 type TrainOp struct {
 	url string
-	node skyhook.ExecNode
+	node skyhook.Runnable
 	dataset skyhook.Dataset
 }
 
@@ -35,12 +35,8 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
-	datasets, err := exec_ops.GetParentDatasets(e.url, e.node)
-	if err != nil {
-		return err
-	}
-	videoDataset := datasets["video"][0]
-	detectionDataset := datasets["detections"][0]
+	videoDataset := e.node.InputDatasets["video"][0]
+	detectionDataset := e.node.InputDatasets["detections"][0]
 	datasetList := []skyhook.Dataset{videoDataset, detectionDataset}
 
 	// pre-process the detections
@@ -48,7 +44,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	if err != nil {
 		return err
 	}
-	matchesPath := filepath.Join(os.TempDir(), fmt.Sprintf("reid-%d", e.node.ID))
+	matchesPath := filepath.Join(os.TempDir(), fmt.Sprintf("reid-%d", e.dataset.ID))
 	if err := os.Mkdir(matchesPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", matchesPath, err)
 	}
@@ -81,10 +77,10 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	datasetsArg := string(skyhook.JsonMarshal(datasetList))
-	fmt.Println(e.node.ID, e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
+	fmt.Println(e.dataset.ID, e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
 	cmd := exec.Command(
 		"python3", "exec_ops/unsupervised_reid/train.py",
-		fmt.Sprintf("%d", e.node.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
+		fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -97,7 +93,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	}
 
 	// add filename to the string dataset
-	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.node.ID)}}
+	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.dataset.ID)}}
 	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
 }
 
@@ -105,19 +101,19 @@ func (e *TrainOp) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["unsupervised_reid"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			op := &TrainOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets["model"],
+				dataset: node.OutputDatasets["model"],
 			}
 			return op, nil
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/pytorch", nil
 		},
 	}

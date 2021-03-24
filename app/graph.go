@@ -1,143 +1,285 @@
 package app
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"github.com/skyhookml/skyhookml/skyhook"
+
 	"fmt"
 	"log"
-	"sort"
+	"sync"
 )
 
-type Node interface {
-	GraphParents() map[string]Node
-	LocalHash() []byte
-	GraphType() string
-	IsDone() bool
-
-	// return unique ID for this node
-	GraphID() string
+func (node *DBExecNode) GetGraphID() skyhook.GraphID {
+	return skyhook.GraphID{
+		Type: "exec",
+		ID: node.ID,
+	}
 }
 
-func GetNodeHash(node Node) []byte {
-	parentHashes := make(map[string][]byte)
-	var parentKeys []string
-	for k, n := range node.GraphParents() {
-		parentKeys = append(parentKeys, k)
-		parentHashes[k] = GetNodeHash(n)
-	}
-
-	h := sha256.New()
-	sort.Strings(parentKeys)
-	for _, k := range parentKeys {
-		hash := parentHashes[k]
-		h.Write([]byte(fmt.Sprintf("%s=%s\n", k, string(hash))))
-	}
-	h.Write(node.LocalHash())
-	return h.Sum(nil)
-}
-
-func (node *DBExecNode) GraphParents() map[string]Node {
-	parents := make(map[string]Node)
-	for name, plist := range node.GetParents() {
-		for i, parent := range plist {
-			if parent.Type == "n" {
-				k := fmt.Sprintf("%s-%d-n[%s]", name, i, parent.Name)
-				parents[k] = GetExecNode(parent.ID)
-			} else if parent.Type == "d" {
-				k := fmt.Sprintf("%s-%d-d", name, i)
-				parents[k] = GetDataset(parent.ID)
-			}
+// Retrieves the Node (VirtualNode or Dataset) based on GraphID.
+func GetNodeByGraphID(id skyhook.GraphID) skyhook.Node {
+	if id.Type == "exec" {
+		if id.VirtualKey != "" {
+			panic(fmt.Errorf("addByGraphID called with non-empty VirtualKey"))
 		}
-	}
-
-	return parents
-}
-
-func (node *DBExecNode) Hash() string {
-	bytes := GetNodeHash(node)
-	return hex.EncodeToString(bytes)
-}
-
-func (node *DBExecNode) GraphType() string {
-	return "exec"
-}
-
-func (node *DBExecNode) IsDone() bool {
-	datasets, ok := node.GetDatasets(false)
-	if !ok {
-		return false
-	}
-	for _, ds := range datasets {
-		if !ds.Done {
-			return false
+		execNode := GetExecNode(id.ID)
+		vnode := skyhook.Virtualize(execNode.ExecNode)
+		if id != vnode.GraphID() {
+			panic(fmt.Errorf("unexpected id != vnode.GraphID()"))
 		}
+		return vnode
+	} else if id.Type == "dataset" {
+		dataset := GetDataset(id.ID)
+		return dataset.Dataset
 	}
-	return true
-}
-
-func (node *DBExecNode) GraphID() string {
-	return fmt.Sprintf("exec-%d", node.ID)
-}
-
-func (node *DBDataset) GraphParents() map[string]Node {
 	return nil
 }
-func (node *DBDataset) GraphType() string {
-	return "dataset"
-}
-func (node *DBDataset) IsDone() bool {
-	return true
-}
-func (node *DBDataset) GraphID() string {
-	return fmt.Sprintf("dataset-%d", node.ID)
-}
 
-// Run the specified node, while running ancestors first if needed.
-func RunTree(node Node) error {
-	if node.IsDone() {
-		return nil
+// Incorporate a subgraph (graph of new nodes) into an existing execution graph.
+// The subgraph may present new dependencies that don't exist yet in the graph, so we need to search those.
+func IncorporateIntoGraph(graph skyhook.ExecutionGraph, subgraph skyhook.ExecutionGraph) {
+	// first, add/replace from subgraph
+	for id, node := range subgraph {
+		graph[id] = node
 	}
 
-	needed := map[string]Node{node.GraphID(): node}
-	q := []Node{node}
+	// now perform a search to make sure all ancestors are in the graph
+	var q []skyhook.GraphID
+	for id := range subgraph {
+		q = append(q, id)
+	}
 	for len(q) > 0 {
 		cur := q[len(q)-1]
 		q = q[0:len(q)-1]
-		for _, parent := range cur.GraphParents() {
-			if parent.IsDone() {
+		for _, parentID := range graph[cur].GraphParents() {
+			if graph[parentID] != nil {
 				continue
 			}
-			if needed[parent.GraphID()] != nil {
-				continue
-			}
-			needed[parent.GraphID()] = parent
+			node := GetNodeByGraphID(parentID)
+			graph[node.GraphID()] = node
+			q = append(q, node.GraphID())
 		}
 	}
+}
 
-	log.Printf("[run-tree %v] running %d nodes", node, len(needed))
-	for len(needed) > 0 {
-		for id, cur := range needed {
-			ready := true
-			for _, parent := range cur.GraphParents() {
-				if !parent.IsDone() {
-					ready = false
-					break
-				}
+// Build the execution graph rooted at this node.
+// Execution graph maps from GraphID to Node.
+func (node *DBExecNode) GetGraph() skyhook.ExecutionGraph {
+	graph := make(skyhook.ExecutionGraph)
+	srcID := node.GetGraphID()
+	subgraph := skyhook.ExecutionGraph{srcID: GetNodeByGraphID(srcID)}
+	IncorporateIntoGraph(graph, subgraph)
+	return graph
+}
+
+func (node *DBExecNode) Hash() string {
+	graph := node.GetGraph()
+	hashes := graph.GetHashStrings()
+	return hashes[node.GetGraphID()]
+}
+
+// Run the specified node, while running ancestors first if needed.
+type RunNodeOptions struct {
+	// If force, we run even if outputs were already available.
+	Force bool
+	// If NoRunTree, we do not run if the parents of targetNode are not available.
+	NoRunTree bool
+	// MultiExecJobOp to update with jobs for each ExecNode run.
+	JobOp *MultiExecJobOp
+}
+func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
+	if targetNode.IsDone() && !opts.Force {
+		log.Printf("[run-tree %s] this node is already done", targetNode.Name)
+		return nil
+	}
+
+	log.Printf("[run-tree %s] building graph", targetNode.Name)
+	graph := targetNode.GetGraph()
+
+	log.Printf("[run-tree %s] computing ready/needed nodes", targetNode.Name)
+	// graph ID to outputs at that node
+	// for datasets, the key is always "" (empty string)
+	ready := make(map[skyhook.GraphID]map[string]*DBDataset)
+	// stores GraphIDs that need to be executed
+	// (outputs not yet available in ready)
+	needed := make(map[skyhook.GraphID]skyhook.Node)
+	// map from ExecNode.ID to *DBExecNode instance
+	dbExecNodes := make(map[int]*DBExecNode)
+
+	// populate ready/needed depending on whether outputs are available
+	// also populate dbExecNodes
+	populateReadyNeeded := func() {
+		for graphID, node := range graph {
+			if ready[graphID] != nil || needed[graphID] != nil {
+				continue
 			}
-			if !ready {
+			if graphID.Type == "dataset" {
+				// datasets are always ready
+				ready[graphID] = map[string]*DBDataset{"": GetDataset(graphID.ID)}
 				continue
 			}
 
-			var err error
-			if cur.GraphType() == "exec" {
-				err = cur.(*DBExecNode).Run(ExecRunOptions{})
+			if graphID.VirtualKey == "" {
+				execNode := GetExecNode(graphID.ID)
+				dbExecNodes[graphID.ID] = execNode
+				if execNode.IsDone() {
+					datasets, ok := execNode.GetDatasets(false)
+					if !ok {
+						panic(fmt.Errorf("execNode Done but GetDatasets not ok"))
+					}
+					ready[graphID] = datasets
+				} else {
+					needed[graphID] = node
+				}
 			} else {
-				err = fmt.Errorf("unknown type %s", cur.GraphType())
+				execNode := dbExecNodes[graphID.ID]
+				datasets := execNode.GetVirtualDatasets(node.(*skyhook.VirtualNode))
+				done := true
+				for _, ds := range datasets {
+					done = done && ds.Done
+				}
+				if done {
+					ready[graphID] = datasets
+				} else {
+					needed[graphID] = node
+				}
 			}
+		}
+	}
+	if opts.Force {
+		targetGraphID := targetNode.GetGraphID()
+		needed[targetGraphID] = graph[targetGraphID]
+		dbExecNodes[targetNode.ID] = targetNode
+	}
+	populateReadyNeeded()
+	log.Printf("[run-tree %s] ... get %d ready, %d needed", targetNode.Name, len(ready), len(needed))
+	if len(needed) != 1 && opts.NoRunTree {
+		return fmt.Errorf("NoRunTree is set but more than one node needed")
+	}
+
+	// repeatedly run needed nodes where parents are all available
+	// until all nodes are done
+	for len(needed) > 0 {
+		for id, cur := range needed {
+			vnode := cur.(*skyhook.VirtualNode)
+			// are parents available?
+			// also collect the parent datasets here from ready
+			avail := true
+			parentDatasets := make(map[string][]*DBDataset)
+			for name, plist := range vnode.GetParents() {
+				parentDatasets[name] = make([]*DBDataset, len(plist))
+				for i, vparent := range plist {
+					if ready[vparent.GraphID] == nil {
+						avail = false
+						break
+					}
+					parentDatasets[name][i] = ready[vparent.GraphID][vparent.Name]
+				}
+			}
+			if !avail {
+				continue
+			}
+
+			// enumerate items
+			// we need these for Resolve/GetTasks
+			parentItems := make(map[string][][]skyhook.Item)
+			for name, dslist := range parentDatasets {
+				parentItems[name] = make([][]skyhook.Item, len(dslist))
+				for i, ds := range dslist {
+					var skItems []skyhook.Item
+					for _, item := range ds.ListItems() {
+						skItems = append(skItems, item.Item)
+					}
+					parentItems[name][i] = skItems
+				}
+			}
+
+			// make sure this node doesn't Resolve to something else if needed
+			opImpl := skyhook.GetExecOpImpl(vnode.Op)
+			if opImpl.Resolve != nil {
+				subgraph := opImpl.Resolve(vnode, ToSkyhookInputDatasets(parentDatasets), parentItems)
+				if subgraph != nil {
+					// this vnode wants to be dynamically replaced with the new subgraph
+					// we need to incorporate the subgraph into our graph
+					log.Printf("[run-tree %s] node %s resolved into a subgraph of size %d, adding to our graph of size %d", targetNode.Name, vnode.Name, len(subgraph), len(graph))
+					IncorporateIntoGraph(graph, subgraph)
+					log.Printf("[run-tree %s] ... graph grew to size %d", targetNode.Name, len(graph))
+
+					// we also need to populate ready and needed with any new nodes
+					// so we call populateReadyNeeded with anything that's not already there
+					populateReadyNeeded()
+
+					// parents and stuff may have changed now
+					// so we need to re-evaluate whether parent datasets are available
+					// so: skip processing for now
+					continue
+				}
+			}
+
+			log.Printf("[run-tree %s] running node %s", targetNode.Name, vnode.Name)
+
+			// get output datasets
+			origNode := dbExecNodes[vnode.OrigNode.ID]
+			var outputDatasets map[string]*DBDataset
+			if vnode.VirtualKey == "" {
+				outputDatasets, _ = origNode.GetDatasets(true)
+			} else {
+				outputDatasets = origNode.GetVirtualDatasets(vnode)
+			}
+			for _, ds := range outputDatasets {
+				ds.Clear()
+				ds.SetDone(false)
+			}
+
+			// load runnable
+			runnable := vnode.GetRunnable(ToSkyhookInputDatasets(parentDatasets), ToSkyhookOutputDatasets(outputDatasets))
+
+			// get tasks
+			tasks, err := opImpl.GetTasks(runnable, parentItems)
 			if err != nil {
 				return err
 			}
+
+			// initialize job
+			var nodeJobOp skyhook.JobOp
+			jobOpName := "execnode"
+			if opImpl.GetJobOp != nil {
+				nodeJobOp = opImpl.GetJobOp(runnable)
+				jobOpName = runnable.Op
+			}
+			job := NewJob(
+				fmt.Sprintf("Exec Node %s", vnode.Name),
+				"execnode",
+				jobOpName,
+				fmt.Sprintf("%d", vnode.OrigNode.ID),
+			)
+			jobOp := &ExecJobOp{
+				Job: job,
+				NumTasks: len(tasks),
+				TailOp: &skyhook.TailJobOp{},
+				NodeJobOp: nodeJobOp,
+			}
+			jobOp.cond = sync.NewCond(&jobOp.mu)
+			job.AttachOp(jobOp)
+
+			// if MultiExecJobOp is provided, we need to update it with the current job
+			if opts.JobOp != nil {
+				opts.JobOp.ChangeJob(job.Job)
+			}
+
+			rd := &RunData{
+				Node: runnable,
+				Job: job,
+				JobOp: jobOp,
+				Tasks: tasks,
+				WillBeDone: true,
+			}
+			err = rd.Run()
+			if err != nil {
+				return err
+			}
+
 			delete(needed, id)
+			ready[id] = outputDatasets
 		}
 	}
 

@@ -163,7 +163,6 @@ func (params Params) ExtractMatches(matrix [][]float64) [][2]int {
 
 type Tracker struct {
 	URL string
-	Node skyhook.ExecNode
 	Dataset skyhook.Dataset
 	Params Params
 }
@@ -248,11 +247,11 @@ func (e *Tracker) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["simple_tracker"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
 			// try to decode parameters, but it's okay if it's not configured
 			// since we have default settings
@@ -260,13 +259,13 @@ func init() {
 				log.Printf("[simple_tracker] warning: error decoding parameters: %v", err)
 			}
 
-			op := &Tracker{url, node, outputDatasets["tracks"], params}
+			op := &Tracker{url, node.OutputDatasets["tracks"], params}
 			return op, nil
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

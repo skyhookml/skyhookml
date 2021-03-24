@@ -13,6 +13,24 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func ToSkyhookInputDatasets(datasets map[string][]*DBDataset) map[string][]skyhook.Dataset {
+	sk := make(map[string][]skyhook.Dataset)
+	for name, dslist := range datasets {
+		for _, ds := range dslist {
+			sk[name] = append(sk[name], ds.Dataset)
+		}
+	}
+	return sk
+}
+
+func ToSkyhookOutputDatasets(datasets map[string]*DBDataset) map[string]skyhook.Dataset {
+	sk := make(map[string]skyhook.Dataset)
+	for name, ds := range datasets {
+		sk[name] = ds.Dataset
+	}
+	return sk
+}
+
 // Helper function to compute the keys already computed at a node.
 // This only works for incremental nodes, which must produce the same keys across all output datasets.
 func (node *DBExecNode) GetComputedKeys() map[string]bool {
@@ -53,8 +71,8 @@ type ExecRunOptions struct {
 	LimitOutputKeys map[string]bool
 }
 type RunData struct {
-	Node *DBExecNode
-	OutputDatasets map[string]skyhook.Dataset
+	Name string
+	Node skyhook.Runnable
 	Job *DBJob
 	JobOp *ExecJobOp
 	Tasks []skyhook.ExecTask
@@ -82,10 +100,6 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 		if done {
 			return nil, nil
 		}
-	}
-	skOutputDatasets := make(map[string]skyhook.Dataset)
-	for name, ds := range outputDatasets {
-		skOutputDatasets[name] = ds.Dataset
 	}
 
 	// get parent datasets
@@ -128,7 +142,9 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 
 	// get tasks
 	opImpl := skyhook.GetExecOpImpl(node.Op)
-	tasks, err := opImpl.GetTasks(Config.CoordinatorURL, node.ExecNode, items)
+	vnode := skyhook.Virtualize(node.ExecNode)
+	runnable := vnode.GetRunnable(ToSkyhookInputDatasets(parentDatasets), ToSkyhookOutputDatasets(outputDatasets))
+	tasks, err := opImpl.GetTasks(runnable, items)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +190,7 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	var nodeJobOp skyhook.JobOp
 	jobOpName := "execnode"
 	if opImpl.GetJobOp != nil {
-		nodeJobOp = opImpl.GetJobOp(Config.CoordinatorURL, node.ExecNode)
+		nodeJobOp = opImpl.GetJobOp(runnable)
 		jobOpName = node.Op
 	}
 	job := NewJob(
@@ -193,8 +209,8 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	job.AttachOp(jobOp)
 
 	return &RunData{
-		Node: node,
-		OutputDatasets: skOutputDatasets,
+		Name: node.Name,
+		Node: runnable,
 		Job: job,
 		JobOp: jobOp,
 		Tasks: tasks,
@@ -203,7 +219,7 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 }
 
 func (rd RunData) Run() error {
-	name := rd.Node.Name
+	name := rd.Name
 	// prepare op
 	log.Printf("[exec-node %s] [run] acquiring worker", name)
 	workerURL := AcquireWorker()
@@ -211,8 +227,7 @@ func (rd RunData) Run() error {
 	defer ReleaseWorker(workerURL)
 
 	beginRequest := skyhook.ExecBeginRequest{
-		Node: rd.Node.ExecNode,
-		OutputDatasets: rd.OutputDatasets,
+		Node: rd.Node,
 		JobID: &rd.Job.ID,
 	}
 	var beginResponse skyhook.ExecBeginResponse
@@ -278,7 +293,7 @@ func (rd RunData) Run() error {
 
 	// update dataset states
 	if rd.WillBeDone {
-		for _, ds := range rd.OutputDatasets {
+		for _, ds := range rd.Node.OutputDatasets {
 			(&DBDataset{Dataset: ds}).SetDone(true)
 		}
 	}
@@ -315,10 +330,11 @@ func (node *DBExecNode) Incremental(n int) error {
 	// identify all non-incremental ancestors of this node
 	// but stop the search at ExecNodes whose outputs have already been computed
 	// we will need to run these ancestors in their entirety
-	var nonIncremental []Node
+	// note: we do not need to worry about Virtualize here because we assume Virtualize and Incremental are mutually exclusive
+	var nonIncremental []*DBExecNode
 	incrementalNodes := make(map[int]*DBExecNode)
-	q := []Node{node}
-	seen := map[string]bool{node.GraphID(): true}
+	q := []*DBExecNode{node}
+	seen := map[int]bool{node.ID: true}
 	for len(q) > 0 {
 		cur := q[len(q)-1]
 		q = q[0:len(q)-1]
@@ -327,33 +343,32 @@ func (node *DBExecNode) Incremental(n int) error {
 			continue
 		}
 
-		if cur.GraphType() != "exec" {
-			// all non-exec are non-incremental
+		if !isIncremental(cur) {
 			nonIncremental = append(nonIncremental, cur)
 			continue
 		}
 
-		execNode := cur.(*DBExecNode)
-		if !isIncremental(execNode) {
-			nonIncremental = append(nonIncremental, cur)
-			continue
-		}
+		incrementalNodes[cur.ID] = cur
 
-		incrementalNodes[execNode.ID] = execNode
-
-		for _, parent := range cur.GraphParents() {
-			if seen[parent.GraphID()] {
-				continue
+		for _, plist := range cur.Parents {
+			for _, parent := range plist {
+				if parent.Type != "n" {
+					continue
+				}
+				if seen[parent.ID] {
+					continue
+				}
+				seen[parent.ID] = true
+				parentNode := GetExecNode(parent.ID)
+				q = append(q, parentNode)
 			}
-			seen[parent.GraphID()] = true
-			q = append(q, parent)
 		}
 	}
 
 	if len(nonIncremental) > 0 {
 		log.Printf("[exec-node %s] [incremental] running %d non-incremental ancestors: %v", node.Name, len(nonIncremental), nonIncremental)
 		for _, cur := range nonIncremental {
-			RunTree(cur)
+			RunNode(cur, RunNodeOptions{})
 		}
 	}
 
@@ -593,19 +608,32 @@ func init() {
 			http.Error(w, "no such exec node", 404)
 			return
 		}
-		rd, err := node.PrepareRun(ExecRunOptions{Force: true})
-		if err != nil {
-			log.Printf("[exec node %s] error preparing run: %v", node.Name, err)
-			http.Error(w, err.Error(), 400)
-			return
-		}
+
+		// initialize job for this run
+		job := NewJob(
+			fmt.Sprintf("Exec Tree %s", node.Name),
+			"multiexec",
+			"multiexec",
+			fmt.Sprintf("%d", node.ID),
+		)
+		jobOp := &MultiExecJobOp{}
+		job.AttachOp(jobOp)
+
 		go func() {
-			err := rd.Run()
+			err := RunNode(node, RunNodeOptions{
+				Force: true,
+				JobOp: jobOp,
+			})
+			job.UpdateState(jobOp.Encode())
 			if err != nil {
 				log.Printf("[exec node %s] run error: %v", node.Name, err)
+				job.SetDone(err.Error())
+			} else {
+				job.SetDone("")
 			}
 		}()
-		skyhook.JsonResponse(w, rd.Job)
+
+		skyhook.JsonResponse(w, job)
 	}).Methods("POST")
 
 	Router.HandleFunc("/exec-nodes/{node_id}/incremental", func(w http.ResponseWriter, r *http.Request) {

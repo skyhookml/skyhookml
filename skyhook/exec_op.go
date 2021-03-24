@@ -40,13 +40,13 @@ type ExecTask struct {
 }
 
 type ExecOpImpl struct {
-	Requirements func(url string, node ExecNode) map[string]int
+	Requirements func(node Runnable) map[string]int
 	// items is: input name -> input dataset index -> items in that dataset
-	GetTasks func(url string, node ExecNode, items map[string][][]Item) ([]ExecTask, error)
+	GetTasks func(node Runnable, items map[string][][]Item) ([]ExecTask, error)
 	// initialize an ExecOp
-	Prepare func(url string, node ExecNode, outputDatasets map[string]Dataset) (ExecOp, error)
+	Prepare func(url string, node Runnable) (ExecOp, error)
 	// determine the output names/types given current inputs and configuration
-	GetOutputs func(url string, node ExecNode) []ExecOutput
+	GetOutputs func(params string, inputTypes map[string][]DataType) []ExecOutput
 
 	// optional; if set, op is considered "incremental"
 	Incremental bool
@@ -54,11 +54,59 @@ type ExecOpImpl struct {
 	GetNeededInputs func(node ExecNode, outputs []string) map[string][][]string
 
 	// Docker image name
-	ImageName func(url string, node ExecNode) (string, error)
+	ImageName func(node Runnable) (string, error)
 
 	// Optional system to provide customized state to store in ExecNode jobs.
 	// For example, when training a model, we may want to store the loss history.
-	GetJobOp func(url string, node ExecNode) JobOp
+	GetJobOp func(node Runnable) JobOp
+
+	// Optional system for dynamic control flow.
+	// Virtualize is called when constructing an initial ExecutionGraph.
+	// For example, if(A) { input B } else { input C } can be implemented by:
+	// - Virtualize should return VirtualNode requiring only A
+	// - Resolve can load A, and output a new graph that includes B or C depending on A
+	Virtualize func(node ExecNode) *VirtualNode
+
+	// Optional system for pre-processing steps, dynamic execution graphs, etc.
+	// Given a VirtualNode, returns a subgraph of new VirtualNodes that implement it.
+	// Or nil if the VirtualNode is already OK.
+	// Resolve is called just before executing the node.
+	Resolve func(node *VirtualNode, inputDatasets map[string][]Dataset, items map[string][][]Item) ExecutionGraph
+}
+
+func Virtualize(node ExecNode) *VirtualNode {
+	opImpl := GetExecOpImpl(node.Op)
+	if opImpl.Virtualize != nil {
+		return opImpl.Virtualize(node)
+	}
+	parents := make([][]VirtualParent, len(node.Parents))
+	for i := range parents {
+		parents[i] = make([]VirtualParent, len(node.Parents[i]))
+		for j := range parents[i] {
+			execParent := node.Parents[i][j]
+			var graphID GraphID
+			if execParent.Type == "n" {
+				graphID.Type = "exec"
+			} else if execParent.Type == "d" {
+				graphID.Type = "dataset"
+			}
+			graphID.ID = execParent.ID
+			parents[i][j] = VirtualParent{
+				GraphID: graphID,
+				Name: execParent.Name,
+			}
+		}
+	}
+	return &VirtualNode{
+		Name: node.Name,
+		Op: node.Op,
+		Params: node.Params,
+		Inputs: node.Inputs,
+		Outputs: node.Outputs,
+
+		Parents: parents,
+		OrigNode: node,
+	}
 }
 
 var ExecOpImpls = make(map[string]ExecOpImpl)

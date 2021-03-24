@@ -18,7 +18,7 @@ import (
 
 type TrainOp struct {
 	url string
-	node skyhook.ExecNode
+	node skyhook.Runnable
 	dataset skyhook.Dataset
 }
 
@@ -38,12 +38,12 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// create temporary directory for training config/example files
 	log.Println("[yolov3-train] creating training and export directories")
-	trainPath := filepath.Join(workingDir, "models", fmt.Sprintf("yolov3-%d", e.node.ID))
+	trainPath := filepath.Join(workingDir, "models", fmt.Sprintf("yolov3-%d", e.dataset.ID))
 	if err := os.Mkdir(trainPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", trainPath, err)
 	}
 
-	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", e.node.ID))
+	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", e.dataset.ID))
 	if err := os.Mkdir(exportPath, 0755); err != nil {
 		return fmt.Errorf("could not mkdir %s: %v", exportPath, err)
 	}
@@ -53,12 +53,8 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// export the images and detections to a new folder in darknet format
 	log.Println("[yolov3-train] exporting examples")
-	datasets, err := exec_ops.GetParentDatasets(e.url, e.node)
-	if err != nil {
-		return err
-	}
-	imageDataset := datasets["images"][0]
-	detectionDataset := datasets["detections"][0]
+	imageDataset := e.node.InputDatasets["images"][0]
+	detectionDataset := e.node.InputDatasets["detections"][0]
 	flatDatasets := []skyhook.Dataset{imageDataset, detectionDataset}
 	items, err := exec_ops.GetItems(e.url, flatDatasets)
 	if err != nil {
@@ -247,7 +243,7 @@ backup=%s
 	skyhook.CopyFile(filepath.Join(exportPath, "yolov3_best.weights"), filepath.Join(trainPath, "yolov3.weights"))
 
 	// add filename to the string dataset
-	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.node.ID)}}
+	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.dataset.ID)}}
 	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
 }
 
@@ -255,19 +251,19 @@ func (e *TrainOp) Close() {}
 
 func init() {
 	skyhook.ExecOpImpls["yolov3_train"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			op := &TrainOp{
 				url: url,
 				node: node,
-				dataset: outputDatasets["model"],
+				dataset: node.OutputDatasets["model"],
 			}
 			return op, nil
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/yolov3", nil
 		},
 	}

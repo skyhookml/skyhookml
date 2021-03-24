@@ -57,9 +57,9 @@ export default function(impl) {
 				impl.mounted.call(this);
 			}
 		},
-		unmounted: function() {
-			if(impl.unmounted) {
-				impl.unmounted.call(this);
+		destroyed: function() {
+			if(impl.destroyed) {
+				impl.destroyed.call(this);
 			}
 		},
 		methods: {

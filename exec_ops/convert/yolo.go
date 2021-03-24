@@ -18,14 +18,14 @@ import (
 
 func init() {
 	skyhook.ExecOpImpls["to_yolo"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// we mostly use SimpleTasks, which creates a task for each corresponding image/detection pair between the input datasets
 			// but we need to assign one task for writing the "obj.names" output
 			// to assign it, we just set the metadata to "obj.names", which applyFunc below will check
-			tasks, err := exec_ops.SimpleTasks(url, node, rawItems)
+			tasks, err := exec_ops.SimpleTasks(node, rawItems)
 			if err != nil {
 				return nil, err
 			}
@@ -34,7 +34,7 @@ func init() {
 			}
 			return tasks, nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params struct {
 				Format string
 				Symlink bool
@@ -44,6 +44,7 @@ func init() {
 				params.Format = "jpeg"
 			}
 
+			// TODO: this should probably be a shared function in skyhook/data_image.go
 			formatToExt := func(format string) string {
 				if format == "jpeg" {
 					return "jpg"
@@ -54,7 +55,7 @@ func init() {
 				}
 			}
 
-			outDS := outputDatasets["output"]
+			outDS := node.OutputDatasets["output"]
 			applyFunc := func(task skyhook.ExecTask) error {
 				inImageItem := task.Items["images"][0][0]
 				inLabelItem := task.Items["detections"][0][0]
@@ -133,16 +134,16 @@ func init() {
 
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}
 
 	skyhook.ExecOpImpls["from_yolo"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: func(url string, node skyhook.ExecNode, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			files := ItemsToFileMap(rawItems["input"][0])
 
 			// first load obj.names to get object categories
@@ -190,15 +191,15 @@ func init() {
 			}
 			return tasks, nil
 		},
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params struct {
 				Symlink bool
 			}
 			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
 				log.Printf("warning: from_yolo node is not configured, using defaults")
 			}
-			imageDS := outputDatasets["images"]
-			labelDS := outputDatasets["detections"]
+			imageDS := node.OutputDatasets["images"]
+			labelDS := node.OutputDatasets["detections"]
 			applyFunc := func(task skyhook.ExecTask) error {
 				inImageItem := task.Items["image"][0][0]
 				inLabelItem := task.Items["detections"][0][0]
@@ -283,7 +284,7 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}

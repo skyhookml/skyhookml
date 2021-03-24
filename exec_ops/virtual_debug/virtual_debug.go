@@ -10,7 +10,6 @@ import (
 	"github.com/skyhookml/skyhookml/exec_ops"
 
 	"fmt"
-	"log"
 	urllib "net/url"
 )
 
@@ -20,15 +19,15 @@ func init() {
 	}, false)
 
 	skyhook.ExecOpImpls["virtual_debug"] = skyhook.ExecOpImpl{
-		Requirements: func(url string, node skyhook.ExecNode) map[string]int {
+		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
-		Prepare: func(url string, node skyhook.ExecNode, outputDatasets map[string]skyhook.Dataset) (skyhook.ExecOp, error) {
+		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			applyFunc := func(task skyhook.ExecTask) error {
 				for i, itemList := range task.Items["inputs"] {
 					item := itemList[0]
-					dataset := outputDatasets[fmt.Sprintf("outputs%d", i)]
+					dataset := node.OutputDatasets[fmt.Sprintf("outputs%d", i)]
 					err := skyhook.JsonPostForm(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
 						"key": {task.Key},
 						"ext": {item.Ext},
@@ -45,34 +44,8 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		GetOutputs: func(url string, node skyhook.ExecNode) []skyhook.ExecOutput {
-			// output outputs0, outputs1, ... for each dataset in inputs
-
-			// return empty string on error
-			getOutputType := func(parent skyhook.ExecParent) skyhook.DataType {
-				dataType, err := exec_ops.ParentToDataType(url, parent)
-				if err != nil {
-					log.Printf("[render] warning: unable to compute outputs: %v", err)
-					return ""
-				}
-				return dataType
-			}
-
-			parents := node.GetParents()
-			var outputs []skyhook.ExecOutput
-			for i, parent := range parents["inputs"] {
-				dataType := getOutputType(parent)
-				if dataType == "" {
-					return node.Outputs
-				}
-				outputs = append(outputs, skyhook.ExecOutput{
-					Name: fmt.Sprintf("outputs%d", i),
-					DataType: dataType,
-				})
-			}
-			return outputs
-		},
-		ImageName: func(url string, node skyhook.ExecNode) (string, error) {
+		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
+		ImageName: func(node skyhook.Runnable) (string, error) {
 			return "skyhookml/basic", nil
 		},
 	}
