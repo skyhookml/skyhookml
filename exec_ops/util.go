@@ -16,64 +16,6 @@ func GetDataset(url string, id int) (skyhook.Dataset, error) {
 	return dataset, nil
 }
 
-func ParentToDataset(url string, parent skyhook.ExecParent) (skyhook.Dataset, error) {
-	if parent.Type == "n" {
-		var parentDatasets map[string]*skyhook.Dataset
-		err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d/datasets", parent.ID), &parentDatasets)
-		if err != nil {
-			return skyhook.Dataset{}, fmt.Errorf("error getting datasets of parent node %d: %v", parent.ID, err)
-		}
-		if parentDatasets[parent.Name] == nil {
-			return skyhook.Dataset{}, fmt.Errorf("parent node %d missing dataset at name %s", parent.ID, parent.Name)
-		}
-		return *parentDatasets[parent.Name], nil
-	} else if parent.Type == "d" {
-		return GetDataset(url, parent.ID)
-	}
-	return skyhook.Dataset{}, fmt.Errorf("unknown parent type %s", parent.Type)
-}
-
-func ParentToDataType(url string, parent skyhook.ExecParent) (skyhook.DataType, error) {
-	if parent.Type == "n" {
-		var node skyhook.ExecNode
-		err := skyhook.JsonGet(url, fmt.Sprintf("/exec-nodes/%d", parent.ID), &node)
-		if err != nil {
-			return "", fmt.Errorf("error getting parent node %d: %v", parent.ID, err)
-		}
-		for _, output := range node.Outputs {
-			if output.Name == parent.Name {
-				return output.DataType, nil
-			}
-		}
-		return "", fmt.Errorf("parent node %d does not have any output named %s", parent.ID, parent.Name)
-	} else if parent.Type == "d" {
-		dataset, err := GetDataset(url, parent.ID)
-		if err != nil {
-			return "", err
-		}
-		return dataset.DataType, nil
-	}
-	return "", fmt.Errorf("unknown parent type %s", parent.Type)
-}
-
-func ParentsToDatasets(url string, parents map[string][]skyhook.ExecParent) (map[string][]skyhook.Dataset, error) {
-	datasets := make(map[string][]skyhook.Dataset)
-	for name, plist := range parents {
-		for _, parent := range plist {
-			dataset, err := ParentToDataset(url, parent)
-			if err != nil {
-				return nil, err
-			}
-			datasets[name] = append(datasets[name], dataset)
-		}
-	}
-	return datasets, nil
-}
-
-func GetParentDatasets(url string, node skyhook.ExecNode) (map[string][]skyhook.Dataset, error) {
-	return ParentsToDatasets(url, node.GetParents())
-}
-
 func GetDatasets(url string, ids []int) ([]skyhook.Dataset, error) {
 	var datasets []skyhook.Dataset
 	for _, id := range ids {
@@ -84,28 +26,6 @@ func GetDatasets(url string, ids []int) ([]skyhook.Dataset, error) {
 		datasets = append(datasets, dataset)
 	}
 	return datasets, nil
-}
-
-func GetKeys(url string, node skyhook.ExecNode) (map[string]bool, error) {
-	datasets, err := ParentsToDatasets(url, node.GetParents())
-	if err != nil {
-		return nil, fmt.Errorf("error getting parent datasets: %v", err)
-	}
-	var flatDatasets []skyhook.Dataset
-	for _, dslist := range datasets {
-		for _, ds := range dslist {
-			flatDatasets = append(flatDatasets, ds)
-		}
-	}
-	items, err := GetItems(url, flatDatasets)
-	if err != nil {
-		return nil, err
-	}
-	keys := make(map[string]bool)
-	for key := range items {
-		keys[key] = true
-	}
-	return keys, nil
 }
 
 func GetDatasetItems(url string, dataset skyhook.Dataset) (map[string]skyhook.Item, error) {
