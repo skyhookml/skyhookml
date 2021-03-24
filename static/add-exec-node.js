@@ -183,6 +183,46 @@ export default {
 							],
 							Outputs: [{Name: "output", DataType: "file"}],
 						},
+						{
+							ID: "from_coco",
+							Name: "From COCO",
+							Description: "Convert from COCO image/JSON format to [image, detection] datasets",
+							Inputs: [{Name: "input", DataTypes: ["file"]}],
+							Outputs: [
+								{Name: "images", DataType: "image"},
+								{Name: "detections", DataType: "detection"},
+							],
+						},
+						{
+							ID: "to_coco",
+							Name: "To COCO",
+							Description: "Convert from [image, detection] datasets to COCO image/JSON format",
+							Inputs: [
+								{Name: "images", DataTypes: ["image"]},
+								{Name: "detections", DataTypes: ["detection"]},
+							],
+							Outputs: [{Name: "output", DataType: "file"}],
+						},
+						{
+							ID: "from_catfolder",
+							Name: "From Category-Folders",
+							Description: "Convert from Category-Folders format to [image, int] datasets",
+							Inputs: [{Name: "input", DataTypes: ["file"]}],
+							Outputs: [
+								{Name: "images", DataType: "image"},
+								{Name: "labels", DataType: "int"},
+							],
+						},
+						{
+							ID: "to_catfolder",
+							Name: "To Category-Folders",
+							Description: "Convert from [image, int] datasets to Category-Folders format",
+							Inputs: [
+								{Name: "images", DataTypes: ["image"]},
+								{Name: "labels", DataTypes: ["int"]},
+							],
+							Outputs: [{Name: "output", DataType: "file"}],
+						},
 					],
 				},
 				{

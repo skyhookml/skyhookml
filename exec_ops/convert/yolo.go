@@ -144,7 +144,7 @@ func init() {
 			return nil
 		},
 		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
-			files := ItemsToFileMap(rawItems["input"][0])
+			files := ItemsToFileMap(rawItems["input"][0], true)
 
 			// first load obj.names to get object categories
 			// we will pass it to tasks in task metadata

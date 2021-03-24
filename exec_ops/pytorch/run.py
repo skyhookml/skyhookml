@@ -88,6 +88,10 @@ def callback_func(*inputs):
 					'CanvasDims': canvas_dims,
 				},
 			})
+		elif t == 'int':
+			y_.append({
+				'Ints': cur[0].tolist(),
+			})
 		else:
 			y_.append(cur[0].tolist())
 	return tuple(y_)

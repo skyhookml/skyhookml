@@ -32,6 +32,11 @@ def data_index(t, data, i):
 			'Detections': data['Detections'][i],
 			'Metadata': data['Metadata'],
 		}
+	if t == 'int':
+		return {
+			'Ints': data['Ints'][i],
+			'Metadata': data['Metadata'],
+		}
 	else:
 		return data[i]
 
@@ -47,6 +52,11 @@ def data_stack(t, datas):
 	elif t == 'detection':
 		return {
 			'Detections': [data['Detections'] for data in datas],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
+	elif t == 'int':
+		return {
+			'Ints': [data['Ints'] for data in datas],
 			'Metadata': datas[0].get('Metadata', {}),
 		}
 	else:
@@ -66,6 +76,11 @@ def data_concat(t, datas):
 			'Detections': [detection_list for data in datas for detection_list in data['Detections']],
 			'Metadata': datas[0].get('Metadata', {}),
 		}
+	elif t == 'int':
+		return {
+			'Ints': [x for data in datas for x in data['Ints']],
+			'Metadata': datas[0].get('Metadata', {}),
+		}
 	else:
 		return [x for data in datas for x in data]
 
@@ -74,8 +89,9 @@ def data_len(t, data):
 		return len(data['Shapes'])
 	if t == 'detection':
 		return len(data['Detections'])
-	else:
-		return len(data)
+	if t == 'int':
+		return len(data['Ints'])
+	return len(data)
 
 # Load data from disk.
 # The output corresponds to what we would get from input_datas.
