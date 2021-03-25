@@ -35,6 +35,8 @@ import Job from './job.js';
 
 const router = new VueRouter({
 	routes: [
+		{path: '/', redirect: '/ws/default'},
+
 		{path: '/ws/:ws', component: Datasets},
 
 		{path: '/ws/:ws/datasets', component: Datasets},

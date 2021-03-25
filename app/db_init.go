@@ -100,6 +100,13 @@ func InitDB(init bool) {
 				db.Exec("UPDATE pytorch_components SET params = ? WHERE name = ?", string(bytes), name)
 			}
 		}
+
+		// add default workspace if it doesn't exist
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM workspaces WHERE name = ?", "default").Scan(&count)
+		if count == 0 {
+			db.Exec("INSERT INTO workspaces (name) VALUES (?)", "default")
+		}
 	}
 
 	// now run some database cleanup steps
