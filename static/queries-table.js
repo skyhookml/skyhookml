@@ -234,6 +234,12 @@ export default {
 	<div v-if="selectedNode" class="flex-content scroll-content">
 		<hr />
 		<h4 class="my-2">{{ selectedNode.Name }} ({{ selectedNode.Op }})</h4>
+		<div>
+			<button type="button" class="btn btn-primary" v-on:click="editNode">Edit</button>
+			<button type="button" class="btn btn-primary" v-on:click="runNode">Run</button>
+			<button type="button" class="btn btn-primary" v-on:click="viewInteractive">Interactive</button>
+			<button type="button" class="btn btn-danger" v-on:click="deleteNode">Delete</button>
+		</div>
 		<h5 class="my-2">Inputs</h5>
 		<div v-for="(plist, inputIdx) in selectedNode.Parents" class="my-2">
 			<exec-node-parents
