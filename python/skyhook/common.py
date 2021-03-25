@@ -128,6 +128,11 @@ def load_item(dataset, item):
 				'Detections': data,
 				'Metadata': json.loads(metadata),
 			}
+		elif t == 'int':
+			data = {
+				'Ints': data,
+				'Metadata': json.loads(metadata),
+			}
 
 		return data
 
@@ -212,7 +217,7 @@ def input_datas():
 	datas = []
 	for t in meta['InputTypes']:
 		if t == 'image' or t == 'video':
-			datas.append(input_array(channels=3, dt='uint8'))
+			datas.append(input_array(channels=3, dt=numpy.dtype('uint8')))
 		elif t == 'array':
 			datas.append(input_array())
 		else:

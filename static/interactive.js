@@ -103,7 +103,12 @@ export default {
 			<h3>{{ name }}</h3>
 			<div v-for="row in itemList" class="explore-results-row">
 				<div v-for="item in row" class="explore-results-col">
-					<render-item v-bind:dataType="item.Dataset.DataType" v-bind:item="item"></render-item>
+					<template v-if="item.Dataset.DataType == 'video'">
+						<video controls :src="'/datasets/'+item.Dataset.ID+'/items/'+item.Key+'/get?format=mp4'" class="explore-result-img"></video>
+					</template>
+					<template v-else-if="item.Dataset.DataType == 'image'">
+						<img :src="'/datasets/'+item.Dataset.ID+'/items/'+item.Key+'/get?format=jpeg'" class="explore-result-img" />
+					</template>
 				</div>
 			</div>
 		</div>
