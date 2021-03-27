@@ -156,7 +156,14 @@ func (e *Mask) Apply(task skyhook.ExecTask) error {
 func (e *Mask) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["segmentation_mask"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "segmentation_mask",
+			Name: "Segmentation Mask",
+			Description: "Create segmentation mask from shapes or detections",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.DetectionType, skyhook.ShapeType}}},
+		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.ArrayType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -175,8 +182,6 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

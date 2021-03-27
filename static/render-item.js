@@ -16,6 +16,9 @@ export default {
 			this.item = item;
 			try {
 				this.metadata = JSON.parse(this.item.Metadata);
+				if(!this.metadata) {
+					this.metadata = {};
+				}
 			} catch(e) {}
 		});
 	},

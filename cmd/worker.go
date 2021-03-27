@@ -130,8 +130,7 @@ func main() {
 			return
 		}
 
-		opImpl := skyhook.GetExecOpImpl(request.Node.Op)
-		imageName, err := opImpl.ImageName(request.Node)
+		imageName, err := request.Node.GetOp().GetImageName(request.Node)
 		if err != nil {
 			panic(err)
 		}

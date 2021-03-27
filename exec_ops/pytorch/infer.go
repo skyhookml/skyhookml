@@ -9,6 +9,17 @@ import (
 	"fmt"
 )
 
+func GetInferOutputs(params skyhook.PytorchInferParams) []skyhook.ExecOutput {
+	var outputs []skyhook.ExecOutput
+	for i, output := range params.OutputDatasets {
+		outputs = append(outputs, skyhook.ExecOutput{
+			Name: fmt.Sprintf("%d-%s", i, output.Layer),
+			DataType: output.DataType,
+		})
+	}
+	return outputs
+}
+
 func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	// check the ArchID just to make sure we have all git repositories
 	var params skyhook.PytorchInferParams
@@ -42,15 +53,32 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	)
 
 	var flatOutputs []skyhook.Dataset
-	for _, output := range node.Outputs {
+	for _, output := range GetInferOutputs(params) {
 		flatOutputs = append(flatOutputs, node.OutputDatasets[output.Name])
 	}
 
-	return python.NewPythonOp(cmd, url, node, inputDatasets["inputs"], flatOutputs)
+	return python.NewPythonOp(cmd, url, python.Params{}, inputDatasets["inputs"], flatOutputs)
 }
 
 func init() {
-	skyhook.ExecOpImpls["pytorch_infer"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "pytorch_infer",
+			Name: "Pytorch (infer)",
+			Description: "Pytorch (infer)",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "inputs", Variable: true},
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+		},
+		GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
+			var params skyhook.PytorchInferParams
+			err := json.Unmarshal([]byte(rawParams), &params)
+			if err != nil {
+				return nil
+			}
+			return GetInferOutputs(params)
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -67,24 +95,6 @@ func init() {
 			return exec_ops.SimpleTasks(node, items)
 		},
 		Prepare: Prepare,
-		GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
-			var params skyhook.PytorchInferParams
-			err := json.Unmarshal([]byte(rawParams), &params)
-			if err != nil {
-				// can't do anything if node isn't configured yet
-				// so we leave it unchanged
-				return nil
-			}
-
-			var outputs []skyhook.ExecOutput
-			for i, output := range params.OutputDatasets {
-				outputs = append(outputs, skyhook.ExecOutput{
-					Name: fmt.Sprintf("%d-%s", i, output.Layer),
-					DataType: output.DataType,
-				})
-			}
-			return outputs
-		},
 		Incremental: true,
 		GetOutputKeys: func(node skyhook.ExecNode, inputs map[string][][]string) []string {
 			inputsWithoutModel := make(map[string][][]string)
@@ -101,8 +111,6 @@ func init() {
 			neededInputs["model"] = [][]string{{"model"}}
 			return neededInputs
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/pytorch", nil
-		},
-	}
+		ImageName: "skyhookml/pytorch",
+	})
 }

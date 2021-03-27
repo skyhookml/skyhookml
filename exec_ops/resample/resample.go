@@ -122,7 +122,14 @@ func (e *Resample) Apply(task skyhook.ExecTask) error {
 func (e *Resample) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["resample"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "resample",
+			Name: "Resample",
+			Description: "Resample sequence data at a different rate",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
+		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -140,9 +147,6 @@ func init() {
 			}
 			return op, nil
 		},
-		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

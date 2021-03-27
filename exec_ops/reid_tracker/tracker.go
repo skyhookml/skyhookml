@@ -236,7 +236,18 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 func (e *Tracker) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["reid_tracker"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "reid_tracker",
+			Name: "Reid Tracker",
+			Description: "Tracker using Re-identification Model",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
+			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "tracks", DataType: skyhook.DetectionType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -252,8 +263,6 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/pytorch", nil
-		},
-	}
+		ImageName: "skyhookml/pytorch",
+	})
 }

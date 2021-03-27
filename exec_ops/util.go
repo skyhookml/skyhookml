@@ -214,7 +214,7 @@ func MapGetOutputKeys(node skyhook.ExecNode, inputs map[string][][]string) []str
 func MapGetNeededInputs(node skyhook.ExecNode, outputs []string) map[string][][]string {
 	// broadcast the output keys over all of the inputs for this node
 	needed := make(map[string][][]string)
-	for name, plist := range node.GetParents() {
+	for name, plist := range node.Parents {
 		needed[name] = make([][]string, len(plist))
 		for i := range plist {
 			needed[name][i] = outputs

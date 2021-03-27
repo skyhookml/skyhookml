@@ -69,22 +69,23 @@ func init() {
 			for len(pendingNodes) > 0 {
 				for id, node := range pendingNodes {
 					// collect parents
-					getParents := func(oldParents [][]skyhook.ExecParent) ([][]skyhook.ExecParent, bool) {
-						parents := make([][]skyhook.ExecParent, len(oldParents))
-						for i, plist := range oldParents {
-							parents[i] = make([]skyhook.ExecParent, len(plist))
-							for j, parent := range plist {
+					getParents := func(oldParents map[string][]skyhook.ExecParent) (map[string][]skyhook.ExecParent, bool) {
+						parents := make(map[string][]skyhook.ExecParent, len(oldParents))
+						for name, plist := range oldParents {
+							parents[name] = make([]skyhook.ExecParent, len(plist))
+							for i, parent := range plist {
 								if parent.Type == "n" {
 									if newNodes[parent.ID] == nil {
 										return nil, false
 									}
-									parents[i][j] = skyhook.ExecParent{
+									parents[name][i] = skyhook.ExecParent{
 										Type: "n",
 										ID: newNodes[parent.ID].ID,
 										Name: parent.Name,
+										DataType: parent.DataType,
 									}
 								} else if parent.Type == "d" {
-									parents[i][j] = parent
+									parents[name][i] = parent
 								}
 							}
 						}
@@ -94,7 +95,7 @@ func init() {
 					if !ok {
 						continue
 					}
-					node_ := NewExecNode(node.Name, node.Op, node.Params, node.Inputs, node.Outputs, parents, cloneWS)
+					node_ := NewExecNode(node.Name, node.Op, node.Params, parents, cloneWS)
 					newNodes[id] = node_
 					delete(pendingNodes, id)
 				}

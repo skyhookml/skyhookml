@@ -1,20 +1,26 @@
 import utils from './utils.js';
-import ExecNodeParents from './exec-node-parents.js';
+import QueriesSelectedPane from './queries-selected-pane.js';
 import AddExecNode from './add-exec-node.js';
 
 export default {
 	components: {
-		'exec-node-parents': ExecNodeParents,
+		'queries-selected-pane': QueriesSelectedPane,
 		'add-exec-node': AddExecNode,
 	},
 	data: function() {
 		return {
 			datasets: {},
 			nodes: {},
+			workspaces: [],
 			sorted: [],
 			selectedNode: null,
 			showingNewNodeModal: false,
 		};
+	},
+	created: function() {
+		utils.request(this, 'GET', '/workspaces', null, (data) => {
+			this.workspaces = data;
+		});
 	},
 	// don't want to render until after mounted
 	mounted: function() {
@@ -62,17 +68,17 @@ export default {
 
 					// this node is ready if none of its parents appear in needed
 					let ready = true;
-					node.Parents.forEach((plist) => {
-						plist.forEach((parent) => {
+					for(let plist of Object.values(node.Parents)) {
+						for(let parent of plist) {
 							if(parent.Type != 'n') {
-								return;
+								continue;
 							}
 							if(!needed[parent.ID]) {
-								return;
+								continue;
 							}
 							ready = false;
-						});
-					});
+						}
+					}
 					if(!ready) {
 						continue;
 					}
@@ -80,31 +86,24 @@ export default {
 
 					// create a string summary of the node inputs
 					let inputs = [];
-					node.Parents.forEach((plist, inputIdx) => {
+					for(let [inputName, plist] of Object.entries(node.Parents)) {
 						let curInput = [];
-						plist.forEach((parent) => {
+						for(let parent of plist) {
 							if(parent.Type == 'd') {
 								let dataset = this.datasets[parent.ID];
 								if(!dataset) {
 									curInput.push('unknown dataset');
-									return;
+									continue;
 								}
 								curInput.push(dataset.Name);
 							} else if(parent.Type == 'n') {
 								let n = this.nodes[parent.ID];
 								if(!n) {
 									curInput.push('unknown node');
-									return;
+									continue;
 								}
 								curInput.push(n.Name+'['+parent.Name+']');
 							}
-						});
-
-						let inputName;
-						if(inputIdx >= node.Inputs.length) {
-							inputName = 'unknown';
-						} else {
-							inputName = node.Inputs[inputIdx].Name;
 						}
 
 						if(curInput.length > 1) {
@@ -115,7 +114,7 @@ export default {
 						} else {
 							inputs.push(inputName+'=()')
 						}
-					});
+					}
 					let inputSummary = inputs.join(', ');
 
 					// also summarize its outputs
@@ -158,47 +157,6 @@ export default {
 				this.selectedNode = node;
 			}
 		},
-		editNode: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.selectedNode.Op+'/'+this.selectedNode.ID);
-		},
-		runNode: function() {
-			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run', null, (job) => {
-				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
-			});
-		},
-		viewInteractive: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/interactive/'+this.selectedNode.ID);
-		},
-		deleteNode: function() {
-			utils.request(this, 'DELETE', '/exec-nodes/'+this.selectedNode.ID, null, () => {
-				this.update();
-			});
-		},
-
-		updateParents: function() {
-			let params = JSON.stringify({
-				Parents: this.selectedNode.Parents,
-			});
-			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
-				this.update();
-			});
-		},
-		addParent: function(inputIdx, parent) {
-			this.selectedNode.Parents[inputIdx].push(parent);
-			this.updateParents();
-		},
-		removeParent: function(inputIdx, idx) {
-			this.selectedNode.Parents[inputIdx] = this.selectedNode.Parents[inputIdx].filter((parent, i) => i != idx);
-			this.updateParents();
-		},
-		setParent: function(inputIdx, parent) {
-			if(parent) {
-				this.selectedNode.Parents[inputIdx] = [parent];
-			} else {
-				this.selectedNode.Parents[inputIdx] = [];
-			}
-			this.updateParents();
-		},
 	},
 	template: `
 <div class="flex-container">
@@ -233,32 +191,7 @@ export default {
 	</div>
 	<div v-if="selectedNode" class="flex-content scroll-content">
 		<hr />
-		<h4 class="my-2">{{ selectedNode.Name }} ({{ selectedNode.Op }})</h4>
-		<div>
-			<button type="button" class="btn btn-primary" v-on:click="editNode">Edit</button>
-			<button type="button" class="btn btn-primary" v-on:click="runNode">Run</button>
-			<button type="button" class="btn btn-primary" v-on:click="viewInteractive">Interactive</button>
-			<button type="button" class="btn btn-danger" v-on:click="deleteNode">Delete</button>
-		</div>
-		<h5 class="my-2">Inputs</h5>
-		<div v-for="(plist, inputIdx) in selectedNode.Parents" class="my-2">
-			<exec-node-parents
-				:node="selectedNode"
-				:inputIdx="inputIdx"
-				:nodes="nodes"
-				:datasets="datasets"
-				v-on:add="addParent(inputIdx, $event)"
-				v-on:remove="removeParent(inputIdx, $event)"
-				v-on:set="setParent(inputIdx, $event)"
-				>
-			</exec-node-parents>
-		</div>
-		<h5 class="my-2">Outputs</h5>
-		<ul>
-			<li v-for="output in selectedNode.Outputs">
-				{{ output.Name }} ({{ output.DataType }})
-			</li>
-		</ul>
+		<queries-selected-pane :node="selectedNode" :nodes="nodes" :datasets="datasets" :workspaces="workspaces" v-on:update="update"></queries-selected-pane>
 	</div>
 	<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>
 </div>

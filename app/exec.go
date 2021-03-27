@@ -54,10 +54,6 @@ func (node *DBExecNode) GetComputedKeys() map[string]bool {
 	return keySet
 }
 
-// Prepare to run this node.
-// Returns a RunData.
-// Or error on error.
-// Or nil RunData and error if the node is already done.
 type ExecRunOptions struct {
 	// If force, we run even if outputs were already available.
 	Force bool
@@ -70,17 +66,77 @@ type ExecRunOptions struct {
 	// Only supported by incremental ops.
 	LimitOutputKeys map[string]bool
 }
+
+// A RunData provides a Run function that executes a Runnable over the specified tasks.
 type RunData struct {
 	Name string
 	Node skyhook.Runnable
-	Job *DBJob
-	JobOp *ExecJobOp
 	Tasks []skyhook.ExecTask
 
 	// whether we'll be done with the node after running Tasks
 	// i.e., whether Tasks contains all pending tasks at this node
 	WillBeDone bool
+
+	// job-related things to update
+	JobOp *AppJobOp
+	ProgressJobOp *ProgressJobOp
+
+	// Saved error if any
+	Error error
 }
+
+// Create a Job for this RunData and populate JobOp/ProgressJobOp.
+func (rd *RunData) SetJob(name string, metadata string) {
+	if rd.JobOp != nil {
+		return
+	}
+
+	// initialize job
+	// if the node doesn't provide a custom JobOp, we use "consoleprogress" view
+	// otherwise the view for the job is the ExecOp's name
+	opImpl := rd.Node.GetOp()
+	nodeJobOp := opImpl.GetJobOp(rd.Node)
+	jobView := "consoleprogress"
+	if nodeJobOp != nil {
+		jobView = rd.Node.Op
+	}
+	job := NewJob(
+		fmt.Sprintf("Exec Node %s", name),
+		"execnode",
+		jobView,
+		metadata,
+	)
+
+	rd.ProgressJobOp = &ProgressJobOp{Total: len(rd.Tasks)}
+	rd.JobOp = &AppJobOp{
+		Job: job,
+		TailOp: &skyhook.TailJobOp{},
+		WrappedJobOps: map[string]skyhook.JobOp{
+			"progress": rd.ProgressJobOp,
+		},
+	}
+	if nodeJobOp != nil {
+		rd.JobOp.WrappedJobOps["node"] = nodeJobOp
+	}
+	job.AttachOp(rd.JobOp)
+}
+
+// Update the AppJobOp with the saved error.
+// We don't call this in RunData.Run by default because it's possible that the
+// specified RunData.JobOp is shared across multiple Runs and shouldn't be
+// marked as completed.
+func (rd *RunData) SetDone() {
+	if rd.Error == nil {
+		rd.JobOp.SetDone("")
+	} else {
+		rd.JobOp.SetDone(rd.Error.Error())
+	}
+}
+
+// Prepare to run this node.
+// Returns a RunData.
+// Or error on error.
+// Or nil RunData and error if the node is already done.
 func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	// create datasets for this op if needed
 	outputDatasets, _ := node.GetDatasets(true)
@@ -107,7 +163,7 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	// in the future, we may need some recursive execution
 	parentDatasets := make(map[string][]*DBDataset)
 	parentsDone := true // whether parent datasets are fully computed
-	for name, plist := range node.GetParents() {
+	for name, plist := range node.Parents {
 		parentDatasets[name] = make([]*DBDataset, len(plist))
 		for i, parent := range plist {
 			if parent.Type == "n" {
@@ -141,8 +197,8 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 	}
 
 	// get tasks
-	opImpl := skyhook.GetExecOpImpl(node.Op)
-	vnode := skyhook.Virtualize(node.ExecNode)
+	opImpl := node.GetOp()
+	vnode := opImpl.Virtualize(node.ExecNode)
 	runnable := vnode.GetRunnable(ToSkyhookInputDatasets(parentDatasets), ToSkyhookOutputDatasets(outputDatasets))
 	tasks, err := opImpl.GetTasks(runnable, items)
 	if err != nil {
@@ -184,41 +240,17 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 		}
 	}
 
-	// initialize job
-	// if the node doesn't provide a custom JobOp, we use the default
-	// otherwise the name of the JobOp is the ExecOp's name
-	var nodeJobOp skyhook.JobOp
-	jobOpName := "execnode"
-	if opImpl.GetJobOp != nil {
-		nodeJobOp = opImpl.GetJobOp(runnable)
-		jobOpName = node.Op
-	}
-	job := NewJob(
-		fmt.Sprintf("Exec Node %s", node.Name),
-		"execnode",
-		jobOpName,
-		fmt.Sprintf("%d", node.ID),
-	)
-	jobOp := &ExecJobOp{
-		Job: job,
-		NumTasks: len(tasks),
-		TailOp: &skyhook.TailJobOp{},
-		NodeJobOp: nodeJobOp,
-	}
-	jobOp.cond = sync.NewCond(&jobOp.mu)
-	job.AttachOp(jobOp)
-
-	return &RunData{
+	rd := &RunData{
 		Name: node.Name,
 		Node: runnable,
-		Job: job,
-		JobOp: jobOp,
 		Tasks: tasks,
 		WillBeDone: willBeDone,
-	}, nil
+	}
+	rd.SetJob(fmt.Sprintf("Exec Node %s", node.Name), fmt.Sprintf("%d", node.ID))
+	return rd, nil
 }
 
-func (rd RunData) Run() error {
+func (rd *RunData) Run() error {
 	name := rd.Name
 	// prepare op
 	log.Printf("[exec-node %s] [run] acquiring worker", name)
@@ -228,23 +260,28 @@ func (rd RunData) Run() error {
 
 	beginRequest := skyhook.ExecBeginRequest{
 		Node: rd.Node,
-		JobID: &rd.Job.ID,
+		JobID: &rd.JobOp.Job.ID,
 	}
 	var beginResponse skyhook.ExecBeginResponse
 	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
-		rd.JobOp.SetDone(err.Error())
+		rd.Error = err
 		return err
 	}
 
-	// we add container de-allocation to jobop instead of deferring because:
-	// we want to call this not only when we exit from Run,
-	// but also in case the user wants to terminate this job early
-	rd.JobOp.AddCleanupFunc(func() {
+	// we want to de-allocate the container in two cases:
+	// (1) when we return from this function
+	// (2) if user requests to stop this job
+	// we achieve this as follows:
+	// - associate cleanup func with the JobOp
+	// - on return, call AppJobOp.Cleanup to only de-allocate if it hasn't been de-allocated already
+	// this is possible because AppJobOp will take care of unsetting CleanupFunc whenever it's called
+	rd.JobOp.SetCleanupFunc(func() {
 		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
 		if err != nil {
 			log.Printf("[exec-node %s] [run] error ending exec container: %v", name, err)
 		}
 	})
+	defer rd.JobOp.Cleanup()
 
 	nthreads := beginResponse.Parallelism
 	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", name, len(rd.Tasks), nthreads)
@@ -279,7 +316,8 @@ func (rd RunData) Run() error {
 				}
 
 				mu.Lock()
-				rd.JobOp.Completed(task.Key)
+				rd.ProgressJobOp.Increment()
+				rd.JobOp.Update([]string{fmt.Sprintf("finished applying on key [%s]", task.Key)})
 				mu.Unlock()
 			}
 		}()
@@ -287,7 +325,7 @@ func (rd RunData) Run() error {
 	wg.Wait()
 
 	if applyErr != nil {
-		rd.JobOp.SetDone(applyErr.Error())
+		rd.Error = applyErr
 		return applyErr
 	}
 
@@ -298,7 +336,6 @@ func (rd RunData) Run() error {
 		}
 	}
 
-	rd.JobOp.SetDone("")
 	log.Printf("[exec-node %s] [run] done", name)
 	return nil
 }
@@ -311,13 +348,15 @@ func (node *DBExecNode) Run(opts ExecRunOptions) error {
 	if rd == nil {
 		return nil
 	}
-	return rd.Run()
+	err = rd.Run()
+	rd.SetDone()
+	return err
 }
 
 // Get some number of incremental outputs from this node.
 func (node *DBExecNode) Incremental(n int) error {
 	isIncremental := func(node *DBExecNode) bool {
-		return skyhook.GetExecOpImpl(node.Op).Incremental
+		return node.GetOp().IsIncremental()
 	}
 
 	if !isIncremental(node) {
@@ -406,7 +445,7 @@ func (node *DBExecNode) Incremental(n int) error {
 			}
 			inputs := make(map[string][][]string)
 			ready := true
-			for name, plist := range cur.GetParents() {
+			for name, plist := range cur.Parents {
 				inputs[name] = make([][]string, len(plist))
 				for i, parent := range plist {
 					keys, ok := getKeys(parent)
@@ -420,7 +459,7 @@ func (node *DBExecNode) Incremental(n int) error {
 			if !ready {
 				continue
 			}
-			outputKeys := skyhook.GetExecOpImpl(cur.Op).GetOutputKeys(cur.ExecNode, inputs)
+			outputKeys := cur.GetOp().GetOutputKeys(cur.ExecNode, inputs)
 			if outputKeys == nil {
 				outputKeys = []string{}
 			}
@@ -467,8 +506,8 @@ func (node *DBExecNode) Incremental(n int) error {
 	for {
 		changed := false
 		for _, cur := range incrementalNodes {
-			neededInputs := skyhook.GetExecOpImpl(cur.Op).GetNeededInputs(cur.ExecNode, getNeededOutputsList(cur.ID))
-			for name, plist := range cur.GetParents() {
+			neededInputs := cur.GetOp().GetNeededInputs(cur.ExecNode, getNeededOutputsList(cur.ID))
+			for name, plist := range cur.Parents {
 				for i, parent := range plist {
 					if parent.Type != "n" {
 						continue
@@ -501,7 +540,7 @@ func (node *DBExecNode) Incremental(n int) error {
 			}
 
 			ready := true
-			for _, plist := range cur.GetParents() {
+			for _, plist := range cur.Parents {
 				for _, parent := range plist {
 					if parent.Type != "n" {
 						continue
@@ -534,15 +573,34 @@ func (node *DBExecNode) Incremental(n int) error {
 }
 
 func init() {
+	type FrontendExecNode struct {
+		DBExecNode
+		Inputs []skyhook.ExecInput
+		Outputs []skyhook.ExecOutput
+	}
+	getFrontendExecNode := func(node *DBExecNode) FrontendExecNode {
+		return FrontendExecNode{
+			DBExecNode: *node,
+			Inputs: node.GetInputs(),
+			Outputs: node.GetOutputs(),
+		}
+	}
+
 	Router.HandleFunc("/exec-nodes", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		wsName := r.Form.Get("ws")
+		var execNodes []*DBExecNode
 		if wsName == "" {
-			skyhook.JsonResponse(w, ListExecNodes())
+			execNodes = ListExecNodes()
 		} else {
 			ws := GetWorkspace(wsName)
-			skyhook.JsonResponse(w, ws.ListExecNodes())
+			execNodes = ws.ListExecNodes()
 		}
+		out := make([]FrontendExecNode, len(execNodes))
+		for i := range out {
+			out[i] = getFrontendExecNode(execNodes[i])
+		}
+		skyhook.JsonResponse(w, out)
 	}).Methods("GET")
 
 	Router.HandleFunc("/exec-nodes", func(w http.ResponseWriter, r *http.Request) {
@@ -550,7 +608,7 @@ func init() {
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
 			return
 		}
-		node := NewExecNode(request.Name, request.Op, request.Params, request.Inputs, request.Outputs, request.Parents, request.Workspace)
+		node := NewExecNode(request.Name, request.Op, request.Params, request.Parents, request.Workspace)
 		skyhook.JsonResponse(w, node)
 	}).Methods("POST")
 
@@ -561,7 +619,7 @@ func init() {
 			http.Error(w, "no such exec node", 404)
 			return
 		}
-		skyhook.JsonResponse(w, node)
+		skyhook.JsonResponse(w, getFrontendExecNode(node))
 	}).Methods("GET")
 
 	Router.HandleFunc("/exec-nodes/{node_id}", func(w http.ResponseWriter, r *http.Request) {
@@ -652,5 +710,54 @@ func init() {
 				log.Printf("[exec node %s] incremental run error: %v", node.Name, err)
 			}
 		}()
+	}).Methods("POST")
+
+	// Execution of an anonymous Runnable with arbitrary configuration.
+	Router.HandleFunc("/runnable", func(w http.ResponseWriter, r *http.Request) {
+		var node skyhook.Runnable
+		if err := skyhook.ParseJsonRequest(w, r, &node); err != nil {
+			return
+		}
+
+		// compute items in input datasets
+		items := make(map[string][][]skyhook.Item)
+		for name, dslist := range node.InputDatasets {
+			items[name] = make([][]skyhook.Item, len(dslist))
+			for i, ds_ := range dslist {
+				ds := GetDataset(ds_.ID)
+				var curItems []skyhook.Item
+				for _, item := range ds.ListItems() {
+					curItems = append(curItems, item.Item)
+				}
+				items[name][i] = curItems
+			}
+		}
+
+		// get tasks
+		tasks, err := node.GetOp().GetTasks(node, items)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			log.Printf("[/runnable] error getting tasks: %v", err)
+			return
+		}
+
+		log.Printf("[/runnable] executing anonymous op [%s-%s] on %d tasks", node.Op, node.Name, len(tasks))
+
+		rd := &RunData{
+			Name: fmt.Sprintf("anonymous-%s", node.Name),
+			Node: node,
+			Tasks: tasks,
+			WillBeDone: true,
+		}
+		rd.SetJob(node.Name, "")
+		go func() {
+			err := rd.Run()
+			rd.SetDone()
+			if err != nil {
+				log.Printf("[/runnable] error on anonymous op [%s-%s]: %v", node.Op, node.Name, err)
+			}
+		}()
+
+		skyhook.JsonResponse(w, rd.JobOp.Job)
 	}).Methods("POST")
 }

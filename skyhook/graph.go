@@ -93,6 +93,8 @@ type VirtualParent struct {
 	GraphID GraphID
 	// if GraphID.Type is "exec", then this is name of output that we want to input
 	Name string
+
+	DataType DataType
 }
 
 // Like ExecNode, but knows its position in the dynamic execution graph.
@@ -104,12 +106,9 @@ type VirtualNode struct {
 	Name string
 	Op string
 	Params string
-	Inputs []ExecInput
-	Outputs []ExecOutput
 
 	// Parents of this node.
-	// Parents[i] corresponds to VirtualNode.Inputs[i].
-	Parents [][]VirtualParent
+	Parents map[string][]VirtualParent
 	// the concrete node that this ExecNode was created from
 	// if ExecOpImpl.Resolve is not set, then Node == OrigNode
 	OrigNode ExecNode
@@ -117,21 +116,31 @@ type VirtualNode struct {
 	VirtualKey string
 }
 
-// Transforms Parents into a map from the input name.
-func (node VirtualNode) GetParents() map[string][]VirtualParent {
-	parents := make(map[string][]VirtualParent)
-	for i := 0; i < len(node.Inputs) && i < len(node.Parents); i++ {
-		input := node.Inputs[i]
-		for _, parent := range node.Parents[i] {
-			parents[input.Name] = append(parents[input.Name], parent)
+func (node VirtualNode) GetOp() ExecOpProvider {
+	return GetExecOp(node.Op)
+}
+
+func (node VirtualNode) GetInputs() []ExecInput {
+	return node.GetOp().GetInputs(node.Params)
+}
+
+func (node VirtualNode) GetInputTypes() map[string][]DataType {
+	inputTypes := make(map[string][]DataType)
+	for _, input := range node.GetInputs() {
+		for _, parent := range node.Parents[input.Name] {
+			inputTypes[input.Name] = append(inputTypes[input.Name], parent.DataType)
 		}
 	}
-	return parents
+	return inputTypes
+}
+
+func (node VirtualNode) GetOutputs() []ExecOutput {
+	return node.GetOp().GetOutputs(node.Params, node.GetInputTypes())
 }
 
 func (node VirtualNode) GraphParents() map[string]GraphID {
 	parents := make(map[string]GraphID)
-	for name, plist := range node.GetParents() {
+	for name, plist := range node.Parents {
 		for i, parent := range plist {
 			if parent.GraphID.Type == "exec" {
 				k := fmt.Sprintf("%s-%d-n[%s]", name, i, parent.Name)
@@ -157,7 +166,6 @@ func (node VirtualNode) LocalHash() []byte {
 	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("op=%s\n", node.Op)))
 	h.Write([]byte(fmt.Sprintf("params=%s\n", node.Params)))
-	h.Write([]byte(fmt.Sprintf("outputs=%s\n", ExecOutputsToString(node.Outputs))))
 	return h.Sum(nil)
 }
 
@@ -166,8 +174,6 @@ func (node VirtualNode) GetRunnable(inputDatasets map[string][]Dataset, outputDa
 		Name: node.Name,
 		Op: node.Op,
 		Params: node.Params,
-		Inputs: node.Inputs,
-		Outputs: node.Outputs,
 		InputDatasets: inputDatasets,
 		OutputDatasets: outputDatasets,
 	}

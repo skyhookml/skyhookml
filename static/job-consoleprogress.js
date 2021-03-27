@@ -25,7 +25,8 @@ export default {
 				if(!state) {
 					return;
 				}
-				this.progress = parseInt(state.Progress);
+				let progressState = JSON.parse(state.Datas['progress'])
+				this.progress = parseInt(progressState);
 				this.lines = state.Lines;
 			});
 		},

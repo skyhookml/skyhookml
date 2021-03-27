@@ -204,7 +204,17 @@ func (e *VideoSample) Apply(task skyhook.ExecTask) error {
 func (e *VideoSample) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["video_sample"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "video_sample",
+			Name: "Sample video",
+			Description: "Sample images or segments from video",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
+			{Name: "others", Variable: true},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "samples", DataType: skyhook.ImageType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -348,8 +358,6 @@ func init() {
 			}
 			return outputs
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

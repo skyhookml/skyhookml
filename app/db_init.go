@@ -45,8 +45,6 @@ func InitDB(init bool) {
 			name TEXT,
 			op TEXT,
 			params TEXT,
-			inputs TEXT,
-			outputs TEXT,
 			parents TEXT,
 			workspace TEXT
 		)`)

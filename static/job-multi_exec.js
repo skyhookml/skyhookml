@@ -1,10 +1,10 @@
 import utils from './utils.js';
-import JobExecNode from './job-exec_node.js';
+import JobConsoleProgress from './job-consoleprogress.js';
 import JobPytorchTrain from './job-pytorch_train.js';
 
 export default {
 	components: {
-		'job-execnode': JobExecNode,
+		'job-consoleprogress': JobConsoleProgress,
 		'job-pytorch_train': JobPytorchTrain,
 	},
 	data: function() {

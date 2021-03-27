@@ -17,7 +17,17 @@ import (
 // An obj.names file is also created for the category names.
 
 func init() {
-	skyhook.ExecOpImpls["to_yolo"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "to_yolo",
+			Name: "To YOLO",
+			Description: "Convert from [image, detection] datasets to YOLO image/txt format",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType}},
+			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.FileType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -134,12 +144,20 @@ func init() {
 
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 
-	skyhook.ExecOpImpls["from_yolo"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "from_yolo",
+			Name: "From YOLO",
+			Description: "Convert from YOLO image/txt format to [image, detection] datasets",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.FileType}}},
+		Outputs: []skyhook.ExecOutput{
+			{Name: "images", DataType: skyhook.ImageType},
+			{Name: "detections", DataType: skyhook.DetectionType},
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -284,8 +302,6 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

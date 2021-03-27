@@ -1,10 +1,10 @@
 import utils from './utils.js';
-import ExecNodeParents from './exec-node-parents.js';
+import QueriesSelectedPane from './queries-selected-pane.js';
 import AddExecNode from './add-exec-node.js';
 
 export default {
 	components: {
-		'exec-node-parents': ExecNodeParents,
+		'queries-selected-pane': QueriesSelectedPane,
 		'add-exec-node': AddExecNode,
 	},
 	data: function() {
@@ -13,19 +13,12 @@ export default {
 			datasets: {},
 			meta: {},
 			nodes: {},
+			workspaces: [],
 			selectedNode: null,
 			showingNewNodeModal: false,
 			nodeRects: {},
 			prevStage: null,
 			resizeObserver: null,
-
-			// for comparing
-			workspaces: [],
-			wsNodes: [],
-			compareForm: {
-				workspace: null,
-				nodeID: null,
-			}
 		};
 	},
 	// don't want to render until after mounted
@@ -181,14 +174,14 @@ export default {
 			// (1) render the datasets
 			let neededDatasetIDs = {};
 			for(let nodeID in this.nodes) {
-				this.nodes[nodeID].Parents.forEach((plist) => {
-					plist.forEach((parent) => {
+				for(let plist of Object.values(this.nodes[nodeID].Parents)) {
+					for(let parent of plist) {
 						if(parent.Type != 'd') {
-							return;
+							continue;
 						}
 						neededDatasetIDs[parent.ID] = true;
-					});
-				});
+					}
+				}
 			}
 			let datasets = [];
 			for(let dsID in neededDatasetIDs) {
@@ -272,8 +265,8 @@ export default {
 			for(let nodeID in this.nodes) {
 				let node = this.nodes[nodeID];
 				let dst = 'n'+nodeID;
-				node.Parents.forEach((plist) => {
-					plist.forEach((parent) => {
+				for(let plist of Object.values(this.nodes[nodeID].Parents)) {
+					for(let parent of plist) {
 						let src;
 						if(parent.Type == 'n') {
 							src = 'n'+parent.ID;
@@ -299,8 +292,8 @@ export default {
 						}
 						arrows[src].push(['src', arrow, dst]);
 						arrows[dst].push(['dst', arrow, src]);
-					});
-				});
+					}
+				}
 			}
 
 			// (4) add listeners to move the arrows when groups are dragged
@@ -358,102 +351,17 @@ export default {
 				cb();
 			}
 		},
-		editNode: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.selectedNode.Op+'/'+this.selectedNode.ID);
-		},
-		runNode: function() {
-			utils.request(this, 'POST', '/exec-nodes/'+this.selectedNode.ID+'/run', null, (job) => {
-				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
-			});
-		},
-		viewInteractive: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/interactive/'+this.selectedNode.ID);
-		},
-		deleteNode: function() {
-			utils.request(this, 'DELETE', '/exec-nodes/'+this.selectedNode.ID, null, () => {
-				this.update();
-			});
-		},
-
-		updateParents: function() {
-			let params = JSON.stringify({
-				Parents: this.selectedNode.Parents,
-			});
-			utils.request(this, 'POST', '/exec-nodes/' + this.selectedNode.ID, params, () => {
-				this.update();
-			});
-		},
-		addParent: function(inputIdx, parent) {
-			this.selectedNode.Parents[inputIdx].push(parent);
-			this.updateParents();
-		},
-		removeParent: function(inputIdx, idx) {
-			this.selectedNode.Parents[inputIdx] = this.selectedNode.Parents[inputIdx].filter((parent, i) => i != idx);
-			this.updateParents();
-		},
-		setParent: function(inputIdx, parent) {
-			if(parent) {
-				this.selectedNode.Parents = [parent];
-			} else {
-				this.selectedNode.Parents = [];
-			}
-			this.updateParents();
-		},
-
-		selectCompareWorkspace: function() {
-			this.compareForm.nodeID = null;
-			this.wsNodes = null;
-			utils.request(this, 'GET', '/exec-nodes?ws='+this.compareForm.workspace, null, (data) => {
-				this.wsNodes = data;
-			});
-		},
-		compareTo: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/compare/'+this.selectedNode.ID+'/'+this.compareForm.workspace+'/'+this.compareForm.nodeID);
-		},
 	},
 	template: `
-<div style="height:100%;" class="graph-div">
-	<div class="graph-view" ref="view">
+<div>
+	<div class="my-2">
+		<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
+	</div>
+	<div ref="view">
 		<div ref="layer"></div>
 	</div>
-	<div>
-		<div class="my-2">
-			<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">New Node</button>
-			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="editNode">Edit Node</button>
-			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="runNode">Run Node</button>
-			<button type="button" class="btn btn-primary" :disabled="selectedNode == null" v-on:click="viewInteractive">Interactive</button>
-			<button type="button" class="btn btn-danger" :disabled="selectedNode == null" v-on:click="deleteNode">Delete Node</button>
-		</div>
-		<hr />
-		<div v-if="selectedNode != null" class="my-2">
-			<div>Node {{ selectedNode.Name }}</div>
-			<div>
-				<div v-for="(plist, inputIdx) in selectedNode.Parents">
-					<exec-node-parents
-						:node="selectedNode"
-						:inputIdx="inputIdx"
-						:nodes="nodes"
-						:datasets="datasets"
-						v-on:add="addParent(inputIdx, $event)"
-						v-on:remove="removeParent(inputIdx, $event)"
-						v-on:set="setParent(inputIdx, $event)"
-						>
-					</exec-node-parents>
-				</div>
-			</div>
-			<div>
-				<form v-on:submit.prevent="compareTo" class="d-flex align-items-center">
-					<label class="mx-2">Compare to:</label>
-					<select v-model="compareForm.workspace" @change="selectCompareWorkspace" class="form-select mx-2">
-						<option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
-					</select>
-					<select v-model="compareForm.nodeID" class="form-select mx-2">
-						<option v-for="node in wsNodes" :key="node.ID" :value="node.ID">{{ node.Name }}</option>
-					</select>
-					<button type="submit" class="btn btn-primary mx-2">Go</button>
-				</form>
-			</div>
-		</div>
+	<div v-if="selectedNode">
+		<queries-selected-pane :node="selectedNode" :nodes="nodes" :datasets="datasets" :workspaces="workspaces" v-on:update="update"></queries-selected-pane>
 	</div>
 	<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>
 </div>

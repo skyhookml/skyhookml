@@ -250,7 +250,17 @@ backup=%s
 func (e *TrainOp) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["yolov3_train"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "yolov3_train",
+			Name: "Yolov3 (train)",
+			Description: "Yolov3 (train)",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType, skyhook.VideoType}},
+			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -263,8 +273,6 @@ func init() {
 			}
 			return op, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/yolov3", nil
-		},
-	}
+		ImageName: "skyhookml/yolov3",
+	})
 }

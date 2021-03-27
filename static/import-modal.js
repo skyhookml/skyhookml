@@ -4,11 +4,29 @@ export default {
 	data: function() {
 		return {
 			path: '',
+			symlink: false,
 			file: null,
 			percent: null,
+
+			// either /datasets/[ID]/import or /import-dataset depending on mode
+			importURL: '',
 		};
 	},
-	props: ['dataset'],
+	props: [
+		// 'add' if we're adding to an existing dataset
+		// 'new' if we're importing a Skyhook export as a new dataset
+		'mode',
+
+		// the dataset object, only if mode='add'
+		'dataset',
+	],
+	created: function() {
+		if(this.mode == 'add') {
+			this.importURL = '/datasets/'+this.dataset.ID+'/import';
+		} else if(this.mode == 'new') {
+			this.importURL = '/import-dataset';
+		}
+	},
 	mounted: function() {
 		$(this.$refs.modal).on('shown.bs.modal', () => {
 			$(this.$refs.modal).focus();
@@ -28,8 +46,9 @@ export default {
 			let params = {
 				mode: 'local',
 				path: this.path,
+				symlink: this.symlink,
 			};
-			utils.request(this, 'POST', '/datasets/'+this.dataset.ID+'/import?mode=local', params);
+			utils.request(this, 'POST', this.importURL+'?mode=local', params);
 			$(this.$refs.modal).modal('hide');
 		},
 		submitUpload: function() {
@@ -38,8 +57,8 @@ export default {
 			this.percent = null;
 			$.ajax({
 				type: 'POST',
-				url: '/datasets/'+this.dataset.ID+'/import?mode=upload',
-				error: function(req, status, errorMsg) {
+				url: this.importURL+'?mode=upload',
+				error: (req, status, errorMsg) => {
 					app.setError(errorMsg);
 				},
 				data: data,
@@ -55,16 +74,24 @@ export default {
 					});
 					return xhr;
 				},
-				success: () => {
+				success: (job) => {
 					$(this.$refs.modal).modal('hide');
-					this.$emit('imported');
+					this.$emit('imported', job);
+					this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 				},
 			});
 		},
 	},
 	template: `
 <span>
-	<button type="button" class="btn btn-primary" v-on:click="click">Import Data</button>
+	<button type="button" class="btn btn-primary" v-on:click="click">
+		<template v-if="mode == 'add'">
+			Import Data
+		</template>
+		<template v-else-if="mode == 'new'">
+			Import SkyhookML Dataset
+		</template>
+	</button>
 	<div class="modal" tabindex="-1" role="dialog" ref="modal">
 		<div class="modal-dialog" role="document">
 			<div class="modal-content">
@@ -85,8 +112,25 @@ export default {
 									<div class="col-sm-10">
 										<input class="form-control" type="text" v-model="path" />
 										<small class="form-text text-muted">
-											The path to an export zip file on the local disk where SkyhookML is running.
+											<template v-if="mode == 'add'">
+												The path to a file or directory from which to import files.
+												The path must exist on the local disk where SkyhookML is running.
+											</template>
+											<template v-if="mode == 'new'">
+												The path to a SkyhookML-formatted archive (.zip or directory containing db.sqlite3 and files) on the local disk where SkyhookML is running.
+											</template>
 										</small>
+									</div>
+								</div>
+								<div class="row mb-2">
+									<div class="col-sm-2">Symlink</div>
+									<div class="col-sm-10">
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" v-model="symlink">
+											<label class="form-check-label">
+												Symlink instead of copying when possible.
+											</label>
+										</div>
 									</div>
 								</div>
 								<div class="row">
@@ -103,7 +147,28 @@ export default {
 									<div class="col-sm-10">
 										<input class="form-control" type="file" @change="onFileChange" />
 										<small class="form-text text-muted">
-											Upload a ... file.
+											<template v-if="mode == 'add'">
+												<template v-if="dataset.DataType == 'video'">
+													Video files (e.g., mp4) or a zip file that contains them.
+												</template>
+												<template v-else-if="dataset.DataType == 'image'">
+													Image files (PNG or JPG) or a zip file that contains them.
+												</template>
+												<template v-else-if="dataset.DataType == 'detection' || dataset.DataType == 'int' || dataset.DataType == 'shape' || dataset.DataType == 'floats'">
+													Data in SkyhookML JSON format (either .json file or zip file containing .json).
+													To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
+												</template>
+												<template v-else-if="dataset.DataType == 'file'">
+													Either files or a zip file.
+												</template>
+												<template v-else>
+													Data in a SkyhookML-supported format.
+													To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
+												</template>
+											</template>
+											<template v-else-if="mode == 'new'">
+												A SkyhookML-formatted dataset archive (.zip containing db.sqlite3 and files).
+											</template>
 										</small>
 									</div>
 								</div>

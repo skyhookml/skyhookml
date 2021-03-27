@@ -9,22 +9,28 @@ export default {
 	},
 	data: function() {
 		return {
+			datasetID: null,
 			dataset: null,
 			items: [],
 		};
 	},
 	created: function() {
-		const dsID = this.$route.params.dsid;
-		utils.request(this, 'GET', '/datasets/'+dsID, null, (dataset) => {
+		this.datasetID = this.$route.params.dsid;
+		utils.request(this, 'GET', '/datasets/'+this.datasetID, null, (dataset) => {
 			this.dataset = dataset;
 		});
-		utils.request(this, 'GET', '/datasets/'+dsID+'/items', null, (items) => {
-			this.items = items;
-		});
+		this.fetchItems();
 	},
 	methods: {
-		viewItem: function(i) {
-			this.$router.push('/ws/'+this.$route.params.ws+'/datasets/'+this.dataset.ID+'/items/'+this.items[i].Key);
+		fetchItems: function() {
+			utils.request(this, 'GET', '/datasets/'+this.datasetID+'/items', null, (items) => {
+				this.items = items;
+			});
+		},
+		deleteItem: function(key) {
+			utils.request(this, 'DELETE', '/datasets/'+this.datasetID+'/items/'+key, null, () => {
+				this.fetchItems();
+			});
 		},
 	},
 	template: `
@@ -33,19 +39,23 @@ export default {
 		<div class="border-bottom mb-3">
 			<h2>Dataset: {{ dataset.Name }}</h2>
 		</div>
-		<p><import-modal v-bind:dataset="dataset"></import-modal>
+		<p><import-modal mode="add" v-bind:dataset="dataset"></import-modal></p>
 		<h4>Items</h4>
 		<table class="table table-sm">
 			<thead>
 				<tr>
 					<th>Key</th>
 					<th>Format</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr v-for="(item, i) in items">
-					<td><a href="#" v-on:click.prevent="viewItem(i)">{{ item.Key }}</a></td>
+					<td><router-link :to="'/ws/'+$route.params.ws+'/datasets/'+dataset.ID+'/items/'+item.Key">{{ item.Key }}</router-link></td>
 					<td>{{ item.Format }}</td>
+					<td>
+						<button v-on:click="deleteItem(item.Key)" class="btn btn-sm btn-danger">Delete</button>
+					</td>
 				</tr>
 			</tbody>
 		</table>

@@ -2,7 +2,7 @@ function request(comp, method, endpoint, params, successFunc, completeFunc, opts
 	var args = {
 		type: method,
 		url: endpoint,
-		error: function(req, status, errorMsg) {
+		error: (req, status, errorMsg) => {
 			if(!comp) {
 				return;
 			}

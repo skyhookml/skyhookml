@@ -4,10 +4,16 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
 )
+
+type Params struct {
+	Code string
+	Outputs []skyhook.ExecOutput
+}
 
 // Data about one Apply call.
 // Single goroutine reads stdout and passes information based on pendingKey structs.
@@ -34,8 +40,6 @@ type ResponsePacket struct {
 
 type PythonOp struct {
 	url string
-	node skyhook.Runnable
-	inputDatasets []skyhook.Dataset
 	outputDatasets []skyhook.Dataset
 
 	cmd *skyhook.Cmd
@@ -55,7 +59,7 @@ type PythonOp struct {
 	mu sync.Mutex
 }
 
-func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.Runnable, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
+func NewPythonOp(cmd *skyhook.Cmd, url string, params Params, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
 	stdin := cmd.Stdin()
 	stdout := cmd.Stdout()
 
@@ -65,7 +69,7 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.Runnable, inputDatas
 		OutputTypes []skyhook.DataType
 		Code string
 	}
-	metaPacket.Code = node.Params
+	metaPacket.Code = params.Code
 	for _, ds := range inputDatasets {
 		metaPacket.InputTypes = append(metaPacket.InputTypes, ds.DataType)
 	}
@@ -79,8 +83,6 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, node skyhook.Runnable, inputDatas
 
 	op := &PythonOp{
 		url: url,
-		node: node,
-		inputDatasets: inputDatasets,
 		outputDatasets: outputDatasets,
 		cmd: cmd,
 		stdin: stdin,
@@ -285,25 +287,43 @@ func (e *PythonOp) Close() {
 }
 
 func init() {
-	skyhook.ExecOpImpls["python"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "python",
+			Name: "Python",
+			Description: "Express a Python function for the system to execute",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
+		GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
+			// outputs are specified by user in Params
+			var params Params
+			err := json.Unmarshal([]byte(rawParams), &params)
+			if err != nil {
+				return []skyhook.ExecOutput{}
+			}
+			return params.Outputs
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
+			var params Params
+			err := json.Unmarshal([]byte(node.Params), &params)
+			if err != nil {
+				return nil, fmt.Errorf("node has not been configured", err)
+			}
 			var flatOutputs []skyhook.Dataset
-			for _, output := range node.Outputs {
+			for _, output := range params.Outputs {
 				flatOutputs = append(flatOutputs, node.OutputDatasets[output.Name])
 			}
 
 			cmd := skyhook.Command("pynode-"+node.Name, skyhook.CommandOptions{}, "python3", "exec_ops/python/run.py")
-			return NewPythonOp(cmd, url, node, node.InputDatasets["inputs"], flatOutputs)
+			return NewPythonOp(cmd, url, params, node.InputDatasets["inputs"], flatOutputs)
 		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

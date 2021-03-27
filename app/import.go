@@ -16,12 +16,44 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type ImportOptions struct {
+	Symlink bool
+
+	// import will call Update and IsStopping on this AppJobOp if set
+	AppJobOp *AppJobOp
+
+	// import will call Increment if set
+	ProgressJobOp *ProgressJobOp
+}
+
+func (opts ImportOptions) SetTasks(total int) {
+	if opts.ProgressJobOp != nil {
+		opts.ProgressJobOp.SetTotal(total)
+	}
+}
+
+// increment the ProgressJobOp, write a line to AppJobOp, and check IsStopping
+func (opts ImportOptions) CompletedTask(line string, increment int) bool {
+	if line != "" && opts.AppJobOp != nil {
+		opts.AppJobOp.Update([]string{line})
+		if opts.AppJobOp.IsStopping() {
+			return true
+		}
+	}
+	if increment > 0 && opts.ProgressJobOp != nil {
+		for i := 0; i < increment; i++ {
+			opts.ProgressJobOp.Increment()
+		}
+	}
+	return false
+}
+
 // Import a local path that contains a Skyhook dataset.
 // If symlink is true, we will copy the db.sqlite3 but symlink all the other
 //   files in the dataset. We do not symlink the whole directory currently
 //   because we don't want to modify it.
 // If symlink is false, we just copy all the files.
-func ImportDataset(path string, symlink bool) error {
+func ImportDataset(path string, opts ImportOptions) error {
 	// first figure out the dataset attributes from the sqlite3 file
 	srcDBFname := filepath.Join(path, "db.sqlite3")
 	dsdb := GetCachedDB(srcDBFname, nil)
@@ -41,13 +73,20 @@ func ImportDataset(path string, symlink bool) error {
 	}
 
 	// now copy or symlink all the other files
-	for _, item := range ds.ListItems() {
+	items := ds.ListItems()
+	opts.SetTasks(len(items))
+	for _, item := range items {
 		dstFname := item.Fname()
 		srcFname := filepath.Join(path, filepath.Base(dstFname))
-		err := skyhook.CopyOrSymlink(srcFname, dstFname, symlink)
+		err := skyhook.CopyOrSymlink(srcFname, dstFname, opts.Symlink)
 		if err != nil {
 			ds.Delete()
 			return fmt.Errorf("error adding %s: %v", srcFname, err)
+		}
+
+		stopping := opts.CompletedTask(fmt.Sprintf("Copied %s to %s", srcFname, dstFname), 1)
+		if stopping {
+			return fmt.Errorf("stopped by user")
 		}
 	}
 
@@ -67,7 +106,7 @@ func GetKeyFromFilename(fname string) string {
 // specialized function for importing files if the dataset is File type
 // in this case, the metadata specifies the original filename
 // also in this case we want to recursively scan since filenames in subdirectories should be imported too
-func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error {
+func (ds *DBDataset) ImportIntoFileDataset(fnames []string, opts ImportOptions) error {
 	// set of keys that have been used already
 	keySet := make(map[string]bool)
 	// get an unused key from a relative path
@@ -95,6 +134,7 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 
 	// walk over all files
 	ds.Mkdir()
+	opts.SetTasks(len(fnames))
 	for _, root := range fnames {
 		// determine base directory for computing relative paths
 		var rootDir string
@@ -120,6 +160,7 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 				return nil
 			}
 
+			// we use the path of this file relative to the base directory as the FileMetadata.Filename
 			curPath, err := filepath.Rel(rootDir, path)
 			if err != nil {
 				return fmt.Errorf("error computing relative path: %v", err)
@@ -144,9 +185,16 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 				Metadata: string(skyhook.JsonMarshal(metadata)),
 			})
 
-			err = skyhook.CopyOrSymlink(path, item.Fname(), symlink)
+			err = skyhook.CopyOrSymlink(path, item.Fname(), opts.Symlink)
 			if err != nil {
 				return err
+			}
+
+			// log to job console if any
+			// note that we're not updating progress here since we don't know the number of files a priori
+			stopping := opts.CompletedTask(fmt.Sprintf("Imported [%s]", curPath), 0)
+			if stopping {
+				return fmt.Errorf("stopped by user")
 			}
 
 			return nil
@@ -155,14 +203,16 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, symlink bool) error 
 		if err != nil {
 			return err
 		}
+
+		opts.CompletedTask("", 1)
 	}
 
 	return nil
 }
 
-func (ds *DBDataset) ImportFiles(fnames []string) error {
+func (ds *DBDataset) ImportFiles(fnames []string, opts ImportOptions) error {
 	if ds.DataType == skyhook.FileType {
-		return ds.ImportIntoFileDataset(fnames, false)
+		return ds.ImportIntoFileDataset(fnames, opts)
 	}
 
 	// initial pass to make sure the filenames don't conflict with existing keys
@@ -179,6 +229,7 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 	}
 
 	ds.Mkdir()
+	opts.SetTasks(len(fnames))
 	for _, fname := range fnames {
 		key := GetKeyFromFilename(filepath.Base(fname))
 		ext := filepath.Ext(fname)
@@ -193,21 +244,26 @@ func (ds *DBDataset) ImportFiles(fnames []string) error {
 		})
 
 		// copy the file
-		if err := skyhook.CopyFile(fname, item.Fname()); err != nil {
+		if err := skyhook.CopyOrSymlink(fname, item.Fname(), opts.Symlink); err != nil {
 			return err
 		}
 
 		if err := item.SetMetadataFromFile(); err != nil {
 			return err
 		}
+
+		stopping := opts.CompletedTask(fmt.Sprintf("Imported %s", fname), 1)
+		if stopping {
+			return fmt.Errorf("stopped by user")
+		}
 	}
 
 	return nil
 }
 
-func (ds *DBDataset) ImportDir(path string) error {
+func (ds *DBDataset) ImportDir(path string, opts ImportOptions) error {
 	if ds.DataType == skyhook.FileType {
-		return ds.ImportIntoFileDataset([]string{path}, false)
+		return ds.ImportIntoFileDataset([]string{path}, opts)
 	}
 
 	files, err := ioutil.ReadDir(path)
@@ -218,7 +274,7 @@ func (ds *DBDataset) ImportDir(path string) error {
 	for _, fi := range files {
 		fnames = append(fnames, filepath.Join(path, fi.Name()))
 	}
-	return ds.ImportFiles(fnames)
+	return ds.ImportFiles(fnames, opts)
 }
 
 // unzip the filename to a temporary directory, then call another function
@@ -235,7 +291,7 @@ func UnzipThen(fname string, f func(path string) error) error {
 			NoStdout: true,
 			OnlyDebug: true,
 		},
-		"unzip", "-j", "-d", tmpDir, fname,
+		"unzip", "-d", tmpDir, fname,
 	).Wait()
 	if err != nil {
 		return err
@@ -282,48 +338,82 @@ func HandleUpload(w http.ResponseWriter, r *http.Request, f func(fname string, c
 }
 
 func init() {
+	// Helper function to create ImportOptions.
+	// Mostly we need to create a Job for the import operation.
+	makeImportOptions := func(name string, symlink bool) ImportOptions {
+		job := NewJob(
+			name,
+			"import",
+			"consoleprogress",
+			"",
+		)
+		progressJobOp := &ProgressJobOp{}
+		jobOp := &AppJobOp{
+			Job: job,
+			TailOp: &skyhook.TailJobOp{},
+			WrappedJobOps: map[string]skyhook.JobOp{
+				"progress": progressJobOp,
+			},
+		}
+		job.AttachOp(jobOp)
+		return ImportOptions{
+			Symlink: symlink,
+			AppJobOp: jobOp,
+			ProgressJobOp: progressJobOp,
+		}
+	}
+
+	// Importing a dataset in SkyhookML archive format.
 	Router.HandleFunc("/import-dataset", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		mode := r.Form.Get("mode")
-		forceCopy := r.Form.Get("forcecopy") == "true"
+		symlink := r.Form.Get("symlink") == "true"
 
-		importFunc := func(path string) {
+		importFunc := func(path string, opts ImportOptions) {
 			err := func() error {
 				if strings.HasSuffix(path, ".zip") {
 					log.Printf("[import-dataset] importing zip file [%s]", path)
 					return UnzipThen(path, func(path string) error  {
-						return ImportDataset(path, false)
+						opts.Symlink = false
+						return ImportDataset(path, opts)
 					})
 				}
 				if fi, statErr := os.Stat(path); statErr == nil && fi.IsDir() {
 					log.Printf("[import-dataset] importing directory [%s]", path)
-					return ImportDataset(path, !forceCopy)
+					return ImportDataset(path, opts)
 				}
 				return fmt.Errorf("import-dataset expected zip file or directory, but [%s] is neither", path)
 			}()
 			if err == nil {
 				log.Printf("[import-dataset] ... import from %s succeeded", path)
+				opts.AppJobOp.SetDone("")
 			} else {
 				log.Printf("[import-dataset] ... import from %s failed: %v", path, err)
+				opts.AppJobOp.SetDone(err.Error())
 			}
 		}
 
 		if mode == "local" {
 			path := r.PostForm.Get("path")
-			go importFunc(path)
+			opts := makeImportOptions(fmt.Sprintf("Import from %s", path), symlink)
+			go importFunc(path, opts)
+			skyhook.JsonResponse(w, opts.AppJobOp.Job)
 		} else if mode == "upload" {
 			log.Printf("[import-dataset] handling import from upload request")
 			HandleUpload(w, r, func(fname string, cleanup func()) error {
 				log.Printf("[import-dataset] importing from upload request: %s", fname)
+				opts := makeImportOptions(fmt.Sprintf("Import Uploaded Dataset [%s]", fname), false)
 				go func() {
-					importFunc(fname)
+					importFunc(fname, opts)
 					cleanup()
 				}()
+				skyhook.JsonResponse(w, opts.AppJobOp.Job)
 				return nil
 			})
 		}
 	}).Methods("POST")
 
+	// Adding new files to an existing dataset.
 	Router.HandleFunc("/datasets/{ds_id}/import", func(w http.ResponseWriter, r *http.Request) {
 		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
 		dataset := GetDataset(dsID)
@@ -334,40 +424,52 @@ func init() {
 
 		r.ParseForm()
 		mode := r.Form.Get("mode")
+		symlink := r.Form.Get("symlink") == "true"
 
-		importFunc := func(path string) {
+		importFunc := func(path string, opts ImportOptions) {
 			var err error
 			if strings.HasSuffix(path, ".zip") {
 				log.Printf("[import] importing zip file [%s]", path)
-				err = UnzipThen(path, dataset.ImportDir)
+				err = UnzipThen(path, func(path string) error {
+					opts.Symlink = false
+					return dataset.ImportDir(path, opts)
+				})
 			} else {
 				if fi, statErr := os.Stat(path); statErr == nil && fi.IsDir() {
 					log.Printf("[import] importing directory [%s]", path)
-					err = dataset.ImportDir(path)
+					err = dataset.ImportDir(path, opts)
 				} else {
 					log.Printf("[import] importing file [%s]", path)
-					err = dataset.ImportFiles([]string{path})
+					err = dataset.ImportFiles([]string{path}, opts)
 				}
 			}
 
 			if err == nil {
 				log.Printf("[import] ... import from %s succeeded", path)
+				opts.AppJobOp.SetDone("")
 			} else {
 				log.Printf("[import] ... import from %s failed: %v", path, err)
+				opts.AppJobOp.SetDone(err.Error())
 			}
 		}
 
+		jobName := fmt.Sprintf("Import Into %s", dataset.Name)
+		fmt.Println(mode, jobName, "???")
 		if mode == "local" {
 			path := r.PostForm.Get("path")
-			go importFunc(path)
+			opts := makeImportOptions(jobName, symlink)
+			go importFunc(path, opts)
+			skyhook.JsonResponse(w, opts.AppJobOp.Job)
 		} else if mode == "upload" {
 			log.Printf("[import] handling import from upload request")
 			HandleUpload(w, r, func(fname string, cleanup func()) error {
 				log.Printf("[import] importing from upload request: %s", fname)
+				opts := makeImportOptions(jobName, false)
 				go func() {
-					importFunc(fname)
+					importFunc(fname, opts)
 					cleanup()
 				}()
+				skyhook.JsonResponse(w, opts.AppJobOp.Job)
 				return nil
 			})
 		}

@@ -16,7 +16,17 @@ import (
 // Here we just have one folder per category, and put images into folder based on their category.
 
 func init() {
-	skyhook.ExecOpImpls["to_catfolder"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "to_catfolder",
+			Name: "To Category-Folders",
+			Description: "Convert from [image, int] datasets to Category-Folders format",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType}},
+			{Name: "labels", DataTypes: []skyhook.DataType{skyhook.IntType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.FileType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -66,12 +76,20 @@ func init() {
 
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 
-	skyhook.ExecOpImpls["from_catfolder"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "from_catfolder",
+			Name: "From Category-Folders",
+			Description: "Convert from Category-Folders format to [image, int] datasets",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.FileType}}},
+		Outputs: []skyhook.ExecOutput{
+			{Name: "images", DataType: skyhook.ImageType},
+			{Name: "labels", DataType: skyhook.IntType},
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -172,8 +190,6 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

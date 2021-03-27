@@ -5,7 +5,6 @@ import (
 
 	"fmt"
 	"log"
-	"sync"
 )
 
 func (node *DBExecNode) GetGraphID() skyhook.GraphID {
@@ -22,7 +21,7 @@ func GetNodeByGraphID(id skyhook.GraphID) skyhook.Node {
 			panic(fmt.Errorf("addByGraphID called with non-empty VirtualKey"))
 		}
 		execNode := GetExecNode(id.ID)
-		vnode := skyhook.Virtualize(execNode.ExecNode)
+		vnode := execNode.GetOp().Virtualize(execNode.ExecNode)
 		if id != vnode.GraphID() {
 			panic(fmt.Errorf("unexpected id != vnode.GraphID()"))
 		}
@@ -165,7 +164,7 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 			// also collect the parent datasets here from ready
 			avail := true
 			parentDatasets := make(map[string][]*DBDataset)
-			for name, plist := range vnode.GetParents() {
+			for name, plist := range vnode.Parents {
 				parentDatasets[name] = make([]*DBDataset, len(plist))
 				for i, vparent := range plist {
 					if ready[vparent.GraphID] == nil {
@@ -194,25 +193,22 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 			}
 
 			// make sure this node doesn't Resolve to something else if needed
-			opImpl := skyhook.GetExecOpImpl(vnode.Op)
-			if opImpl.Resolve != nil {
-				subgraph := opImpl.Resolve(vnode, ToSkyhookInputDatasets(parentDatasets), parentItems)
-				if subgraph != nil {
-					// this vnode wants to be dynamically replaced with the new subgraph
-					// we need to incorporate the subgraph into our graph
-					log.Printf("[run-tree %s] node %s resolved into a subgraph of size %d, adding to our graph of size %d", targetNode.Name, vnode.Name, len(subgraph), len(graph))
-					IncorporateIntoGraph(graph, subgraph)
-					log.Printf("[run-tree %s] ... graph grew to size %d", targetNode.Name, len(graph))
+			subgraph := vnode.GetOp().Resolve(vnode, ToSkyhookInputDatasets(parentDatasets), parentItems)
+			if subgraph != nil {
+				// this vnode wants to be dynamically replaced with the new subgraph
+				// we need to incorporate the subgraph into our graph
+				log.Printf("[run-tree %s] node %s resolved into a subgraph of size %d, adding to our graph of size %d", targetNode.Name, vnode.Name, len(subgraph), len(graph))
+				IncorporateIntoGraph(graph, subgraph)
+				log.Printf("[run-tree %s] ... graph grew to size %d", targetNode.Name, len(graph))
 
-					// we also need to populate ready and needed with any new nodes
-					// so we call populateReadyNeeded with anything that's not already there
-					populateReadyNeeded()
+				// we also need to populate ready and needed with any new nodes
+				// so we call populateReadyNeeded with anything that's not already there
+				populateReadyNeeded()
 
-					// parents and stuff may have changed now
-					// so we need to re-evaluate whether parent datasets are available
-					// so: skip processing for now
-					continue
-				}
+				// parents and stuff may have changed now
+				// so we need to re-evaluate whether parent datasets are available
+				// so: skip processing for now
+				continue
 			}
 
 			log.Printf("[run-tree %s] running node %s", targetNode.Name, vnode.Name)
@@ -234,46 +230,24 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 			runnable := vnode.GetRunnable(ToSkyhookInputDatasets(parentDatasets), ToSkyhookOutputDatasets(outputDatasets))
 
 			// get tasks
-			tasks, err := opImpl.GetTasks(runnable, parentItems)
+			tasks, err := runnable.GetOp().GetTasks(runnable, parentItems)
 			if err != nil {
 				return err
 			}
 
-			// initialize job
-			var nodeJobOp skyhook.JobOp
-			jobOpName := "execnode"
-			if opImpl.GetJobOp != nil {
-				nodeJobOp = opImpl.GetJobOp(runnable)
-				jobOpName = runnable.Op
-			}
-			job := NewJob(
-				fmt.Sprintf("Exec Node %s", vnode.Name),
-				"execnode",
-				jobOpName,
-				fmt.Sprintf("%d", vnode.OrigNode.ID),
-			)
-			jobOp := &ExecJobOp{
-				Job: job,
-				NumTasks: len(tasks),
-				TailOp: &skyhook.TailJobOp{},
-				NodeJobOp: nodeJobOp,
-			}
-			jobOp.cond = sync.NewCond(&jobOp.mu)
-			job.AttachOp(jobOp)
-
-			// if MultiExecJobOp is provided, we need to update it with the current job
-			if opts.JobOp != nil {
-				opts.JobOp.ChangeJob(job.Job)
-			}
-
 			rd := &RunData{
+				Name: vnode.Name,
 				Node: runnable,
-				Job: job,
-				JobOp: jobOp,
 				Tasks: tasks,
 				WillBeDone: true,
 			}
+			rd.SetJob(fmt.Sprintf("Exec Node %s", vnode.Name), fmt.Sprintf("%d", vnode.OrigNode.ID))
+			// if MultiExecJobOp is provided, we need to update it with the current job
+			if opts.JobOp != nil {
+				opts.JobOp.ChangeJob(rd.JobOp.Job.Job)
+			}
 			err = rd.Run()
+			rd.SetDone()
 			if err != nil {
 				return err
 			}

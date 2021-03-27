@@ -13,7 +13,14 @@ import (
 )
 
 func init() {
-	skyhook.ExecOpImpls["materialize"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "materialize",
+			Name: "Materialize",
+			Description: "Materialize input datasets",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
+		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -36,12 +43,9 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

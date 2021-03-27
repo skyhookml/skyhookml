@@ -3,8 +3,6 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			// The input object.
-			input: null,
 			isVariable: false,
 
 			// Current parents.
@@ -22,11 +20,10 @@ export default {
 		};
 	},
 	props: [
-		'node', 'inputIdx', 'nodes', 'datasets',
+		'node', 'input', 'nodes', 'datasets',
 	],
 	created: function() {
-		this.input = this.node.Inputs[this.inputIdx];
-		this.parents = this.node.Parents[this.inputIdx];
+		this.parents = this.node.Parents[this.input.Name];
 		this.isVariable = this.input.Variable || this.parents.length > 1;
 
 		// helper function that decides whether a given data type is acceptable for this input
@@ -57,7 +54,11 @@ export default {
 				continue;
 			}
 			let label = 'Dataset: ' + ds.Name;
-			let obj = {'Type': 'd', 'ID': ds.ID};
+			let obj = {
+				'Type': 'd',
+				'ID': ds.ID,
+				'DataType': ds.DataType
+			};
 			let key = objToKey(obj);
 			this.options[key] = label;
 			this.optionToObj[key] = obj;
@@ -76,6 +77,7 @@ export default {
 					'Type': 'n',
 					'ID': node.ID,
 					'Name': output.Name,
+					'DataType': output.DataType,
 				};
 				let key = objToKey(obj);
 				this.options[key] = label;
@@ -93,6 +95,7 @@ export default {
 		// if isVariable
 		add: function() {
 			this.$emit('add', this.optionToObj[this.selected]);
+			this.selected = '';
 		},
 
 		// if NOT isVariable
@@ -117,7 +120,7 @@ export default {
 				<tr><th colspan="2">{{ input.Name }}</th></tr>
 			</thead>
 			<tbody>
-				<tr v-for="(parent, i) in node.Parents[inputIdx]" :key="i">
+				<tr v-for="(parent, i) in node.Parents[input.Name]" :key="i">
 					<template v-if="parent.Type == 'd'">
 						<td>Dataset: {{ datasets[parent.ID].Name }}</td>
 					</template>

@@ -18,7 +18,14 @@ func init() {
 		return data, nil
 	}, false)
 
-	skyhook.ExecOpImpls["virtual_debug"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "virtual_debug",
+			Name: "Virtual Debug",
+			Description: "Op implementing identity function with a virtual provider",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
+		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -44,9 +51,6 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		GetOutputs: exec_ops.GetOutputsSimilarToInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

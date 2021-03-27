@@ -246,7 +246,14 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 func (e *Tracker) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["simple_tracker"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "simple_tracker",
+			Name: "Simple Tracker",
+			Description: "Simple Tracker",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}}},
+		Outputs: []skyhook.ExecOutput{{Name: "tracks", DataType: skyhook.DetectionType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -265,8 +272,6 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

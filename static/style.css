@@ -8,9 +8,18 @@ html, body {
 	flex-direction: column;
 }
 
+.flex-x-container {
+	display: flex;
+	flex-direction: row;
+}
+
 .flex-content {
 	flex-grow: 1;
 	min-height: 0px;
+}
+
+.flex-content-big {
+	flex-grow: 2;
 }
 
 .scroll-content {
@@ -31,8 +40,27 @@ html, body {
 	max-width: 200px;
 }
 
+.medium-input {
+	max-width: 400px;
+}
+
 .small-container {
 	max-width: 600px;
+}
+
+.medium-container {
+	max-width: 900px;
+}
+
+.table-container {
+	display: table;
+}
+.table-container > .row {
+	display: table-row;
+}
+.table-container > .row > * {
+	display: table-cell;
+	white-space: nowrap;
 }
 
 .bordered-div {

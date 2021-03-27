@@ -23,4 +23,24 @@ func init() {
 	Router.HandleFunc("/data-types", func(w http.ResponseWriter, r *http.Request) {
 		skyhook.JsonResponse(w, skyhook.DataTypes)
 	}).Methods("GET")
+
+	Router.HandleFunc("/ops", func(w http.ResponseWriter, r *http.Request) {
+		type Op struct {
+			skyhook.ExecOpConfig
+			Inputs []skyhook.ExecInput
+			Outputs []skyhook.ExecOutput
+		}
+		ops := make(map[string]Op)
+		for _, provider := range skyhook.ExecOpProviders {
+			cfg := provider.Config()
+			inputs := provider.GetInputs("")
+			outputs := provider.GetOutputs("", nil)
+			ops[cfg.ID] = Op{
+				ExecOpConfig: cfg,
+				Inputs: inputs,
+				Outputs: outputs,
+			}
+		}
+		skyhook.JsonResponse(w, ops)
+	}).Methods("GET")
 }

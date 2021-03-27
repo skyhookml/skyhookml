@@ -1,5 +1,9 @@
 import utils from './utils.js';
 
+import Dashboard from './dashboard.js';
+
+import QuickstartImport from './quickstart-import.js';
+
 import Datasets from './datasets.js';
 import Dataset from './dataset.js';
 import RenderItem from './render-item.js';
@@ -37,7 +41,9 @@ const router = new VueRouter({
 	routes: [
 		{path: '/', redirect: '/ws/default'},
 
-		{path: '/ws/:ws', component: Datasets},
+		{path: '/ws/:ws', component: Dashboard},
+
+		{path: '/ws/:ws/quickstart/import', component: QuickstartImport},
 
 		{path: '/ws/:ws/datasets', component: Datasets},
 		{path: '/ws/:ws/datasets/:dsid', component: Dataset},
@@ -79,6 +85,9 @@ Vue.prototype.$globals = globals;
 Promise.all([
 	utils.request(null, 'GET', '/data-types', null, (dataTypes) => {
 		globals.dataTypes = dataTypes;
+	}),
+	utils.request(null, 'GET', '/ops', null, (ops) => {
+		globals.ops = ops;
 	}),
 ]).then(() => {
 	const app = new Vue({

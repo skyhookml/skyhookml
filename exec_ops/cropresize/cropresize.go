@@ -111,7 +111,14 @@ func (e *CropResize) Apply(task skyhook.ExecTask) error {
 func (e *CropResize) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["cropresize"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "cropresize",
+			Name: "Crop/Resize Video",
+			Description: "Crop video followed by optional resize",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.VideoType}}},
+		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.VideoType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -132,8 +139,6 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

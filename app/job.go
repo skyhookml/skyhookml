@@ -71,6 +71,163 @@ func (j *DBJob) SetDone(error string) {
 	db.Exec("UPDATE jobs SET done = 1, error = ? WHERE id = ?", error, j.ID)
 }
 
+// A JobOp that wraps a TailOp for console, plus arbitrary number of other JobOps.
+// It also provides functionality for stopping via mutex/condition.
+type AppJobOp struct {
+	Job *DBJob
+	TailOp *skyhook.TailJobOp
+
+	WrappedJobOps map[string]skyhook.JobOp
+	LastWrappedDatas map[string]string
+
+	// stopping support
+	Stopping bool
+	Stopped bool
+
+	// function to call when stopping a job
+	// we also call this on SetDone
+	CleanupFunc func()
+
+	mu sync.Mutex
+	cond *sync.Cond
+}
+
+type AppJobState struct {
+	Lines []string
+	Datas map[string]string
+}
+
+func (op *AppJobOp) Encode() string {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	// we only need to compute LastWrappedDatas if it isn't set yet
+	if op.LastWrappedDatas == nil {
+		op.LastWrappedDatas = make(map[string]string)
+		for name, wrapped := range op.WrappedJobOps {
+			op.LastWrappedDatas[name] = wrapped.Encode()
+		}
+	}
+	state := AppJobState{
+		Lines: op.TailOp.Lines,
+		Datas: op.LastWrappedDatas,
+	}
+	return string(skyhook.JsonMarshal(state))
+}
+
+func (op *AppJobOp) Update(lines []string) {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+
+	op.TailOp.Update(lines)
+	if op.LastWrappedDatas == nil {
+		op.LastWrappedDatas = make(map[string]string)
+	}
+	for name, wrapped := range op.WrappedJobOps {
+		wrapped.Update(lines)
+		op.LastWrappedDatas[name] = wrapped.Encode()
+	}
+}
+
+func (op *AppJobOp) SetCleanupFunc(f func()) {
+	op.mu.Lock()
+	op.CleanupFunc = f
+	op.mu.Unlock()
+}
+
+// Run cleanup func and reset it.
+// Caller must have the lock.
+func (op *AppJobOp) cleanup() {
+	if op.CleanupFunc != nil {
+		op.CleanupFunc()
+	}
+	op.CleanupFunc = nil
+}
+
+func (op *AppJobOp) Cleanup() {
+	op.mu.Lock()
+	op.cleanup()
+	op.mu.Unlock()
+}
+
+// Handles ending the job so that the caller doesn't need to call Job.SetDone directly.
+func (op *AppJobOp) SetDone(err string) {
+	op.mu.Lock()
+	op.cleanup()
+
+	op.Stopped = true
+	if op.cond != nil {
+		op.cond.Broadcast()
+	}
+	op.mu.Unlock()
+
+	// make sure job state reflects the latest updates
+	if err == "" {
+		op.Update([]string{"Job completed successfully."})
+	} else {
+		op.Update([]string{"Job exiting with error: " + err})
+	}
+	op.Job.UpdateState(op.Encode())
+	op.Job.SetDone(err)
+}
+
+func (op *AppJobOp) IsStopping() bool {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	return op.Stopping
+}
+
+func (op *AppJobOp) Stop() error {
+	op.mu.Lock()
+	// Apply cleanup functions if needed, to interrupt the job.
+	op.cleanup()
+	// Set stopping and wait for the job thread to stop.
+	// Job thread will notify on cond when it's stopped.
+	op.Stopping = true
+	if op.cond == nil {
+		op.cond = sync.NewCond(&op.mu)
+	}
+	op.TailOp.Update([]string{"TERMINATING JOB: user requested to stop this job."})
+	for !op.Stopped {
+		op.cond.Wait()
+	}
+	op.mu.Unlock()
+	return nil
+}
+
+type ProgressJobOp struct {
+	Completed int
+	Total int
+	mu sync.Mutex
+}
+
+func (op *ProgressJobOp) Encode() string {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	// compute progress
+	// we check Total>0 because Total might not be set yet
+	var progress int = 0
+	if op.Total > 0 {
+		progress = op.Completed*100/op.Total
+	}
+	return string(skyhook.JsonMarshal(progress))
+}
+
+func (op *ProgressJobOp) SetTotal(total int) {
+	op.mu.Lock()
+	op.Total = total
+	op.Completed = 0
+	op.mu.Unlock()
+}
+
+func (op *ProgressJobOp) Increment() {
+	op.mu.Lock()
+	op.Completed++
+	op.mu.Unlock()
+}
+
+func (op *ProgressJobOp) Update(lines []string) {}
+func (op *ProgressJobOp) Stop() error { return nil }
+
 func init() {
 	Router.HandleFunc("/worker/job-update", func(w http.ResponseWriter, r *http.Request) {
 		var request skyhook.JobUpdate

@@ -33,9 +33,8 @@ func main() {
 		}
 
 		coordinatorURL = request.CoordinatorURL
-		opImpl := skyhook.GetExecOpImpl(request.Node.Op)
 		var err error
-		execOp, err = opImpl.Prepare(coordinatorURL, request.Node)
+		execOp, err = request.Node.GetOp().Prepare(coordinatorURL, request.Node)
 		if err != nil {
 			panic(err)
 		}

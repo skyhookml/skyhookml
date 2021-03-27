@@ -200,7 +200,24 @@ func (e *Render) Apply(task skyhook.ExecTask) error {
 func (e *Render) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["render"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "render",
+			Name: "Render video",
+			Description: "Render video from various input data types",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
+		GetOutputs: func(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
+			// whether we output video or image depends on the first input
+			var dtype skyhook.DataType = skyhook.VideoType
+			if len(inputTypes["inputs"]) > 0 {
+				dtype = inputTypes["inputs"][0]
+			}
+			return []skyhook.ExecOutput{{
+				Name: "output",
+				DataType: dtype,
+			}}
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -209,21 +226,9 @@ func init() {
 			op := &Render{url, node.OutputDatasets["output"]}
 			return op, nil
 		},
-		GetOutputs: func(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
-			// whether we output video or image depends on the first input
-			if len(inputTypes["inputs"]) == 0 {
-				return nil
-			}
-			return []skyhook.ExecOutput{{
-				Name: "output",
-				DataType: inputTypes["inputs"][0],
-			}}
-		},
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

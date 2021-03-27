@@ -100,7 +100,17 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 func (e *TrainOp) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["unsupervised_reid"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "unsupervised_reid",
+			Name: "Unsupervised Re-identification",
+			Description: "Self-Supervised Re-identification Model",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
+			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -113,8 +123,6 @@ func init() {
 			}
 			return op, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/pytorch", nil
-		},
-	}
+		ImageName: "skyhookml/pytorch",
+	})
 }

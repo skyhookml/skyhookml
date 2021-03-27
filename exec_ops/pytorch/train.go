@@ -89,7 +89,17 @@ func (op *TrainJobOp) Stop() error {
 }
 
 func init() {
-	skyhook.ExecOpImpls["pytorch_train"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "pytorch_train",
+			Name: "Pytorch (train)",
+			Description: "Pytorch (train)",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "inputs", Variable: true},
+			{Name: "models", DataTypes: []skyhook.DataType{skyhook.StringType}, Variable: true},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -102,9 +112,7 @@ func init() {
 			}
 			return op, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/pytorch", nil
-		},
+		ImageName: "skyhookml/pytorch",
 		GetJobOp: func(node skyhook.Runnable) skyhook.JobOp {
 			return &TrainJobOp{}
 		},
@@ -149,7 +157,7 @@ func init() {
 			var matInputTypes []skyhook.DataType
 			specToMatOutputIndex := make(map[ParentSpec]int)
 			for i, spec := range needed {
-				matParents = append(matParents, node.GetParents()[spec.Name][spec.Index])
+				matParents = append(matParents, node.Parents[spec.Name][spec.Index])
 				matInputTypes = append(matInputTypes, inputDatasets[spec.Name][spec.Index].DataType)
 				specToMatOutputIndex[spec] = i
 			}
@@ -162,22 +170,19 @@ func init() {
 				Name: node.Name+"-materialize",
 				Op: "materialize",
 				Params: "",
-				Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
-				Outputs: skyhook.GetExecOpImpl("materialize").GetOutputs("", map[string][]skyhook.DataType{"inputs": matInputTypes}),
-				Parents: [][]skyhook.VirtualParent{matParents},
+				Parents: map[string][]skyhook.VirtualParent{"inputs": matParents},
 				OrigNode: node.OrigNode,
 				VirtualKey: matGID.VirtualKey,
 			}
 
 			// and we need to update the pytorch node to input from the materialize node
-			for i := range node.Parents {
-				name := node.Inputs[i].Name
-				for idx := range node.Parents[i] {
+			for name := range node.Parents {
+				for idx := range node.Parents[name] {
 					matOutputIndex, ok := specToMatOutputIndex[ParentSpec{name, idx}]
 					if !ok {
 						continue
 					}
-					node.Parents[i][idx] = skyhook.VirtualParent{
+					node.Parents[name][idx] = skyhook.VirtualParent{
 						GraphID: matGID,
 						Name: fmt.Sprintf("outputs%d", matOutputIndex),
 					}
@@ -187,5 +192,5 @@ func init() {
 
 			return subgraph
 		},
-	}
+	})
 }

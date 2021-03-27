@@ -55,7 +55,14 @@ func (e *DetectionFilter) Apply(task skyhook.ExecTask) error {
 func (e *DetectionFilter) Close() {}
 
 func init() {
-	skyhook.ExecOpImpls["detection_filter"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "detection_filter",
+			Name: "Detection Filter",
+			Description: "Detection Filter",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}}},
+		Outputs: []skyhook.ExecOutput{{Name: "detections", DataType: skyhook.DetectionType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -84,8 +91,6 @@ func init() {
 		Incremental: true,
 		GetOutputKeys: exec_ops.MapGetOutputKeys,
 		GetNeededInputs: exec_ops.MapGetNeededInputs,
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

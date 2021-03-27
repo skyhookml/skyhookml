@@ -12,24 +12,26 @@ type DBExecNode struct {
 	Workspace string
 }
 
-const ExecNodeQuery = "SELECT id, name, op, params, inputs, outputs, parents, workspace FROM exec_nodes"
+const ExecNodeQuery = "SELECT id, name, op, params, parents, workspace FROM exec_nodes"
 
 func execNodeListHelper(rows *Rows) []*DBExecNode {
 	nodes := []*DBExecNode{}
 	for rows.Next() {
 		var node DBExecNode
-		var inputsRaw, outputsRaw, parentsRaw string
-		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &inputsRaw, &outputsRaw, &parentsRaw, &node.Workspace)
-		node.Inputs = skyhook.ParseExecInputs(inputsRaw)
-		node.Outputs = skyhook.ParseExecOutputs(outputsRaw)
-		node.Parents = skyhook.ParseExecParents(parentsRaw)
-
-
-		// make sure parents list is the same length as inputs
-		for len(node.Parents) < len(node.Inputs) {
-			node.Parents = append(node.Parents, []skyhook.ExecParent{})
+		var parentsRaw string
+		rows.Scan(&node.ID, &node.Name, &node.Op, &node.Params, &parentsRaw, &node.Workspace)
+		skyhook.JsonUnmarshal([]byte(parentsRaw), &node.Parents)
+		if node.Parents == nil {
+			node.Parents = make(map[string][]skyhook.ExecParent)
 		}
 
+		// make sure parents list is set for each input
+		for _, input := range node.GetInputs() {
+			if node.Parents[input.Name] != nil {
+				continue
+			}
+			node.Parents[input.Name] = []skyhook.ExecParent{}
+		}
 
 		nodes = append(nodes, &node)
 	}
@@ -56,15 +58,14 @@ func GetExecNode(id int) *DBExecNode {
 	}
 }
 
-func NewExecNode(name string, op string, params string, inputs []skyhook.ExecInput, outputs []skyhook.ExecOutput, parents [][]skyhook.ExecParent, workspace string) *DBExecNode {
+func NewExecNode(name string, op string, params string, parents map[string][]skyhook.ExecParent, workspace string) *DBExecNode {
 	res := db.Exec(
-		"INSERT INTO exec_nodes (name, op, params, inputs, outputs, parents, workspace) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO exec_nodes (name, op, params, parents, workspace) VALUES (?, ?, ?, ?, ?)",
 		name, op, params,
-		skyhook.ExecInputsToString(inputs), skyhook.ExecOutputsToString(outputs), skyhook.ExecParentsToString(parents),
+		string(skyhook.JsonMarshal(parents)),
 		workspace,
 	)
 	node := GetExecNode(res.LastInsertId())
-	node.updateOutputs()
 	return node
 }
 
@@ -97,7 +98,7 @@ func (node *DBExecNode) GetDatasets(create bool) (map[string]*DBDataset, bool) {
 	// find datasets that match current hash
 	datasets := make(map[string]*DBDataset)
 	ok := true
-	for _, output := range node.Outputs {
+	for _, output := range node.GetOutputs() {
 		dsName := fmt.Sprintf("%s[%s]", node.Name, output.Name)
 		curHash := fmt.Sprintf("%s[%s]", nodeHash, output.Name)
 		ds := FindDataset(curHash)
@@ -124,7 +125,8 @@ func (node *DBExecNode) GetDatasets(create bool) (map[string]*DBDataset, bool) {
 func (node *DBExecNode) GetVirtualDatasets(vnode *skyhook.VirtualNode) map[string]*DBDataset {
 	nodeHash := node.Hash()
 	datasets := make(map[string]*DBDataset)
-	for _, output := range vnode.Outputs {
+
+	for _, output := range vnode.GetOutputs() {
 		dsName := fmt.Sprintf("%s.%s[%s]", node.Name, vnode.VirtualKey, output.Name)
 		curHash := fmt.Sprintf("%s.%s[%s]", nodeHash, vnode.VirtualKey, output.Name)
 		ds := FindDataset(curHash)
@@ -169,13 +171,13 @@ func DeleteBrokenReferences(node *DBExecNode, newOutputs []skyhook.ExecOutput) {
 		if !needsUpdate {
 			continue
 		}
-		newParents := make([][]skyhook.ExecParent, len(other.Parents))
-		for i, plist := range other.Parents {
+		newParents := make(map[string][]skyhook.ExecParent, len(other.Parents))
+		for name, plist := range other.Parents {
 			for _, parent := range plist {
 				if parent.Type == "n" && parent.ID == node.ID && !outputSet[parent.Name] {
 					continue
 				}
-				newParents[i] = append(newParents[i], parent)
+				newParents[name] = append(newParents[name], parent)
 			}
 		}
 		other.Update(ExecNodeUpdate{
@@ -184,51 +186,11 @@ func DeleteBrokenReferences(node *DBExecNode, newOutputs []skyhook.ExecOutput) {
 	}
 }
 
-func (node *DBExecNode) GetInputTypes() map[string][]skyhook.DataType {
-	inputTypes := make(map[string][]skyhook.DataType)
-	for i := range node.Parents {
-		name := node.Inputs[i].Name
-		inputTypes[name] = make([]skyhook.DataType, len(node.Parents[i]))
-		for idx, parent := range node.Parents[i] {
-			if parent.Type == "n" {
-				n := GetExecNode(parent.ID)
-				dt := n.GetOutputTypes()[parent.Name]
-				inputTypes[name][idx] = dt
-			} else if parent.Type == "d" {
-				inputTypes[name][idx] = GetDataset(parent.ID).DataType
-			}
-		}
-	}
-	return inputTypes
-}
-
-func (node *DBExecNode) updateOutputs() {
-	// make sure the current expected outputs match the actual outputs
-	impl := skyhook.GetExecOpImpl(node.Op)
-	if impl.GetOutputs == nil {
-		return
-	}
-
-	expectedOutputs := impl.GetOutputs(node.Params, node.GetInputTypes())
-	if expectedOutputs == nil {
-		// impl wasn't able to compute outputs
-		return
-	}
-
-	if skyhook.ExecOutputsToString(expectedOutputs) != skyhook.ExecOutputsToString(node.Outputs) {
-		db.Exec("UPDATE exec_nodes SET outputs = ? WHERE id = ?", skyhook.ExecOutputsToString(expectedOutputs), node.ID)
-		DeleteBrokenReferences(node, expectedOutputs)
-		node.Outputs = expectedOutputs
-	}
-}
-
 type ExecNodeUpdate struct {
 	Name *string
 	Op *string
 	Params *string
-	Inputs *[]skyhook.ExecInput
-	Outputs *[]skyhook.ExecOutput
-	Parents *[][]skyhook.ExecParent
+	Parents *map[string][]skyhook.ExecParent
 }
 
 func (node *DBExecNode) Update(req ExecNodeUpdate) {
@@ -244,21 +206,11 @@ func (node *DBExecNode) Update(req ExecNodeUpdate) {
 		db.Exec("UPDATE exec_nodes SET params = ? WHERE id = ?", *req.Params, node.ID)
 		node.Params = *req.Params
 	}
-	if req.Inputs != nil {
-		db.Exec("UPDATE exec_nodes SET inputs = ? WHERE id = ?", skyhook.ExecInputsToString(*req.Inputs), node.ID)
-		node.Inputs = *req.Inputs
-	}
-	if req.Outputs != nil {
-		db.Exec("UPDATE exec_nodes SET outputs = ? WHERE id = ?", skyhook.ExecOutputsToString(*req.Outputs), node.ID)
-		DeleteBrokenReferences(node, *req.Outputs)
-		node.Outputs = *req.Outputs
-	}
 	if req.Parents != nil {
-		db.Exec("UPDATE exec_nodes SET parents = ? WHERE id = ?", skyhook.ExecParentsToString(*req.Parents), node.ID)
+		db.Exec("UPDATE exec_nodes SET parents = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Parents)), node.ID)
 		node.Parents = *req.Parents
 	}
-
-	node.updateOutputs()
+	DeleteBrokenReferences(node, node.GetOutputs())
 }
 
 func (node *DBExecNode) Delete() {

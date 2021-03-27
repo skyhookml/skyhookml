@@ -1,6 +1,10 @@
 import utils from './utils.js';
+import ImportModal from './import-modal.js';
 
 const Datasets = {
+	components: {
+		'import-modal': ImportModal,
+	},
 	data: function() {
 		return {
 			datasets: [],
@@ -54,35 +58,44 @@ const Datasets = {
 	<div class="border-bottom mb-3">
 		<h2>Datasets</h2>
 	</div>
-	<button type="button" class="btn btn-primary mb-2" v-on:click="showAddDatasetModal">Add Dataset</button>
-	<div class="modal" tabindex="-1" role="dialog" ref="addDatasetModal">
-		<div class="modal-dialog" role="document">
-			<div class="modal-content">
-				<div class="modal-body">
-					<form v-on:submit.prevent="addDataset">
-						<div class="row mb-2">
-							<label class="col-sm-4 col-form-label">Name</label>
-							<div class="col-sm-8">
-								<input class="form-control" type="text" v-model="addDatasetForm.name" />
-							</div>
+	<div class="mb-2">
+		<p>
+			Add a new dataset or import an existing one.
+			If you want to import data that is not in a SkyhookML-formatted dataset archive, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
+		</p>
+		<span>
+			<button type="button" class="btn btn-primary" v-on:click="showAddDatasetModal">Add Dataset</button>
+			<div class="modal" tabindex="-1" role="dialog" ref="addDatasetModal">
+				<div class="modal-dialog" role="document">
+					<div class="modal-content">
+						<div class="modal-body">
+							<form v-on:submit.prevent="addDataset">
+								<div class="row mb-2">
+									<label class="col-sm-4 col-form-label">Name</label>
+									<div class="col-sm-8">
+										<input class="form-control" type="text" v-model="addDatasetForm.name" />
+									</div>
+								</div>
+								<div class="row mb-2">
+									<label class="col-sm-4 col-form-label">Data Type</label>
+									<div class="col-sm-8">
+										<select v-model="addDatasetForm.data_type" class="form-select">
+											<option v-for="(name, dt) in $globals.dataTypes" :value="dt">{{ name }}</option>
+										</select>
+									</div>
+								</div>
+								<div class="row mb-2">
+									<div class="col-sm-8">
+										<button type="submit" class="btn btn-sm btn-primary">Add Dataset</button>
+									</div>
+								</div>
+							</form>
 						</div>
-						<div class="row mb-2">
-							<label class="col-sm-4 col-form-label">Data Type</label>
-							<div class="col-sm-8">
-								<select v-model="addDatasetForm.data_type" class="form-select">
-									<option v-for="(name, dt) in $globals.dataTypes" :value="dt">{{ name }}</option>
-								</select>
-							</div>
-						</div>
-						<div class="row mb-2">
-							<div class="col-sm-8">
-								<button type="submit" class="btn btn-sm btn-primary">Add Dataset</button>
-							</div>
-						</div>
-					</form>
+					</div>
 				</div>
 			</div>
-		</div>
+		</span>
+		<import-modal mode="new"></import-modal>
 	</div>
 	<table class="table table-sm align-middle">
 		<thead>

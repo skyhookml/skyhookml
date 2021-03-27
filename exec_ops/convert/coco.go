@@ -79,10 +79,17 @@ type CocoJSON struct {
 }
 
 func init() {
-	skyhook.ExecOpImpls["to_coco"] = skyhook.ExecOpImpl{
-		Requirements: func(node skyhook.Runnable) map[string]int {
-			return nil
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "to_coco",
+			Name: "To COCO",
+			Description: "Convert from [image, detection] datasets to COCO image/JSON format",
 		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType}},
+			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.FileType}},
 		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// create one task for each image
 			// and one task for all detections
@@ -233,12 +240,20 @@ func init() {
 
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 
-	skyhook.ExecOpImpls["from_coco"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "from_coco",
+			Name: "From COCO",
+			Description: "Convert from COCO image/JSON format to [image, detection] datasets",
+		},
+		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.FileType}}},
+		Outputs: []skyhook.ExecOutput{
+			{Name: "images", DataType: skyhook.ImageType},
+			{Name: "detections", DataType: skyhook.DetectionType},
+		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -353,8 +368,6 @@ func init() {
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/basic", nil
-		},
-	}
+		ImageName: "skyhookml/basic",
+	})
 }

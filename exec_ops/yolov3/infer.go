@@ -155,7 +155,17 @@ func (e *Yolov3) Close() {
 }
 
 func init() {
-	skyhook.ExecOpImpls["yolov3_infer"] = skyhook.ExecOpImpl{
+	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
+		Config: skyhook.ExecOpConfig{
+			ID: "yolov3_infer",
+			Name: "Yolov3 (infer)",
+			Description: "Yolov3 (infer)",
+		},
+		Inputs: []skyhook.ExecInput{
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType, skyhook.VideoType}},
+		},
+		Outputs: []skyhook.ExecOutput{{Name: "detections", DataType: skyhook.DetectionType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
@@ -174,8 +184,6 @@ func init() {
 			neededInputs["model"] = [][]string{{"model"}}
 			return neededInputs
 		},
-		ImageName: func(node skyhook.Runnable) (string, error) {
-			return "skyhookml/yolov3", nil
-		},
-	}
+		ImageName: "skyhookml/yolov3",
+	})
 }
