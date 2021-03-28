@@ -9,6 +9,7 @@ import Dataset from './dataset.js';
 import RenderItem from './render-item.js';
 
 import Annotate from './annotate.js';
+import AnnotateAdd from './annotate-add.js';
 import AnnotateInt from './annotate-int.js';
 import AnnotateShape from './annotate-shape.js';
 import AnnotateDetectionToTrack from './annotate-detection-to-track.js';
@@ -50,6 +51,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/datasets/:dsid/items/:itemkey', component: RenderItem},
 
 		{path: '/ws/:ws/annotate', component: Annotate},
+		{path: '/ws/:ws/annotate-add', component: AnnotateAdd},
 		{path: '/ws/:ws/annotate/int/:setid', component: AnnotateInt},
 		{path: '/ws/:ws/annotate/shape/:setid', component: AnnotateShape},
 		{path: '/ws/:ws/annotate/detection-to-track/:setid', component: AnnotateDetectionToTrack},

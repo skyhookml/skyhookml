@@ -33,7 +33,7 @@ export default {
 			</router-link>
 		</div>
 		<div class="card my-2" style="max-width: 800px" role="button">
-			<router-link tag="div" :to="'/ws/'+$route.params.ws+'/quickstart/annotate'">
+			<router-link tag="div" :to="'/ws/'+$route.params.ws+'/annotate-add'">
 				<div class="card-body">
 					<h5 class="card-title">Annotate</h5>
 					<p class="card-text">Label images or videos with object detections, image classes, etc.</p>

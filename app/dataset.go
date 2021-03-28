@@ -154,7 +154,11 @@ func init() {
 
 		if format == "meta" {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(item.Metadata))
+			metadata := item.Metadata
+			if metadata == "" {
+				metadata = "{}"
+			}
+			w.Write([]byte(metadata))
 			return
 		}
 

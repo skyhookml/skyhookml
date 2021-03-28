@@ -41,6 +41,12 @@
 		<div class="position-sticky pt-3">
 			<ul class="nav flex-column">
 				<li class="nav-item">
+					<router-link class="nav-link" :to="wsPrefix" active-class="active" exact>
+						<span data-feather="circle"></span>
+						Dashboard
+					</router-link>
+				</li>
+				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/datasets'" active-class="active" exact>
 						<span data-feather="database"></span>
 						Datasets
