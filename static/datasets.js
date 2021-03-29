@@ -74,6 +74,9 @@ const Datasets = {
 									<label class="col-sm-4 col-form-label">Name</label>
 									<div class="col-sm-8">
 										<input class="form-control" type="text" v-model="addDatasetForm.name" />
+										<small class="form-text text-muted">
+											A name for this dataset, which will be initialized as an empty dataset.
+										</small>
 									</div>
 								</div>
 								<div class="row mb-2">

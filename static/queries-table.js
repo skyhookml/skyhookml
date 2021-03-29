@@ -190,7 +190,6 @@ export default {
 		</table>
 	</div>
 	<div v-if="selectedNode" class="flex-content scroll-content">
-		<hr />
 		<queries-selected-pane :node="selectedNode" :nodes="nodes" :datasets="datasets" :workspaces="workspaces" v-on:update="update"></queries-selected-pane>
 	</div>
 	<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>

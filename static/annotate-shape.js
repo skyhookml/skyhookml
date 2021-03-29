@@ -193,7 +193,6 @@ export default AnnotateGenericUI({
 
 			let resetColors = () => {
 				konvaShapes.forEach((kshp, idx) => {
-					console.log(this.selectedIdx, idx);
 					if(this.selectedIdx === idx) {
 						kshp.stroke('orange');
 					} else {
@@ -553,6 +552,13 @@ export default AnnotateGenericUI({
 		<button type="submit" class="btn btn-primary">Save Settings</button>
 	</div>
 </form>
+		`,
+		im_above: `
+<div>
+	<p v-if="params.Mode == 'box'">
+		Box mode: click twice to draw a box. Escape to cancel current drawing, click to select box, Delete to delete selection.
+	</p>
+</div>
 		`,
 		im_after: `
 <div

@@ -18,9 +18,6 @@ export default {
 				// input dataset IDs to use for annotation
 				// corresponds to toolObj.Inputs
 				inputIDs: [],
-
-				// the currently selected input dataset (only used if toolObj.Inputs is not set)
-				inputSelection: '',
 			},
 
 			tools: {
