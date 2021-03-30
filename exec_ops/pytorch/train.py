@@ -23,11 +23,13 @@ params_arg = sys.argv[3]
 arch_arg = sys.argv[4]
 comps_arg = sys.argv[5]
 datasets_arg = sys.argv[6]
+parent_models_arg = sys.argv[7]
 
 params = json.loads(params_arg)
 arch = json.loads(arch_arg)
 comps = json.loads(comps_arg)
 datasets = json.loads(datasets_arg)
+parent_models = json.loads(parent_models_arg)
 
 arch = arch['Params']
 comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
@@ -138,6 +140,9 @@ class StopCondition(object):
 
 		return False
 
+def save_model():
+	torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
+
 class ModelSaver(object):
 	def __init__(self, params):
 		# either "latest" or "best"
@@ -155,7 +160,7 @@ class ModelSaver(object):
 				should_save = True
 
 		if should_save:
-			torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
+			save_model()
 
 stop_condition = StopCondition(train_params['StopCondition'])
 model_saver = ModelSaver(train_params['ModelSaver'])
@@ -174,6 +179,42 @@ elif rate_decay_params['Op'] == 'plateau':
 		min_lr=rate_decay_params['PlateauMin']
 	)
 
+if params.get('Restore', None):
+	for i, restore in enumerate(params['Restore']):
+		parent_model = parent_models[i]
+		src_prefix = restore['SrcPrefix']
+		dst_prefix = restore['DstPrefix']
+		skip_prefixes = [prefix.strip() for prefix in restore['SkipPrefixes'].split(',') if prefix.strip()]
+		print('restore model to', dst_prefix)
+		# load the string data to find filename, then load the save dict
+		str_data = lib.load_item(parent_model['Dataset'], parent_model)
+		fname = 'models/{}.pt'.format(str_data[0])
+		save_dict = torch.load(fname)
+		# update the parameter names based on src/dst/skip prefixes
+		state_dict = save_dict['model']
+		new_dict = {}
+		for k, v in state_dict.items():
+			if not k.startswith(src_prefix):
+				continue
+			# check skip prefixes
+			skip = False
+			for prefix in skip_prefixes:
+				if k.startswith(prefix):
+					skip = True
+					break
+			if skip:
+				continue
+			# remove src_prefix and add dst_prefix
+			k = k[len(src_prefix):]
+			k = dst_prefix+k
+			new_dict[k] = v
+
+		missing_keys, unexpected_keys = net.load_state_dict(new_dict, strict=False)
+		if missing_keys:
+			print('... warning: got missing keys:', missing_keys)
+		if unexpected_keys:
+			print('... warning: got unexpected keys:', unexpected_keys)
+
 epoch = 0
 
 def get_loss_avgs(losses):
@@ -183,6 +224,7 @@ def get_loss_avgs(losses):
 	return loss_avgs
 
 print('begin training')
+save_model()
 while True:
 	train_losses = []
 	net.train()

@@ -51,12 +51,10 @@ export default {
 
 		let inputs = [];
 		if(this.node.Parents) {
-			// get Parents['inputs'], but Parents is array
-			// really the index should always be 0 for pytorch_train node
-			let index = getIndexByKeyValue(this.node.Inputs, 'Name', 'inputs');
-			if(index >= 0) {
-				inputs = this.node.Parents[index];
-			}
+			inputs = this.node.Parents['inputs'];
+		}
+		while(this.inputOptions.length < inputs.length) {
+			this.inputOptions.push({});
 		}
 		this.parents = [];
 		inputs.forEach((parent, idx) => {
@@ -64,9 +62,6 @@ export default {
 				Name: 'unknown',
 				DataType: 'unknown',
 			});
-			if(!this.inputOptions[idx]) {
-				this.$set(this.inputOptions, idx, {});
-			}
 			if(parent.Type == 'n') {
 				utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
 					this.parents[idx].Name = node.Name;
@@ -116,15 +111,15 @@ export default {
 					</small>
 				</div>
 			</div>
-				<div class="form-group row">
-					<label class="col-sm-2 col-form-label">Height</label>
-					<div class="col-sm-10">
-						<input v-model.number="inputOptions[idx].Height" type="text" class="form-control" @change="update">
-						<small class="form-text text-muted">
-							Resize the image to this height. Leave as 0 to use the input image without resizing.
-						</small>
-					</div>
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Height</label>
+				<div class="col-sm-10">
+					<input v-model.number="inputOptions[idx].Height" type="text" class="form-control" @change="update">
+					<small class="form-text text-muted">
+						Resize the image to this height. Leave as 0 to use the input image without resizing.
+					</small>
 				</div>
+			</div>
 		</template>
 	</template>
 </div>

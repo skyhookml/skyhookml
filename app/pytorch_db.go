@@ -84,6 +84,16 @@ func GetPytorchArch(id int) *DBPytorchArch {
 	}
 }
 
+func GetPytorchArchByName(name string) *DBPytorchArch {
+	rows := db.Query(PytorchArchQuery + " WHERE name = ?", name)
+	archs := pytorchArchListHelper(rows)
+	if len(archs) == 1 {
+		return archs[0]
+	} else {
+		return nil
+	}
+}
+
 func NewPytorchArch(name string) *DBPytorchArch {
 	res := db.Exec("INSERT INTO pytorch_archs (name, params) VALUES (?, '{}')", name)
 	return GetPytorchArch(res.LastInsertId())

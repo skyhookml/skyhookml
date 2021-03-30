@@ -12,7 +12,7 @@ export default {
 			}, {
 				ID: "model",
 				Name: "Model",
-				Ops: ['pytorch_train', 'pytorch_infer', 'yolov3_train', 'yolov3_infer', 'unsupervised_reid'],
+				Ops: ['pytorch_train', 'pytorch_infer', 'pytorch_yolov3_train', 'yolov3_train', 'yolov3_infer', 'unsupervised_reid'],
 			}, {
 				ID: "video",
 				Name: "Video Manipulation",

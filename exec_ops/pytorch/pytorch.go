@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 )
 
-func GetTrainArgs(url string, archID int) (*skyhook.PytorchArch, map[int]*skyhook.PytorchComponent, error) {
+func GetTrainArgs(url string, archName string) (*skyhook.PytorchArch, map[int]*skyhook.PytorchComponent, error) {
 	// get the PytorchComponents
 	var arch skyhook.PytorchArch
-	err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/archs/%d", archID), &arch)
+	err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/archs/%s", archName), &arch)
 	if err != nil {
 		return nil, nil, err
 	}

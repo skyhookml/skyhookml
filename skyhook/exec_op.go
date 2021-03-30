@@ -77,7 +77,8 @@ type ExecOpProvider interface {
 	// Optional system to provide customized state to store in ExecNode jobs.
 	// For example, when training a model, we may want to store the loss history.
 	// Can return nil to use defaults.
-	GetJobOp(node Runnable) JobOp
+	// Second return value is the view of the JobOp, empty string to use default view.
+	GetJobOp(node Runnable) (JobOp, string)
 
 	// Virtualize is called when constructing an initial ExecutionGraph.
 	// For example, if(A) { input B } else { input C } can be implemented by:
@@ -121,7 +122,7 @@ type ExecOpImpl struct {
 	GetNeededInputs func(node ExecNode, outputs []string) map[string][][]string
 
 	// more various optional functions
-	GetJobOp func(node Runnable) JobOp
+	GetJobOp func(node Runnable) (JobOp, string)
 	Virtualize func(node ExecNode) *VirtualNode
 	Resolve func(node *VirtualNode, inputDatasets map[string][]Dataset, items map[string][][]Item) ExecutionGraph
 }
@@ -171,9 +172,9 @@ func (p ExecOpImplProvider) GetImageName(node Runnable) (string, error) {
 		return p.Impl.GetImageName(node)
 	}
 }
-func (p ExecOpImplProvider) GetJobOp(node Runnable) JobOp {
+func (p ExecOpImplProvider) GetJobOp(node Runnable) (JobOp, string) {
 	if p.Impl.GetJobOp == nil {
-		return nil
+		return nil, ""
 	}
 	return p.Impl.GetJobOp(node)
 }

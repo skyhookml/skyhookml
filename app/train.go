@@ -57,9 +57,8 @@ func init() {
 		skyhook.JsonResponse(w, arch)
 	}).Methods("POST")
 
-	Router.HandleFunc("/pytorch/archs/{arch_id}", func(w http.ResponseWriter, r *http.Request) {
-		archID := skyhook.ParseInt(mux.Vars(r)["arch_id"])
-		arch := GetPytorchArch(archID)
+	Router.HandleFunc("/pytorch/archs/{arch}", func(w http.ResponseWriter, r *http.Request) {
+		arch := GetPytorchArchByName(mux.Vars(r)["arch"])
 		if arch == nil {
 			http.Error(w, "no such PytorchArch", 404)
 			return
@@ -67,9 +66,8 @@ func init() {
 		skyhook.JsonResponse(w, arch)
 	}).Methods("GET")
 
-	Router.HandleFunc("/pytorch/archs/{arch_id}", func(w http.ResponseWriter, r *http.Request) {
-		archID := skyhook.ParseInt(mux.Vars(r)["arch_id"])
-		arch := GetPytorchArch(archID)
+	Router.HandleFunc("/pytorch/archs/{arch}", func(w http.ResponseWriter, r *http.Request) {
+		arch := GetPytorchArchByName(mux.Vars(r)["arch"])
 		if arch == nil {
 			http.Error(w, "no such PytorchArch", 404)
 			return

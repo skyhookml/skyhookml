@@ -5,7 +5,7 @@ export default {
 		return {
 			node: null,
 			params: {
-				archID: '',
+				arch: '',
 				inputOptions: [],
 				outputDatasets: [],
 			},
@@ -21,7 +21,7 @@ export default {
 
 		utils.request(this, 'GET', '/pytorch/archs', null, (archs) => {
 			archs.forEach((arch) => {
-				this.$set(this.archs, arch.ID, arch);
+				this.$set(this.archs, arch.Name, arch);
 			});
 		});
 		utils.request(this, 'GET', '/pytorch/components', null, (comps) => {
@@ -35,11 +35,11 @@ export default {
 			this.node = node;
 			try {
 				let s = JSON.parse(this.node.Params);
-				if(s.ArchID) {
-					this.params.archID = s.ArchID;
+				if(s.Arch) {
+					this.params.arch = s.Arch;
 				}
-				if(s.InputDatasets) {
-					this.params.inputDatasets = s.InputDatasets;
+				if(s.InputOptions) {
+					this.params.inputOptions = s.InputOptions;
 				}
 				if(s.OutputDatasets) {
 					this.params.outputDatasets = s.OutputDatasets;
@@ -60,13 +60,8 @@ export default {
 			};
 
 			let inputs = [];
-			if(this.node.Parents) {
-				// get Parents['inputs'], but Parents is array
-				// really the index should always be 0 for pytorch_train node
-				let index = getIndexByKeyValue(this.node.Inputs, 'Name', 'inputs');
-				if(index >= 0) {
-					inputs = this.node.Parents[index];
-				}
+			if(this.node.Parents && this.node.Parents['inputs']) {
+				inputs = this.node.Parents['inputs'];
 			}
 			this.parents = [];
 			inputs.forEach((parent, idx) => {
@@ -100,7 +95,7 @@ export default {
 		},
 		save: function() {
 			let params = {
-				ArchID: parseInt(this.params.archID),
+				Arch: this.params.arch,
 				InputOptions: this.params.inputOptions,
 				OutputDatasets: this.params.outputDatasets,
 			};
@@ -150,7 +145,7 @@ export default {
 	},
 	computed: {
 		arch: function() {
-			return this.archs[this.params.archID];
+			return this.archs[this.params.arch];
 		},
 	},
 	template: `
@@ -159,9 +154,9 @@ export default {
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Architecture</label>
 			<div class="col-sm-10">
-				<select v-model="params.archID" class="form-select">
+				<select v-model="params.arch" class="form-select">
 					<template v-for="arch in archs">
-						<option :key="arch.ID" :value="arch.ID">{{ arch.Name }}</option>
+						<option :key="arch.ID" :value="arch.Name">{{ arch.Name }}</option>
 					</template>
 				</select>
 			</div>

@@ -26,7 +26,7 @@ func (e *TrainOp) Parallelism() int {
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	var params skyhook.PytorchTrainParams
 	skyhook.JsonUnmarshal([]byte(e.node.Params), &params)
-	arch, components, err := pytorch.GetTrainArgs(e.url, params.ArchID)
+	arch, components, err := pytorch.GetTrainArgs(e.url, params.Arch)
 	if err != nil {
 		return err
 	}

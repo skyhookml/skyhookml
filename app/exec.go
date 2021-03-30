@@ -95,10 +95,10 @@ func (rd *RunData) SetJob(name string, metadata string) {
 	// if the node doesn't provide a custom JobOp, we use "consoleprogress" view
 	// otherwise the view for the job is the ExecOp's name
 	opImpl := rd.Node.GetOp()
-	nodeJobOp := opImpl.GetJobOp(rd.Node)
+	nodeJobOp, nodeView := opImpl.GetJobOp(rd.Node)
 	jobView := "consoleprogress"
-	if nodeJobOp != nil {
-		jobView = rd.Node.Op
+	if nodeView != "" {
+		jobView = nodeView
 	}
 	job := NewJob(
 		fmt.Sprintf("Exec Node %s", name),
@@ -579,10 +579,18 @@ func init() {
 		Outputs []skyhook.ExecOutput
 	}
 	getFrontendExecNode := func(node *DBExecNode) FrontendExecNode {
+		inputs := node.GetInputs()
+		outputs := node.GetOutputs()
+		if inputs == nil {
+			inputs = []skyhook.ExecInput{}
+		}
+		if outputs == nil {
+			outputs = []skyhook.ExecOutput{}
+		}
 		return FrontendExecNode{
 			DBExecNode: *node,
-			Inputs: node.GetInputs(),
-			Outputs: node.GetOutputs(),
+			Inputs: inputs,
+			Outputs: outputs,
 		}
 	}
 

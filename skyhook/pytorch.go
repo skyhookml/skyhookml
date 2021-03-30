@@ -109,8 +109,25 @@ type PytorchArch struct {
 	Params PytorchArchParams
 }
 
+// Pytorch default dataset
+type PDDImageOptions struct {
+	Width int
+	Height int
+}
+type PDDParams struct {
+	InputOptions []interface{}
+	ValPercent int
+}
+
+// Pytorch restore models
+type PRestore struct {
+	SrcPrefix string
+	DstPrefix string
+	SkipPrefixes string
+}
+
 type PytorchTrainParams struct {
-	ArchID int
+	Arch string
 
 	// dataset options
 	Dataset struct{
@@ -124,6 +141,9 @@ type PytorchTrainParams struct {
 		Params string
 	}
 
+	// restoring models, corresponding to the "models" input
+	Restore []PRestore
+
 	Train struct {
 		Op string
 		Params string
@@ -131,7 +151,7 @@ type PytorchTrainParams struct {
 }
 
 type PytorchInferParams struct {
-	ArchID int
+	Arch string
 
 	InputOptions []struct{
 		Idx int

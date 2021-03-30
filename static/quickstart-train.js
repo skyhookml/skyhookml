@@ -22,10 +22,12 @@ export default {
 					Name: "Object Detection",
 					Help: "Train a model to detect bounding boxes of instances of one or more object categories in images.",
 					Inputs: [{
+						ID: "images",
 						Name: "Images",
 						DataType: "image",
 						Help: "An image dataset containing example inputs.",
 					}, {
+						ID: "detections",
 						Name: "Detection Labels",
 						DataType: "detection",
 						Help: "A detection dataset containing bounding box labels corresponding to each input image.",
@@ -55,10 +57,12 @@ export default {
 					Name: "Image Classification",
 					Help: "Train a model to classify images into categories.",
 					Inputs: [{
+						ID: "images",
 						Name: "Images",
 						DataType: "image",
 						Help: "An image dataset containing example inputs.",
 					}, {
+						ID: "labels",
 						Name: "Classification Labels",
 						DataType: "int",
 						Help: "An integer dataset containing category labels corresponding to each input image.",
@@ -96,13 +100,14 @@ export default {
 		},
 		addNode: function() {
 			// create ExecParents from dataset inputIDs
-			let parents = [];
+			let parents = {};
 			for(let [idx, datasetID] of this.form.inputIDs.entries()) {
-				parents.push({
+				let input = this.form.task.Inputs[idx];
+				parents[input.ID] = [{
 					Type: 'd',
 					ID: datasetID,
-					DataType: this.form.task.Inputs[idx].DataType,
-				});
+					DataType: input.DataType,
+				}];
 			}
 			// create the node
 			let params = {
@@ -137,7 +142,7 @@ export default {
 				<label class="col-sm-4 col-form-label">Name</label>
 				<div class="col-sm-8">
 					<input v-model="form.name" type="text" class="form-control">
-					<small class="form-text text-muted">A name for these annotations.</small>
+					<small class="form-text text-muted">A name for this node.</small>
 				</div>
 			</div>
 			<div class="row mb-2">

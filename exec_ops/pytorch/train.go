@@ -23,7 +23,7 @@ func (e *TrainOp) Parallelism() int {
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	var params skyhook.PytorchTrainParams
 	skyhook.JsonUnmarshal([]byte(e.node.Params), &params)
-	arch, components, err := GetTrainArgs(e.url, params.ArchID)
+	arch, components, err := GetTrainArgs(e.url, params.Arch)
 	if err != nil {
 		return err
 	}
@@ -34,15 +34,24 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	datasets := e.node.InputDatasets
 
+	var parentModels []skyhook.Item
+	for i, itemList := range task.Items["models"] {
+		if len(itemList) != 1 {
+			return fmt.Errorf("parent model at index %d has %d items, expected exactly 1 item", i, len(itemList))
+		}
+		parentModels = append(parentModels, itemList[0])
+	}
+
 	// run the python op
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	datasetsArg := string(skyhook.JsonMarshal(datasets["inputs"]))
-	fmt.Println(e.dataset.ID, paramsArg, archArg, compsArg, datasetsArg)
+	modelsArg := string(skyhook.JsonMarshal(parentModels))
+	fmt.Println(e.dataset.ID, paramsArg, archArg, compsArg, datasetsArg, modelsArg)
 	cmd := exec.Command(
 		"python3", "exec_ops/pytorch/train.py",
-		fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg,
+		fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, modelsArg,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -88,109 +97,111 @@ func (op *TrainJobOp) Stop() error {
 	return nil
 }
 
-func init() {
-	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
-		Config: skyhook.ExecOpConfig{
-			ID: "pytorch_train",
-			Name: "Pytorch (train)",
-			Description: "Pytorch (train)",
-		},
-		Inputs: []skyhook.ExecInput{
-			{Name: "inputs", Variable: true},
-			{Name: "models", DataTypes: []skyhook.DataType{skyhook.StringType}, Variable: true},
-		},
-		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
-		Requirements: func(node skyhook.Runnable) map[string]int {
+var TrainImpl = skyhook.ExecOpImpl{
+	Config: skyhook.ExecOpConfig{
+		ID: "pytorch_train",
+		Name: "Pytorch (train)",
+		Description: "Pytorch (train)",
+	},
+	Inputs: []skyhook.ExecInput{
+		{Name: "inputs", Variable: true},
+		{Name: "models", DataTypes: []skyhook.DataType{skyhook.StringType}, Variable: true},
+	},
+	Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
+	Requirements: func(node skyhook.Runnable) map[string]int {
+		return nil
+	},
+	GetTasks: exec_ops.SingleTask("model"),
+	Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
+		op := &TrainOp{
+			url: url,
+			node: node,
+			dataset: node.OutputDatasets["model"],
+		}
+		return op, nil
+	},
+	ImageName: "skyhookml/pytorch",
+	GetJobOp: func(node skyhook.Runnable) (skyhook.JobOp, string) {
+		return &TrainJobOp{}, "pytorch_train"
+	},
+	Resolve: func(node *skyhook.VirtualNode, inputDatasets map[string][]skyhook.Dataset, items map[string][][]skyhook.Item) skyhook.ExecutionGraph {
+		// If parent items include non-materialized data (non-default provider),
+		// then we need to run materialize op on those datasets.
+
+		// list of names and indices that need materialization
+		type ParentSpec struct {
+			Name string
+			Index int
+		}
+		var needed []ParentSpec
+		for name, itemLists := range items {
+			for idx, itemList := range itemLists {
+				ok := true
+				for _, item := range itemList {
+					if item.Provider != nil {
+						ok = false
+						break
+					}
+				}
+				if ok {
+					continue
+				}
+				needed = append(needed, ParentSpec{
+					Name: name,
+					Index: idx,
+				})
+			}
+		}
+
+		if len(needed) == 0 {
 			return nil
-		},
-		GetTasks: exec_ops.SingleTask("model"),
-		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
-			op := &TrainOp{
-				url: url,
-				node: node,
-				dataset: node.OutputDatasets["model"],
-			}
-			return op, nil
-		},
-		ImageName: "skyhookml/pytorch",
-		GetJobOp: func(node skyhook.Runnable) skyhook.JobOp {
-			return &TrainJobOp{}
-		},
-		Resolve: func(node *skyhook.VirtualNode, inputDatasets map[string][]skyhook.Dataset, items map[string][][]skyhook.Item) skyhook.ExecutionGraph {
-			// If parent items include non-materialized data (non-default provider),
-			// then we need to run materialize op on those datasets.
+		}
 
-			// list of names and indices that need materialization
-			type ParentSpec struct {
-				Name string
-				Index int
-			}
-			var needed []ParentSpec
-			for name, itemLists := range items {
-				for idx, itemList := range itemLists {
-					ok := true
-					for _, item := range itemList {
-						if item.Provider != nil {
-							ok = false
-							break
-						}
-					}
-					if ok {
-						continue
-					}
-					needed = append(needed, ParentSpec{
-						Name: name,
-						Index: idx,
-					})
+		subgraph := make(skyhook.ExecutionGraph)
+		origGID := node.GraphID()
+
+		// create a materialize node to materialize the needed ones
+		var matParents []skyhook.VirtualParent
+		var matInputTypes []skyhook.DataType
+		specToMatOutputIndex := make(map[ParentSpec]int)
+		for i, spec := range needed {
+			matParents = append(matParents, node.Parents[spec.Name][spec.Index])
+			matInputTypes = append(matInputTypes, inputDatasets[spec.Name][spec.Index].DataType)
+			specToMatOutputIndex[spec] = i
+		}
+		matGID := skyhook.GraphID{
+			Type: origGID.Type,
+			ID: origGID.ID,
+			VirtualKey: origGID.VirtualKey+"/materialize",
+		}
+		subgraph[matGID] = &skyhook.VirtualNode{
+			Name: node.Name+"-materialize",
+			Op: "materialize",
+			Params: "",
+			Parents: map[string][]skyhook.VirtualParent{"inputs": matParents},
+			OrigNode: node.OrigNode,
+			VirtualKey: matGID.VirtualKey,
+		}
+
+		// and we need to update the pytorch node to input from the materialize node
+		for name := range node.Parents {
+			for idx := range node.Parents[name] {
+				matOutputIndex, ok := specToMatOutputIndex[ParentSpec{name, idx}]
+				if !ok {
+					continue
+				}
+				node.Parents[name][idx] = skyhook.VirtualParent{
+					GraphID: matGID,
+					Name: fmt.Sprintf("outputs%d", matOutputIndex),
 				}
 			}
+		}
+		subgraph[origGID] = node
 
-			if len(needed) == 0 {
-				return nil
-			}
+		return subgraph
+	},
+}
 
-			subgraph := make(skyhook.ExecutionGraph)
-			origGID := node.GraphID()
-
-			// create a materialize node to materialize the needed ones
-			var matParents []skyhook.VirtualParent
-			var matInputTypes []skyhook.DataType
-			specToMatOutputIndex := make(map[ParentSpec]int)
-			for i, spec := range needed {
-				matParents = append(matParents, node.Parents[spec.Name][spec.Index])
-				matInputTypes = append(matInputTypes, inputDatasets[spec.Name][spec.Index].DataType)
-				specToMatOutputIndex[spec] = i
-			}
-			matGID := skyhook.GraphID{
-				Type: origGID.Type,
-				ID: origGID.ID,
-				VirtualKey: origGID.VirtualKey+"/materialize",
-			}
-			subgraph[matGID] = &skyhook.VirtualNode{
-				Name: node.Name+"-materialize",
-				Op: "materialize",
-				Params: "",
-				Parents: map[string][]skyhook.VirtualParent{"inputs": matParents},
-				OrigNode: node.OrigNode,
-				VirtualKey: matGID.VirtualKey,
-			}
-
-			// and we need to update the pytorch node to input from the materialize node
-			for name := range node.Parents {
-				for idx := range node.Parents[name] {
-					matOutputIndex, ok := specToMatOutputIndex[ParentSpec{name, idx}]
-					if !ok {
-						continue
-					}
-					node.Parents[name][idx] = skyhook.VirtualParent{
-						GraphID: matGID,
-						Name: fmt.Sprintf("outputs%d", matOutputIndex),
-					}
-				}
-			}
-			subgraph[origGID] = node
-
-			return subgraph
-		},
-	})
+func init() {
+	skyhook.AddExecOpImpl(TrainImpl)
 }

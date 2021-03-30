@@ -29,6 +29,7 @@ import ExecReidTracker from './exec-edit-reid_tracker.js';
 import ExecPython from './exec-edit-python.js';
 import ExecPytorchTrain from './exec-edit-pytorch_train.js';
 import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
+import ExecPytorchYolov3Train from './exec-edit-pytorch_yolov3_train.js';
 import ExecYolov3Train from './exec-edit-yolov3_train.js';
 import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
 import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
@@ -72,6 +73,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
 		{path: '/ws/:ws/exec/pytorch_train/:nodeid', component: ExecPytorchTrain},
 		{path: '/ws/:ws/exec/pytorch_infer/:nodeid', component: ExecPytorchInfer},
+		{path: '/ws/:ws/exec/pytorch_yolov3_train/:nodeid', component: ExecPytorchYolov3Train},
 		{path: '/ws/:ws/exec/yolov3_train/:nodeid', component: ExecYolov3Train},
 		{path: '/ws/:ws/exec/yolov3_infer/:nodeid', component: ExecYolov3Infer},
 		{path: '/ws/:ws/exec/unsupervised_reid/:nodeid', component: ExecUnsupervisedReid},

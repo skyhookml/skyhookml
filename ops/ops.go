@@ -8,6 +8,7 @@ import (
 	_ "github.com/skyhookml/skyhookml/exec_ops/materialize"
 	_ "github.com/skyhookml/skyhookml/exec_ops/python"
 	_ "github.com/skyhookml/skyhookml/exec_ops/pytorch"
+	_ "github.com/skyhookml/skyhookml/exec_ops/pytorch/archs"
 	_ "github.com/skyhookml/skyhookml/exec_ops/reid_tracker"
 	_ "github.com/skyhookml/skyhookml/exec_ops/render"
 	_ "github.com/skyhookml/skyhookml/exec_ops/resample"
