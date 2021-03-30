@@ -113,7 +113,7 @@ const Datasets = {
 			<tr v-for="ds in datasets">
 				<td>{{ ds.Name }}</td>
 				<td>{{ ds.Type }}</td>
-				<td>{{ ds.DataType }}</td>
+				<td>{{ $globals.dataTypes[ds.DataType] }}</td>
 				<td>
 					<button v-on:click="selectDataset(ds)" class="btn btn-sm btn-primary">Manage</button>
 					<button v-on:click="exportDataset(ds)" class="btn btn-sm btn-primary">Export</button>

@@ -181,7 +181,7 @@ export default {
 					v-on:click="selectNode(nodeInfo.Node)"
 					>
 					<td>{{ nodeInfo.Node.Name }}</td>
-					<td>{{ nodeInfo.Node.Op }}</td>
+					<td>{{ $globals.ops[nodeInfo.Node.Op].Name }}</td>
 					<td>{{ nodeInfo.Inputs }}</td>
 					<td>{{ nodeInfo.Outputs }}</td>
 					<td></td>

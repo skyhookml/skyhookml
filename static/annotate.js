@@ -49,7 +49,7 @@ export default {
 				<td>{{ set.Dataset.Name }}</td>
 				<td>{{ set.Tool }}</td>
 				<td>{{ set.Inputs | niceInputs }}</td>
-				<td>{{ set.Dataset.DataType }}</td>
+				<td>{{ $globals.dataTypes[set.Dataset.DataType] }}</td>
 				<td>
 					<router-link :to="'/ws/'+$route.params.ws+'/annotate/'+set.Tool+'/'+set.ID" class="btn btn-sm btn-primary">Annotate</router-link>
 					<button v-on:click="removeAnnoset(set)" class="btn btn-sm btn-danger">Remove</button>
