@@ -21,11 +21,11 @@ func init() {
 		TrainInputs: []skyhook.ExecInput{
 			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType}},
 			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
-			{Name: "models", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "models", DataTypes: []skyhook.DataType{skyhook.FileType}},
 		},
 		InferInputs: []skyhook.ExecInput{
 			{Name: "input", DataTypes: []skyhook.DataType{skyhook.ImageType, skyhook.VideoType}},
-			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.FileType}},
 		},
 		InferOutputs: []skyhook.ExecOutput{
 			{Name: "detections", DataType: skyhook.DetectionType},

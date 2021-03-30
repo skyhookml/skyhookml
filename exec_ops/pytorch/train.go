@@ -33,21 +33,14 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	}
 
 	datasets := e.node.InputDatasets
-
-	var parentModels []skyhook.Item
-	for i, itemList := range task.Items["models"] {
-		if len(itemList) != 1 {
-			return fmt.Errorf("parent model at index %d has %d items, expected exactly 1 item", i, len(itemList))
-		}
-		parentModels = append(parentModels, itemList[0])
-	}
+	e.dataset.Mkdir()
 
 	// run the python op
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	datasetsArg := string(skyhook.JsonMarshal(datasets["inputs"]))
-	modelsArg := string(skyhook.JsonMarshal(parentModels))
+	modelsArg := string(skyhook.JsonMarshal(datasets["models"]))
 	fmt.Println(e.dataset.ID, paramsArg, archArg, compsArg, datasetsArg, modelsArg)
 	cmd := exec.Command(
 		"python3", "exec_ops/pytorch/train.py",
@@ -63,9 +56,14 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
-	// add filename to the string dataset
-	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.dataset.ID)}}
-	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
+	// add to the file dataset
+	fileMetadata := skyhook.FileMetadata{Filename: "model.pt"}
+	_, err = exec_ops.AddItem(e.url, e.dataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *TrainOp) Close() {}
@@ -105,9 +103,9 @@ var TrainImpl = skyhook.ExecOpImpl{
 	},
 	Inputs: []skyhook.ExecInput{
 		{Name: "inputs", Variable: true},
-		{Name: "models", DataTypes: []skyhook.DataType{skyhook.StringType}, Variable: true},
+		{Name: "models", DataTypes: []skyhook.DataType{skyhook.FileType}, Variable: true},
 	},
-	Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
+	Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.FileType}},
 	Requirements: func(node skyhook.Runnable) map[string]int {
 		return nil
 	},

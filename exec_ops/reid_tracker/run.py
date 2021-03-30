@@ -15,11 +15,11 @@ import torch
 import skyhook.pytorch.model as model
 import skyhook.pytorch.util as util
 
-node_id = int(sys.argv[1])
+in_dataset_id = int(sys.argv[1])
 
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
-model_path = 'models/{}.pt'.format(node_id)
+model_path = 'items/{}/model.pt'.format(in_dataset_id)
 save_dict = torch.load(model_path)
 net = model.Net(save_dict['arch'], save_dict['comps'], save_dict['example_inputs'])
 net.to(device)

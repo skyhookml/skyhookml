@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -17,21 +18,11 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	var params Params
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
 
-	// load model path from first input dataset
-	dataset := node.InputDatasets["model"][0]
-	modelItems, err := exec_ops.GetDatasetItems(url, dataset)
-	if err != nil {
-		return nil, err
-	}
-	strdata, err := modelItems["model"].LoadData()
-	if err != nil {
-		return nil, err
-	}
-	modelPath := strdata.(skyhook.StringData).Strings[0]
+	modelDataset := node.InputDatasets["model"][0]
 
 	// load category names
 	var categories []string
-	trainPath := fmt.Sprintf("models/yolov3-%s/", modelPath)
+	trainPath := modelDataset.Dirname()
 	bytes, err := ioutil.ReadFile(filepath.Join(trainPath, "obj.names"))
 	if err != nil {
 		return nil, fmt.Errorf("error reading obj.names: %v", err)
@@ -49,9 +40,9 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	cmd := skyhook.Command(
 		"yolov3-exec", skyhook.CommandOptions{},
 		"python3", "exec_ops/yolov3/run.py",
-		modelPath,
-		fmt.Sprintf("%d", batchSize),
-		fmt.Sprintf("%d", params.InputSize[0]), fmt.Sprintf("%d", params.InputSize[1]),
+		strconv.Itoa(modelDataset.ID),
+		strconv.Itoa(batchSize),
+		strconv.Itoa(params.InputSize[0]), strconv.Itoa(params.InputSize[1]),
 	)
 
 	return &Yolov3{
@@ -162,7 +153,7 @@ func init() {
 			Description: "Yolov3 (infer)",
 		},
 		Inputs: []skyhook.ExecInput{
-			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.FileType}},
 			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType, skyhook.VideoType}},
 		},
 		Outputs: []skyhook.ExecOutput{{Name: "detections", DataType: skyhook.DetectionType}},

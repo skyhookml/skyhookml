@@ -13,6 +13,7 @@ import (
 	"log"
 	"math"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -53,21 +54,10 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 		log.Printf("[reid_tracker] warning: error decoding parameters: %v", err)
 	}
 
-	// get the model path from the first input dataset
-	modelItems, err := exec_ops.GetDatasetItems(url, node.InputDatasets["model"][0])
-	if err != nil {
-		return nil, err
-	}
-	strdata, err := modelItems["model"].LoadData()
-	if err != nil {
-		return nil, err
-	}
-	modelPath := strdata.(skyhook.StringData).Strings[0]
-
 	cmd := skyhook.Command(
 		fmt.Sprintf("reid_tracker-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/reid_tracker/run.py",
-		modelPath,
+		strconv.Itoa(node.InputDatasets["model"][0].ID),
 	)
 
 	return &Tracker{
@@ -243,7 +233,7 @@ func init() {
 			Description: "Tracker using Re-identification Model",
 		},
 		Inputs: []skyhook.ExecInput{
-			{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+			{Name: "model", DataTypes: []skyhook.DataType{skyhook.FileType}},
 			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
 			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
 		},

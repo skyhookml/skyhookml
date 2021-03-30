@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 )
 
 type TrainOp struct {
@@ -73,6 +74,8 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		}
 	}
 
+	e.dataset.Mkdir()
+
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
@@ -80,7 +83,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	fmt.Println(e.dataset.ID, e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath)
 	cmd := exec.Command(
 		"python3", "exec_ops/unsupervised_reid/train.py",
-		fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
+		strconv.Itoa(e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, matchesPath,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -92,9 +95,14 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
-	// add filename to the string dataset
-	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.dataset.ID)}}
-	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
+	// add to the file dataset
+	fileMetadata := skyhook.FileMetadata{Filename: "model.pt"}
+	_, err = exec_ops.AddItem(e.url, e.dataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *TrainOp) Close() {}
@@ -110,7 +118,7 @@ func init() {
 			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
 			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
 		},
-		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
+		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.FileType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},

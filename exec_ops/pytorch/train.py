@@ -17,7 +17,7 @@ import skyhook.pytorch.util as util
 import skyhook.pytorch.dataset as skyhook_dataset
 import skyhook.pytorch.augment as skyhook_augment
 
-node_id = int(sys.argv[1])
+out_dataset_id = int(sys.argv[1])
 url = sys.argv[2]
 params_arg = sys.argv[3]
 arch_arg = sys.argv[4]
@@ -141,7 +141,7 @@ class StopCondition(object):
 		return False
 
 def save_model():
-	torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
+	torch.save(net.get_save_dict(), 'items/{}/model.pt'.format(out_dataset_id))
 
 class ModelSaver(object):
 	def __init__(self, params):
@@ -186,9 +186,8 @@ if params.get('Restore', None):
 		dst_prefix = restore['DstPrefix']
 		skip_prefixes = [prefix.strip() for prefix in restore['SkipPrefixes'].split(',') if prefix.strip()]
 		print('restore model to', dst_prefix)
-		# load the string data to find filename, then load the save dict
-		str_data = lib.load_item(parent_model['Dataset'], parent_model)
-		fname = 'models/{}.pt'.format(str_data[0])
+		# load save dict based on dataset ID
+		fname = 'items/{}/model.pt'.format(parent_model['ID'])
 		save_dict = torch.load(fname)
 		# update the parameter names based on src/dst/skip prefixes
 		state_dict = save_dict['model']

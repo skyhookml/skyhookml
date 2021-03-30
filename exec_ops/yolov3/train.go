@@ -38,10 +38,8 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// create temporary directory for training config/example files
 	log.Println("[yolov3-train] creating training and export directories")
-	trainPath := filepath.Join(workingDir, "models", fmt.Sprintf("yolov3-%d", e.dataset.ID))
-	if err := os.Mkdir(trainPath, 0755); err != nil {
-		return fmt.Errorf("could not mkdir %s: %v", trainPath, err)
-	}
+	trainPath := filepath.Join(workingDir, e.dataset.Dirname())
+	e.dataset.Mkdir()
 
 	exportPath := filepath.Join(os.TempDir(), fmt.Sprintf("yolov3-%d", e.dataset.ID))
 	if err := os.Mkdir(exportPath, 0755); err != nil {
@@ -242,9 +240,19 @@ backup=%s
 
 	skyhook.CopyFile(filepath.Join(exportPath, "yolov3_best.weights"), filepath.Join(trainPath, "yolov3.weights"))
 
-	// add filename to the string dataset
-	mydata := skyhook.StringData{Strings: []string{fmt.Sprintf("%d", e.dataset.ID)}}
-	return exec_ops.WriteItem(e.url, e.dataset, "model", mydata)
+	// add files to output dataset
+	for _, fname := range []string{"train.txt", "valid.txt", "test.txt", "yolov3.cfg", "obj.data", "obj.names", "yolov3.weights"} {
+		ext := filepath.Ext(fname)
+		key := fname[0:len(fname)-len(ext)]
+		ext = ext[1:]
+		fileMetadata := skyhook.FileMetadata{Filename: fname}
+		_, err := exec_ops.AddItem(e.url, e.dataset, key, ext, "", string(skyhook.JsonMarshal(fileMetadata)))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (e *TrainOp) Close() {}
@@ -260,7 +268,7 @@ func init() {
 			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType, skyhook.VideoType}},
 			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
 		},
-		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.StringType}},
+		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.FileType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},

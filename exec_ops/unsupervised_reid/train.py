@@ -20,7 +20,7 @@ MIN_PADDING = 4
 CROP_SIZE = 64
 MATCH_LENGTHS = [8, 16, 32, 64]
 
-node_id = int(sys.argv[1])
+out_dataset_id = int(sys.argv[1])
 url = sys.argv[2]
 params_arg = sys.argv[3]
 arch_arg = sys.argv[4]
@@ -218,7 +218,7 @@ while stop_count < 20:
 	if best_loss is None or val_loss < best_loss:
 		best_loss = val_loss
 		stop_count = 0
-		torch.save(net.get_save_dict(), 'models/{}.pt'.format(node_id))
+		torch.save(net.get_save_dict(), 'items/{}/model.pt'.format(out_dataset_id))
 	else:
 		stop_count += 1
 		if not updated_lr and stop_count > 10:

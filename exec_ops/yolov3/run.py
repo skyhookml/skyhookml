@@ -12,13 +12,13 @@ def eprint(s):
 	sys.stderr.write(str(s) + "\n")
 	sys.stderr.flush()
 
-train_node_id = int(sys.argv[1])
+in_dataset_id = int(sys.argv[1])
 batch_size = int(sys.argv[2])
 width = int(sys.argv[3])
 height = int(sys.argv[4])
 threshold = 0.05
 
-train_dir = os.path.join(base_path, 'models', 'yolov3-{}'.format(train_node_id))
+train_dir = os.path.join(base_path, 'items', str(in_dataset_id))
 config_path = os.path.join(train_dir, 'yolov3.cfg')
 meta_path = os.path.join(train_dir, 'obj.data')
 weight_path = os.path.join(train_dir, 'yolov3.weights')

@@ -7,6 +7,7 @@ import (
 
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 func GetInferOutputs(params skyhook.PytorchInferParams) []skyhook.ExecOutput {
@@ -34,22 +35,11 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 
 	inputDatasets := node.InputDatasets
 
-	// get the model path from the model input dataset
-	modelItems, err := exec_ops.GetDatasetItems(url, inputDatasets["model"][0])
-	if err != nil {
-		return nil, err
-	}
-	strdata, err := modelItems["model"].LoadData()
-	if err != nil {
-		return nil, err
-	}
-	modelPath := strdata.(skyhook.StringData).Strings[0]
-
 	paramsArg := node.Params
 	cmd := skyhook.Command(
 		fmt.Sprintf("pytorch-exec-%s", node.Name), skyhook.CommandOptions{},
 		"python3", "exec_ops/pytorch/run.py",
-		modelPath, paramsArg,
+		strconv.Itoa(inputDatasets["model"][0].ID), paramsArg,
 	)
 
 	var flatOutputs []skyhook.Dataset
@@ -68,7 +58,7 @@ var InferImpl = skyhook.ExecOpImpl{
 	},
 	Inputs: []skyhook.ExecInput{
 		{Name: "inputs", Variable: true},
-		{Name: "model", DataTypes: []skyhook.DataType{skyhook.StringType}},
+		{Name: "model", DataTypes: []skyhook.DataType{skyhook.FileType}},
 	},
 	GetOutputs: func(rawParams string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
 		var params skyhook.PytorchInferParams

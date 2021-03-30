@@ -28,7 +28,7 @@ export default {
 				}
 				let metadata = null;
 				try {
-					metadata = JSON.parse(state.Metadata);
+					metadata = JSON.parse(state.Datas.node);
 				} catch(e) {}
 				this.updateChart(metadata);
 				this.lines = state.Lines;
