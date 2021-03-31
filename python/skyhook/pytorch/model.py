@@ -9,7 +9,7 @@ import sys
 import skyhook.common as lib
 
 class Net(torch.nn.Module):
-	def __init__(self, arch, comps, example_inputs, example_metadatas, output_datasets=None):
+	def __init__(self, arch, comps, example_inputs, example_metadatas, output_datasets=None, infer=False):
 		super(Net, self).__init__()
 
 		self.arch = arch
@@ -49,6 +49,7 @@ class Net(torch.nn.Module):
 				'params': cur_params,
 				'example_inputs': cur_inputs,
 				'metadatas': cur_metadatas,
+				'infer': infer,
 			}
 
 			module_spec = comp.get('Module')

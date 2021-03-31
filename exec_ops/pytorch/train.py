@@ -65,25 +65,66 @@ val_set.set_augments(ds_augments)
 # this is because some augmentations are random but we want a consistent validation set
 # here we assume the validation set fits in system memory, but not necessarily GPU memory
 # so we apply augmentation on CPU, whereas during training we will apply on GPU
+
+train_params = json.loads(params['Train']['Params'])
+batch_size = train_params.get('BatchSize', 1)
+
 print('preparing validation set')
-val_loader = torch.utils.data.DataLoader(val_set, batch_size=32, num_workers=4, collate_fn=val_set.collate_fn)
+val_loader = torch.utils.data.DataLoader(
+	val_set,
+	batch_size=batch_size,
+	num_workers=4,
+	collate_fn=val_set.collate_fn,
+	# drop last unless we'd end up with 0 batches
+	drop_last=len(val_set) > batch_size
+)
 val_batches = []
 for batch in val_loader:
 	for obj in torch_augments:
 		batch = obj.forward(batch)
 	val_batches.append(batch)
 
+'''
+batch = val_batches[0]
+for i in range(32):
+	im = batch[0][i, :, :, :].cpu().numpy().transpose(1, 2, 0)
+	prefix = sum(batch[1]['counts'][0:i])
+	detections = batch[1]['detections'][prefix:prefix+batch[1]['counts'][i]]
+	for d in detections:
+		cls, sx, sy, ex, ey = d
+		sx = int(sx*im.shape[1])
+		sy = int(sy*im.shape[0])
+		ex = int(ex*im.shape[1])
+		ey = int(ey*im.shape[0])
+		im[sy:sy+2, sx:ex, :] = [255, 0, 0]
+		im[ey-2:ey, sx:ex, :] = [255, 0, 0]
+		im[sy:ey, sx:sx+2, :] = [255, 0, 0]
+		im[sy:ey, ex-2:ex, :] = [255, 0, 0]
+	skimage.io.imsave('/home/ubuntu/vis/{}.jpg'.format(i), im)
+'''
+
+'''
+batch = val_batches[0]
+for i in range(32):
+	im1 = batch[0][i, :, :, :].cpu().numpy().transpose(1, 2, 0)
+	im2 = (batch[1][i, 0, :, :].cpu().numpy() > 0).astype('uint8')*255
+	skimage.io.imsave('/home/ubuntu/vis/{}_im.jpg'.format(i), im1)
+	skimage.io.imsave('/home/ubuntu/vis/{}_mask.png'.format(i), im2)
+'''
+
 print('initialize model')
-train_params = json.loads(params['Train']['Params'])
 train_loader = torch.utils.data.DataLoader(
 	train_set,
-	batch_size=train_params.get('BatchSize', 1),
+	batch_size=batch_size,
 	shuffle=True,
 	num_workers=4,
-	collate_fn=train_set.collate_fn
+	collate_fn=train_set.collate_fn,
+	# drop last unless we'd end up with 0 batches
+	drop_last=len(train_set) > batch_size
 )
 
-example_inputs = train_set.collate_fn([train_set[0]])
+for example_inputs in train_loader:
+	break
 example_metadatas = train_set.get_metadatas(0)
 net = model.Net(arch, comps, example_inputs, example_metadatas)
 net.to(device)

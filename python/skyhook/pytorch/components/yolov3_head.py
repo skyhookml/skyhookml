@@ -17,6 +17,7 @@ def M(info):
 		class Yolov3(torch.nn.Module):
 			def __init__(self, info):
 				super(Yolov3, self).__init__()
+				self.infer = info['infer']
 				detection_metadata = info['metadatas'][3]
 				if detection_metadata and 'Categories' in detection_metadata:
 					self.categories = detection_metadata['Categories']
@@ -116,14 +117,14 @@ head:
 
 				if self.training:
 					d['pred'] = x
-					d['detections'] = None
 				else:
 					inf_out, d['pred'] = x
 
-					conf_thresh = 0.1
-					iou_thresh = 0.5
-					detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
-					d['detections'] = yolov3_common.process_outputs((x1.shape[3]*8, x1.shape[2]*8), detections, self.categories)
+					if self.infer:
+						conf_thresh = 0.1
+						iou_thresh = 0.5
+						detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
+						d['detections'] = yolov3_common.process_outputs((x1.shape[3]*8, x1.shape[2]*8), detections, self.categories)
 
 				if targets is not None:
 					loss, _ = utils.loss.compute_loss(d['pred'], targets, self)

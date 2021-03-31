@@ -85,7 +85,7 @@ func GetPytorchArch(id int) *DBPytorchArch {
 }
 
 func GetPytorchArchByName(name string) *DBPytorchArch {
-	rows := db.Query(PytorchArchQuery + " WHERE name = ?", name)
+	rows := db.Query(PytorchArchQuery + " WHERE name = ? OR id = ?", name, name)
 	archs := pytorchArchListHelper(rows)
 	if len(archs) == 1 {
 		return archs[0]

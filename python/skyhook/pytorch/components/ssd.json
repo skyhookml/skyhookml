@@ -1,0 +1,16 @@
+{
+	"Module": {"BuiltInModule": "ssd"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Outputs": {
+		"detections": "detection"
+	},
+	"Losses": [
+		"loss",
+		"regress_loss",
+		"classify_loss"
+	],
+	"Repositories": [
+		{"URL":"https://github.com/qfgaohao/pytorch-ssd.git"}
+	]
+}
