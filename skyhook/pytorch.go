@@ -58,7 +58,7 @@ type PytorchComponentParams struct {
 }
 
 type PytorchComponent struct {
-	ID int
+	ID string
 	Name string
 	Params PytorchComponentParams
 }
@@ -73,43 +73,44 @@ type PytorchArchInput struct {
 	DatasetIdx int
 }
 
+type PytorchArchComponent struct {
+	// PytorchComponent ID
+	ID string
+	// arbitrary JSON parameters
+	Params string
+	// where should component.Inputs come from
+	// these must be layer or input dataset (not target dataset)
+	Inputs []PytorchArchInput
+	// where should component.Targets come from
+	// these could be layer, input dataset, or target dataset
+	Targets []PytorchArchInput
+}
+
+type PytorchArchLoss struct {
+	ComponentIdx int
+	Layer string
+	Weight float64
+}
+
 type PytorchArchParams struct {
 	// datasets during training are numbered starting from inputs, then continuing with targets
 	// DatasetIdx refer to this unified numbering scheme
 	NumInputs int
 	NumTargets int
 
-	Components []struct{
-		// PytorchComponent ID
-		ID int
-		// arbitrary JSON parameters
-		Params string
-		// where should component.Inputs come from
-		// these must be layer or input dataset (not target dataset)
-		Inputs []PytorchArchInput
-		// where should component.Targets come from
-		// these could be layer, input dataset, or target dataset
-		Targets []PytorchArchInput
-	}
-	Losses []struct{
-		ComponentIdx int
-		Layer string
-		Weight float64
-	}
-	Scores []struct{
-		ComponentIdx int
-		Layer string
-		Weight float64
-	}
+	Components []PytorchArchComponent
+	Losses []PytorchArchLoss
+	Scores []PytorchArchLoss
 }
 
 type PytorchArch struct {
-	ID int
-	Name string
+	ID string
 	Params PytorchArchParams
 }
 
-// Pytorch default dataset
+// Pytorch default dataset parameters.
+// This configures skyhook.pytorch.dataset.default,
+// and goes JSON-encoded in PytorchTrainParams.Dataset.Params.
 type PDDImageOptions struct {
 	Width int
 	Height int
@@ -126,41 +127,42 @@ type PRestore struct {
 	SkipPrefixes string
 }
 
+type PytorchOpParams struct {
+	Op string
+	Params string
+}
+
 type PytorchTrainParams struct {
-	Arch string
-
+	ArchID string
 	// dataset options
-	Dataset struct{
-		Op string
-		Params string
-	}
-
+	Dataset PytorchOpParams
 	// data augmentation
-	Augment []struct{
-		Op string
-		Params string
-	}
-
+	Augment []PytorchOpParams
 	// restoring models, corresponding to the "models" input
 	Restore []PRestore
+	// training loop parameters
+	Train PytorchOpParams
+	// Configuring component parameters.
+	// This is like PytorchArchComponent.Params, but just overrides or extends
+	// those parameters with more options.
+	// It is map from component index to JSON-encoded parameters.
+	Components map[int]string
+}
 
-	Train struct {
-		Op string
-		Params string
-	}
+type PIInputOption struct {
+	Idx int
+	Value string
+}
+type PIOutputDataset struct {
+	ComponentIdx int
+	Layer string
+	DataType DataType
 }
 
 type PytorchInferParams struct {
-	Arch string
-
-	InputOptions []struct{
-		Idx int
-		Value string
-	}
-
-	OutputDatasets []struct{
-		ComponentIdx int
-		Layer string
-		DataType DataType
-	}
+	ArchID string
+	InputOptions []PIInputOption
+	OutputDatasets []PIOutputDataset
+	// See PytorchTrainParams.Components
+	Components map[int]string
 }

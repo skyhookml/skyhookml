@@ -32,7 +32,18 @@ datasets = json.loads(datasets_arg)
 parent_models = json.loads(parent_models_arg)
 
 arch = arch['Params']
-comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
+
+# overwrite parameters in arch['Components'][idx]['Params'] with parameters
+# from params['Components'][idx]
+if params.get('Components', None):
+	overwrite_comp_params = {int(k): v for k, v in params['Components'].items()}
+	for comp_idx, comp_spec in enumerate(arch['Components']):
+		comp_params = {}
+		if comp_spec['Params']:
+			comp_params = json.loads(comp_spec['Params'])
+		if overwrite_comp_params.get(comp_idx, None):
+			comp_params.update(json.loads(overwrite_comp_params[comp_idx]))
+		comp_spec['Params'] = json.dumps(comp_params)
 
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
@@ -220,8 +231,12 @@ elif rate_decay_params['Op'] == 'plateau':
 		min_lr=rate_decay_params['PlateauMin']
 	)
 
-if params.get('Restore', None):
+if params.get('Restore', None) and parent_models:
 	for i, restore in enumerate(params['Restore']):
+		if i >= len(parent_models):
+			# could happen if user configured restore but then removed parent
+			continue
+
 		parent_model = parent_models[i]
 		src_prefix = restore['SrcPrefix']
 		dst_prefix = restore['DstPrefix']

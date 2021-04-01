@@ -52,7 +52,7 @@ class Net(torch.nn.Module):
 				'infer': infer,
 			}
 
-			module_spec = comp.get('Module')
+			module_spec = comp['Params']['Module']
 			if module_spec.get('BuiltInModule', None):
 				module = importlib.import_module('skyhook.pytorch.components.' + module_spec['BuiltInModule'], package='skyhook.pytorch.components')
 				m = module.M(cur_info)

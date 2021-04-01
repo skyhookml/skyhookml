@@ -7,14 +7,14 @@ import (
 type DBPytorchComponent struct {skyhook.PytorchComponent}
 type DBPytorchArch struct {skyhook.PytorchArch}
 
-const PytorchComponentQuery = "SELECT id, name, params FROM pytorch_components"
+const PytorchComponentQuery = "SELECT id, params FROM pytorch_components"
 
 func pytorchComponentListHelper(rows *Rows) []*DBPytorchComponent {
 	var comps []*DBPytorchComponent
 	for rows.Next() {
 		var c DBPytorchComponent
 		var paramsRaw string
-		rows.Scan(&c.ID, &c.Name, &paramsRaw)
+		rows.Scan(&c.ID, &paramsRaw)
 		skyhook.JsonUnmarshal([]byte(paramsRaw), &c.Params)
 		comps = append(comps, &c)
 	}
@@ -26,7 +26,7 @@ func ListPytorchComponents() []*DBPytorchComponent {
 	return pytorchComponentListHelper(rows)
 }
 
-func GetPytorchComponent(id int) *DBPytorchComponent {
+func GetPytorchComponent(id string) *DBPytorchComponent {
 	rows := db.Query(PytorchComponentQuery + " WHERE id = ?", id)
 	comps := pytorchComponentListHelper(rows)
 	if len(comps) == 1 {
@@ -36,33 +36,29 @@ func GetPytorchComponent(id int) *DBPytorchComponent {
 	}
 }
 
-func NewPytorchComponent(name string) *DBPytorchComponent {
-	res := db.Exec("INSERT INTO pytorch_components (name, params) VALUES (?, '{}')", name)
-	return GetPytorchComponent(res.LastInsertId())
+func NewPytorchComponent(id string) *DBPytorchComponent {
+	db.Exec("INSERT INTO pytorch_components (id, params) VALUES (?, '{}')", id)
+	return GetPytorchComponent(id)
 }
 
 type PytorchComponentUpdate struct {
-	Name *string
 	Params *skyhook.PytorchComponentParams
 }
 
 func (c *DBPytorchComponent) Update(req PytorchComponentUpdate) {
-	if req.Name != nil {
-		db.Exec("UPDATE pytorch_components SET name = ? WHERE id = ?", *req.Name, c.ID)
-	}
 	if req.Params != nil {
 		db.Exec("UPDATE pytorch_components SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), c.ID)
 	}
 }
 
-const PytorchArchQuery = "SELECT id, name, params FROM pytorch_archs"
+const PytorchArchQuery = "SELECT id, params FROM pytorch_archs"
 
 func pytorchArchListHelper(rows *Rows) []*DBPytorchArch {
 	var archs []*DBPytorchArch
 	for rows.Next() {
 		var arch DBPytorchArch
 		var paramsRaw string
-		rows.Scan(&arch.ID, &arch.Name, &paramsRaw)
+		rows.Scan(&arch.ID, &paramsRaw)
 		skyhook.JsonUnmarshal([]byte(paramsRaw), &arch.Params)
 		archs = append(archs, &arch)
 	}
@@ -74,7 +70,7 @@ func ListPytorchArchs() []*DBPytorchArch {
 	return pytorchArchListHelper(rows)
 }
 
-func GetPytorchArch(id int) *DBPytorchArch {
+func GetPytorchArch(id string) *DBPytorchArch {
 	rows := db.Query(PytorchArchQuery + " WHERE id = ?", id)
 	archs := pytorchArchListHelper(rows)
 	if len(archs) == 1 {
@@ -84,8 +80,8 @@ func GetPytorchArch(id int) *DBPytorchArch {
 	}
 }
 
-func GetPytorchArchByName(name string) *DBPytorchArch {
-	rows := db.Query(PytorchArchQuery + " WHERE name = ? OR id = ?", name, name)
+func GetPytorchArchByName(id string) *DBPytorchArch {
+	rows := db.Query(PytorchArchQuery + " WHERE id = ?", id)
 	archs := pytorchArchListHelper(rows)
 	if len(archs) == 1 {
 		return archs[0]
@@ -94,20 +90,16 @@ func GetPytorchArchByName(name string) *DBPytorchArch {
 	}
 }
 
-func NewPytorchArch(name string) *DBPytorchArch {
-	res := db.Exec("INSERT INTO pytorch_archs (name, params) VALUES (?, '{}')", name)
-	return GetPytorchArch(res.LastInsertId())
+func NewPytorchArch(id string) *DBPytorchArch {
+	db.Exec("INSERT INTO pytorch_archs (id, params) VALUES (?, '{}')", id)
+	return GetPytorchArch(id)
 }
 
 type PytorchArchUpdate struct {
-	Name *string
 	Params *skyhook.PytorchArchParams
 }
 
 func (arch *DBPytorchArch) Update(req PytorchArchUpdate) {
-	if req.Name != nil {
-		db.Exec("UPDATE pytorch_archs SET name = ? WHERE id = ?", *req.Name, arch.ID)
-	}
 	if req.Params != nil {
 		db.Exec("UPDATE pytorch_archs SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), arch.ID)
 	}

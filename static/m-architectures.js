@@ -19,7 +19,7 @@ export default {
 		},
 		showAddModal: function() {
 			this.addForm = {
-				name: '',
+				id: '',
 			};
 			$(this.$refs.addModal).modal('show');
 		},
@@ -33,9 +33,6 @@ export default {
 			utils.request(this, 'DELETE', '/pytorch/archs/'+archID, null, () => {
 				this.fetch();
 			});
-		},
-		selectArch: function(arch) {
-			this.$router.push('/ws/'+this.$route.params.ws+'/models/arch/'+arch.ID);
 		},
 	},
 	watch: {
@@ -55,9 +52,9 @@ export default {
 				<div class="modal-body">
 					<form v-on:submit.prevent="add">
 						<div class="row mb-2">
-							<label class="col-sm-4 col-form-label">Name</label>
+							<label class="col-sm-4 col-form-label">ID</label>
 							<div class="col-sm-8">
-								<input class="form-control" type="text" v-model="addForm.name" />
+								<input class="form-control" type="text" v-model="addForm.id" />
 							</div>
 						</div>
 						<div class="row">
@@ -73,15 +70,15 @@ export default {
 	<table class="table table-sm">
 		<thead>
 			<tr>
-				<th>Name</th>
+				<th>ID</th>
 				<th></th>
 			</tr>
 		</thead>
 		<tbody>
 			<tr v-for="arch in archs">
-				<td>{{ arch.Name }}</td>
+				<td>{{ arch.ID }}</td>
 				<td>
-					<button v-on:click="selectArch(arch)" class="btn btn-sm btn-primary">Manage</button>
+					<router-link :to="'/ws/'+$route.params.ws+'/models/arch/'+arch.ID" class="btn btn-sm btn-primary">Manage</router-link>
 					<button v-on:click="deleteArch(arch.ID)" class="btn btn-sm btn-danger">Delete</button>
 				</td>
 			</tr>

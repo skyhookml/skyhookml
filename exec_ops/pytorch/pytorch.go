@@ -10,20 +10,20 @@ import (
 	"path/filepath"
 )
 
-func GetTrainArgs(url string, archName string) (*skyhook.PytorchArch, map[int]*skyhook.PytorchComponent, error) {
+func GetTrainArgs(url string, archID string) (*skyhook.PytorchArch, map[string]*skyhook.PytorchComponent, error) {
 	// get the PytorchComponents
 	var arch skyhook.PytorchArch
-	err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/archs/%s", archName), &arch)
+	err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/archs/%s", archID), &arch)
 	if err != nil {
 		return nil, nil, err
 	}
-	components := make(map[int]*skyhook.PytorchComponent)
+	components := make(map[string]*skyhook.PytorchComponent)
 	for _, compSpec := range arch.Params.Components {
 		if components[compSpec.ID] != nil {
 			continue
 		}
 		var comp skyhook.PytorchComponent
-		err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/components/%d", compSpec.ID), &comp)
+		err := skyhook.JsonGet(url, fmt.Sprintf("/pytorch/components/%s", compSpec.ID), &comp)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -69,7 +69,7 @@ func EnsureRepository(repo skyhook.PytorchRepository) error {
 	return nil
 }
 
-func EnsureRepositories(comps map[int]*skyhook.PytorchComponent) error {
+func EnsureRepositories(comps map[string]*skyhook.PytorchComponent) error {
 	for _, comp := range comps {
 		for _, repo := range comp.Params.Repositories {
 			if err := EnsureRepository(repo); err != nil {

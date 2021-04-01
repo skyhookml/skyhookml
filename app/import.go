@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -66,6 +67,7 @@ func ImportDataset(path string, opts ImportOptions) error {
 
 	// create a new dataset and the directory, and copy the sqlite3
 	ds := NewDataset(rawds.Name, rawds.Type, rawds.DataType, rawds.Hash)
+	opts.AppJobOp.Job.UpdateMetadata(strconv.Itoa(ds.ID))
 	ds.Mkdir()
 	if err := skyhook.CopyFile(srcDBFname, ds.DBFname()); err != nil {
 		ds.Delete()
@@ -277,6 +279,48 @@ func (ds *DBDataset) ImportDir(path string, opts ImportOptions) error {
 	return ds.ImportFiles(fnames, opts)
 }
 
+// Import from a URL.
+// Calls handler function after URL is downloaded and unzipped.
+// Updates opts with progress.
+func ImportURL(url string, opts ImportOptions, f func(path string) error) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("error getting %s: status %d", url, resp.StatusCode)
+	}
+	file, err := ioutil.TempFile("", "*.zip")
+	if err != nil {
+		return fmt.Errorf("error making temporary file: %v", err)
+	}
+	defer os.Remove(file.Name())
+
+	// download the file and update opts with progress
+	opts.AppJobOp.Update([]string{fmt.Sprintf("Downloading from %s to %s", url, file.Name())})
+	buf := make([]byte, 4096)
+	read := 0
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			file.Write(buf[0:n])
+		}
+		read += n
+		if resp.ContentLength > 0 {
+			opts.ProgressJobOp.SetProgressPercent(read * 100 / int(resp.ContentLength))
+		}
+		if err == nil {
+			continue
+		} else if err == io.EOF {
+			break
+		}
+	}
+	opts.AppJobOp.Update([]string{"Download completed!"})
+
+	return UnzipThen(file.Name(), f)
+}
+
 // unzip the filename to a temporary directory, then call another function
 // afterwards we will clear the temporary directory
 func UnzipThen(fname string, f func(path string) error) error {
@@ -410,6 +454,22 @@ func init() {
 				skyhook.JsonResponse(w, opts.AppJobOp.Job)
 				return nil
 			})
+		} else if mode == "url" {
+			url := r.PostForm.Get("url")
+			opts := makeImportOptions(fmt.Sprintf("Import from %s", url), false)
+			go func() {
+				err := ImportURL(url, opts, func(path string) error {
+					importFunc(path, opts)
+					return nil
+				})
+				if err != nil {
+					// This means we didn't quite make it to importFunc.
+					// So we need to set the error here.
+					log.Printf("[import-dataset] failed to download %s: %v", url)
+					opts.AppJobOp.SetDone(err.Error())
+				}
+			}()
+			skyhook.JsonResponse(w, opts.AppJobOp.Job)
 		}
 	}).Methods("POST")
 

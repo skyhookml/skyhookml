@@ -20,9 +20,8 @@ func init() {
 		skyhook.JsonResponse(w, comp)
 	}).Methods("POST")
 
-	Router.HandleFunc("/pytorch/components/{comp_id}", func(w http.ResponseWriter, r *http.Request) {
-		compID := skyhook.ParseInt(mux.Vars(r)["comp_id"])
-		comp := GetPytorchComponent(compID)
+	Router.HandleFunc("/pytorch/components/{comp}", func(w http.ResponseWriter, r *http.Request) {
+		comp := GetPytorchComponent(mux.Vars(r)["comp"])
 		if comp == nil {
 			http.Error(w, "no such PytorchComponent", 404)
 			return
@@ -30,9 +29,8 @@ func init() {
 		skyhook.JsonResponse(w, comp)
 	}).Methods("GET")
 
-	Router.HandleFunc("/pytorch/components/{comp_id}", func(w http.ResponseWriter, r *http.Request) {
-		compID := skyhook.ParseInt(mux.Vars(r)["comp_id"])
-		comp := GetPytorchComponent(compID)
+	Router.HandleFunc("/pytorch/components/{comp}", func(w http.ResponseWriter, r *http.Request) {
+		comp := GetPytorchComponent(mux.Vars(r)["comp"])
 		if comp == nil {
 			http.Error(w, "no such PytorchComponent", 404)
 			return

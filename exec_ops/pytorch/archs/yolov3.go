@@ -10,9 +10,22 @@ import (
 func init() {
 	type TrainParams struct {
 		skyhook.PytorchTrainParams
+		Mode string
 		Width int
 		Height int
 		ValPercent int
+	}
+
+	type InferParams struct {
+		Width int
+		Height int
+		ConfidenceThreshold float64
+	}
+
+	type ModelParams struct {
+		Mode string `json:"mode,omitempty"`
+		ConfidenceThreshold float64 `json:"confidence_threshold,omitempty"`
+		IouThreshold float64 `json:"iou_threshold,omitempty"`
 	}
 
 	AddImpl(Impl{
@@ -44,15 +57,46 @@ func init() {
 				}, struct{}{}},
 				ValPercent: params.ValPercent,
 			}))
-			p.Arch = "yolov3"
+
+			modelParams := ModelParams{
+				Mode: params.Mode,
+			}
+			p.Components = map[int]string{
+				0: string(skyhook.JsonMarshal(modelParams)),
+			}
+
+			p.ArchID = "yolov3"
 			return p, nil
 		},
 		InferPrepare: func(node skyhook.Runnable) (skyhook.PytorchInferParams, error) {
-			var params skyhook.PytorchInferParams
+			var params InferParams
 			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
 				return skyhook.PytorchInferParams{}, fmt.Errorf("node is not configured")
 			}
-			return params, nil
+			p := skyhook.PytorchInferParams{
+				ArchID: "yolov3",
+				OutputDatasets: []skyhook.PIOutputDataset{{
+					ComponentIdx: 0,
+					Layer: "detections",
+					DataType: skyhook.DetectionType,
+				}},
+			}
+			if params.Width > 0 || params.Height > 0 {
+				opt := skyhook.PDDImageOptions{params.Width, params.Height}
+				p.InputOptions = []skyhook.PIInputOption{{
+					Idx: 0,
+					Value: string(skyhook.JsonMarshal(opt)),
+				}}
+			}
+
+			modelParams := ModelParams{
+				ConfidenceThreshold: params.ConfidenceThreshold,
+			}
+			p.Components = map[int]string{
+				0: string(skyhook.JsonMarshal(modelParams)),
+			}
+
+			return p, nil
 		},
 	})
 }

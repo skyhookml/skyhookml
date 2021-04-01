@@ -35,6 +35,9 @@ export default {
 			if(!params.Restore) {
 				params.Restore = [];
 			}
+			if(!params.Mode) {
+				params.Mode = 'yolov3';
+			}
 			if(!params.Width) {
 				params.Width = 0;
 			}
@@ -76,6 +79,20 @@ export default {
 		<div class="tab-content mx-1">
 			<div class="tab-pane fade show active" id="pytorch-basic-panel" role="tabpanel">
 				<div class="small-container">
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Mode</label>
+						<div class="col-sm-8">
+							<select v-model="params.Mode" class="form-select">
+								<option value="yolov3">YOLOv3</option>
+								<option value="yolov3-spp">YOLOv3-SPP</option>
+								<option value="yolov3-tiny">YOLOv3-Tiny</option>
+							</select>
+							<small class="form-text text-muted">
+								YOLOv3 and YOLOv3-SPP are large models providing high accuracy (YOLOv3-SPP may provide slightly higher accuarcy).
+								YOLOv3-Tiny is a small model that is fast but provides lower accuracy.
+							</small>
+						</div>
+					</div>
 					<div class="row mb-2">
 						<label class="col-sm-4 col-form-label">Width</label>
 						<div class="col-sm-8">

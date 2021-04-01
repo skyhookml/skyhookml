@@ -52,27 +52,6 @@ export default {
 			this.file = event.target.files[0];
 		},
 		submitUpload: function() {
-			// helper function to wait for this.job to complete before proceeding
-			let waitForJob = () => {
-				return new Promise((resolve, reject) => {
-					let interval;
-					let checkFunc = () => {
-						utils.request(this, 'GET', '/jobs/'+this.job.ID, null, (job) => {
-							if(!job.Done) {
-								return;
-							}
-							clearInterval(interval);
-							if(job.Error) {
-								reject(job);
-								return;
-							}
-							resolve(job);
-						});
-					};
-					interval = setInterval(checkFunc, 1000);
-				});
-			};
-
 			let handle = async () => {
 				this.phase = 'uploading';
 
@@ -171,7 +150,7 @@ export default {
 				this.phase = 'importing';
 				console.log('[import] waiting for import job');
 				try {
-					await waitForJob();
+					await utils.waitForJob(this.job.ID);
 				} catch(e) {
 					setError('Import error: ' + e.Error);
 					return;
@@ -232,7 +211,7 @@ export default {
 				try {
 					convertJob = await utils.request(this, 'POST', '/runnable', JSON.stringify(runnable));
 				} catch(e) {
-					setDone('Error starting convert job: ' + e.responseText, e);
+					setError('Error starting convert job: ' + e.responseText, e);
 					return;
 				}
 
@@ -242,7 +221,7 @@ export default {
 				this.phase = 'converting';
 				console.log('[import] waiting for convert job');
 				try {
-					await waitForJob();
+					await utils.waitForJob(this.job.ID);
 				} catch(e) {
 					setError('Conversion error: ' + e.Error);
 					return;

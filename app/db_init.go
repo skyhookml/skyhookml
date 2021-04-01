@@ -31,13 +31,11 @@ func InitDB(init bool) {
 			params TEXT
 		)`)
 		db.Exec(`CREATE TABLE IF NOT EXISTS pytorch_archs (
-			id INTEGER PRIMARY KEY ASC,
-			name TEXT,
+			id TEXT PRIMARY KEY,
 			params TEXT
 		)`)
 		db.Exec(`CREATE TABLE IF NOT EXISTS pytorch_components (
-			id INTEGER PRIMARY KEY ASC,
-			name TEXT,
+			id TEXT PRIMARY KEY,
 			params TEXT
 		)`)
 		db.Exec(`CREATE TABLE IF NOT EXISTS exec_nodes (
@@ -85,18 +83,30 @@ func InitDB(init bool) {
 			if !strings.HasSuffix(fi.Name(), ".json") {
 				continue
 			}
-			name := strings.Split(fi.Name(), ".json")[0]
+			id := strings.Split(fi.Name(), ".json")[0]
 			bytes, err := ioutil.ReadFile(filepath.Join(componentPath, fi.Name()))
 			if err != nil {
 				panic(err)
 			}
-			var count int
-			db.QueryRow("SELECT COUNT(*) FROM pytorch_components WHERE name = ?", name).Scan(&count)
-			if count == 0 {
-				db.Exec("INSERT INTO pytorch_components (name, params) VALUES (?, ?)", name, string(bytes))
-			} else {
-				db.Exec("UPDATE pytorch_components SET params = ? WHERE name = ?", string(bytes), name)
+			db.Exec("INSERT OR REPLACE INTO pytorch_components (id, params) VALUES (?, ?)", id, string(bytes))
+		}
+
+		// add missing pytorch archs
+		archPath := "exec_ops/pytorch/archs/"
+		files, err = ioutil.ReadDir(archPath)
+		if err != nil {
+			panic(err)
+		}
+		for _, fi := range files {
+			if !strings.HasSuffix(fi.Name(), ".json") {
+				continue
 			}
+			id := strings.Split(fi.Name(), ".json")[0]
+			bytes, err := ioutil.ReadFile(filepath.Join(archPath, fi.Name()))
+			if err != nil {
+				panic(err)
+			}
+			db.Exec("INSERT OR REPLACE INTO pytorch_archs (id, params) VALUES (?, ?)", id, string(bytes))
 		}
 
 		// add default workspace if it doesn't exist

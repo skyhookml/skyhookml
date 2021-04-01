@@ -25,7 +25,7 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	// check the ArchID just to make sure we have all git repositories
 	var params skyhook.PytorchInferParams
 	skyhook.JsonUnmarshal([]byte(node.Params), &params)
-	_, components, err := GetTrainArgs(url, params.Arch)
+	_, components, err := GetTrainArgs(url, params.ArchID)
 	if err != nil {
 		return nil, err
 	}

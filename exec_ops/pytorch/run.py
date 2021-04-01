@@ -23,7 +23,21 @@ device = torch.device('cuda:0')
 #device = torch.device('cpu')
 model_path = 'items/{}/model.pt'.format(in_dataset_id)
 save_dict = torch.load(model_path)
-net = model.Net(save_dict['arch'], save_dict['comps'], save_dict['example_inputs'], save_dict['example_metadatas'], output_datasets=params['OutputDatasets'], infer=True)
+
+# overwrite parameters in save_dict['arch'] with parameters from
+# params['Components'][comp_idx]
+arch = save_dict['arch']
+if params.get('Components', None):
+	overwrite_comp_params = {int(k): v for k, v in params['Components'].items()}
+	for comp_idx, comp_spec in enumerate(arch['Components']):
+		comp_params = {}
+		if comp_spec['Params']:
+			comp_params = json.loads(comp_spec['Params'])
+		if overwrite_comp_params.get(comp_idx, None):
+			comp_params.update(json.loads(overwrite_comp_params[comp_idx]))
+		comp_spec['Params'] = json.dumps(comp_params)
+
+net = model.Net(arch, save_dict['comps'], save_dict['example_inputs'], save_dict['example_metadatas'], output_datasets=params['OutputDatasets'], infer=True)
 net.to(device)
 
 net.load_state_dict(save_dict['model'])

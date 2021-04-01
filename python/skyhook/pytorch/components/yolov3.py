@@ -21,9 +21,16 @@ def M(info):
 				else:
 					self.categories = ['object']
 				self.nc = len(self.categories)
-				lib.eprint('yolov3: set nc={}'.format(self.nc))
 
-				self.model = models.yolo.Model(cfg=os.path.join(ctx.expected_path, 'models', 'yolov3.yaml'), nc=self.nc)
+				# e.g. 'yolov3', 'yolov3-tiny', 'yolov3-spp'
+				self.mode = info['params'].get('mode', 'yolov3')
+
+				self.confidence_threshold = info['params'].get('confidence_threshold', 0.1)
+				self.iou_threshold = info['params'].get('iou_threshold', 0.5)
+
+				lib.eprint('yolov3: set nc={}, mode={}, conf={}, iou={}'.format(self.nc, self.mode, self.confidence_threshold, self.iou_threshold))
+
+				self.model = models.yolo.Model(cfg=os.path.join(ctx.expected_path, 'models', '{}.yaml'.format(self.mode)), nc=self.nc)
 				self.model.nc = self.nc
 				with open(os.path.join(ctx.expected_path, 'data', 'hyp.scratch.yaml'), 'r') as f:
 					hyp = yaml.load(f, Loader=yaml.FullLoader)
@@ -44,9 +51,7 @@ def M(info):
 					inf_out, d['pred'] = self.model(x.float()/255.0)
 
 					if self.infer:
-						conf_thresh = 0.1
-						iou_thresh = 0.5
-						detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
+						detections = utils.general.non_max_suppression(inf_out, self.confidence_threshold, self.iou_threshold)
 						d['detections'] = yolov3_common.process_outputs((x.shape[3], x.shape[2]), detections, self.categories)
 
 				if targets is not None:

@@ -52,6 +52,10 @@ func (j *DBJob) UpdateState(state string) {
 	db.Exec("UPDATE jobs SET state = ? WHERE id = ?", state, j.ID)
 }
 
+func (j *DBJob) UpdateMetadata(metadata string) {
+	db.Exec("UPDATE jobs SET metadata = ? WHERE id = ?", metadata, j.ID)
+}
+
 func (j *DBJob) GetState() string {
 	var state string
 	db.QueryRow("SELECT state FROM jobs WHERE id = ?", j.ID).Scan(&state)
@@ -216,6 +220,13 @@ func (op *ProgressJobOp) SetTotal(total int) {
 	op.mu.Lock()
 	op.Total = total
 	op.Completed = 0
+	op.mu.Unlock()
+}
+
+func (op *ProgressJobOp) SetProgressPercent(percent int) {
+	op.mu.Lock()
+	op.Total = 100
+	op.Completed = percent
 	op.mu.Unlock()
 }
 

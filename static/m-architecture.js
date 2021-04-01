@@ -82,7 +82,7 @@ export default {
 		},
 		addComponent: function() {
 			this.components.push({
-				ID: parseInt(this.addComponentForm.componentID),
+				ID: this.addComponentForm.componentID,
 				Params: '',
 				Inputs: [],
 				Targets: [],
@@ -191,7 +191,7 @@ export default {
 			<div class="col-sm-10">
 				<template v-for="(compSpec, compIdx) in components">
 					<h3>
-						Component #{{ compIdx }}<template v-if="compSpec.ID in comps">: {{ comps[compSpec.ID].Name }}</template>
+						Component #{{ compIdx }}: {{ compSpec.ID }}
 						<button type="button" class="btn btn-sm btn-danger" v-on:click="removeComponent(compIdx)">Remove</button>
 					</h3>
 					<p>Inputs:</p>
@@ -233,7 +233,7 @@ export default {
 				<form class="row g-1 align-items-center" v-on:submit.prevent="addComponent">
 					<div class="col-auto">
 						<select class="form-select" v-model="addComponentForm.componentID">
-							<option v-for="comp in comps" :key="comp.ID" :value="comp.ID">{{ comp.Name }}</option>
+							<option v-for="comp in comps" :key="comp.ID" :value="comp.ID">{{ comp.ID }}</option>
 						</select>
 					</div>
 					<div class="col-auto">
@@ -260,7 +260,7 @@ export default {
 						<tbody>
 							<tr v-for="(spec, i) in list">
 								<td>
-									Component #{{ spec.ComponentIdx }}<template v-if="getComponent(spec.ComponentIdx)">: {{ getComponent(spec.ComponentIdx).Name }}</template>
+									Component #{{ spec.ComponentIdx }}<template v-if="getComponent(spec.ComponentIdx)">: {{ getComponent(spec.ComponentIdx).ID }}</template>
 								</td>
 								<td>{{ spec.Layer }}</td>
 								<td>{{ spec.Weight }}</td>
@@ -272,7 +272,7 @@ export default {
 								<td>
 									<select v-model="form.componentIdx" class="form-select">
 										<template v-for="(compSpec, compIdx) in components">
-											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ comps[compSpec.ID].Name }}</option>
+											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ compSpec.ID }}</option>
 										</template>
 									</select>
 								</td>

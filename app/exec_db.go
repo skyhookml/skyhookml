@@ -133,6 +133,7 @@ func (node *DBExecNode) GetVirtualDatasets(vnode *skyhook.VirtualNode) map[strin
 		if ds == nil {
 			ds = NewDataset(dsName, "computed", output.DataType, &curHash)
 		}
+		ds.AddExecRef(node.ID)
 		datasets[output.Name] = ds
 	}
 	return datasets

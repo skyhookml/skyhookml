@@ -7,9 +7,10 @@ export default {
 			symlink: false,
 			file: null,
 			percent: null,
+			url: null,
 
 			// either /datasets/[ID]/import or /import-dataset depending on mode
-			importURL: '',
+			importEndpoint: '',
 		};
 	},
 	props: [
@@ -22,9 +23,9 @@ export default {
 	],
 	created: function() {
 		if(this.mode == 'add') {
-			this.importURL = '/datasets/'+this.dataset.ID+'/import';
+			this.importEndpoint = '/datasets/'+this.dataset.ID+'/import';
 		} else if(this.mode == 'new') {
-			this.importURL = '/import-dataset';
+			this.importEndpoint = '/import-dataset';
 		}
 	},
 	mounted: function() {
@@ -48,7 +49,9 @@ export default {
 				path: this.path,
 				symlink: this.symlink,
 			};
-			utils.request(this, 'POST', this.importURL+'?mode=local', params);
+			utils.request(this, 'POST', this.importEndpoint+'?mode=local', params, (job) => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
+			});
 			$(this.$refs.modal).modal('hide');
 		},
 		submitUpload: function() {
@@ -57,7 +60,7 @@ export default {
 			this.percent = null;
 			$.ajax({
 				type: 'POST',
-				url: this.importURL+'?mode=upload',
+				url: this.importEndpoint+'?mode=upload',
 				error: (req, status, errorMsg) => {
 					app.setError(errorMsg);
 				},
@@ -75,11 +78,20 @@ export default {
 					return xhr;
 				},
 				success: (job) => {
-					$(this.$refs.modal).modal('hide');
-					this.$emit('imported', job);
 					this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 				},
 			});
+			$(this.$refs.modal).modal('hide');
+		},
+		submitURL: function() {
+			let params = {
+				mode: 'url',
+				url: this.url,
+			};
+			utils.request(this, 'POST', this.importEndpoint+'?mode=url', params, (job) => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
+			});
+			$(this.$refs.modal).modal('hide');
 		},
 	},
 	template: `
@@ -102,6 +114,9 @@ export default {
 						</li>
 						<li class="nav-item">
 							<a class="nav-link" data-toggle="tab" href="#import-upload-tab" role="tab">Upload</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" data-toggle="tab" href="#import-url-tab" role="tab">URL</a>
 						</li>
 					</ul>
 					<div class="tab-content">
@@ -168,6 +183,29 @@ export default {
 											</template>
 											<template v-else-if="mode == 'new'">
 												A SkyhookML-formatted dataset archive (.zip containing db.sqlite3 and files).
+											</template>
+										</small>
+									</div>
+								</div>
+								<div class="row">
+									<div class="col-sm-10">
+										<button type="submit" class="btn btn-primary">Import</button>
+									</div>
+								</div>
+							</form>
+						</div>
+						<div class="tab-pane" id="import-url-tab">
+							<form v-on:submit.prevent="submitURL">
+								<div class="row mb-2">
+									<label class="col-sm-2 col-form-label">URL</label>
+									<div class="col-sm-10">
+										<input class="form-control" type="text" v-model="url" />
+										<small class="form-text text-muted">
+											<template v-if="mode == 'add'">
+												The URL of a zip file from which to import files.
+											</template>
+											<template v-if="mode == 'new'">
+												The URL of a SkyhookML-formatted dataset archive (.zip containing db.sqlite3 and files).
 											</template>
 										</small>
 									</div>

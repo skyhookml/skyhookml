@@ -24,7 +24,11 @@ def M(info):
 				else:
 					self.categories = ['object']
 				self.nc = len(self.categories)
-				lib.eprint('yolov3: set nc={}'.format(self.nc))
+
+				self.confidence_threshold = info['params'].get('confidence_threshold', 0.1)
+				self.iou_threshold = info['params'].get('iou_threshold', 0.5)
+
+				lib.eprint('yolov3: set nc={}, conf={}, iou={}'.format(self.nc, self.confidence_threshold, self.iou_threshold))
 
 				example_inputs = info['example_inputs']
 				assert example_inputs[0].shape[2] == 2*example_inputs[1].shape[2]
@@ -121,9 +125,7 @@ head:
 					inf_out, d['pred'] = x
 
 					if self.infer:
-						conf_thresh = 0.1
-						iou_thresh = 0.5
-						detections = utils.general.non_max_suppression(inf_out, conf_thresh, iou_thresh)
+						detections = utils.general.non_max_suppression(inf_out, self.confidence_threshold, self.iou_threshold)
 						d['detections'] = yolov3_common.process_outputs((x1.shape[3]*8, x1.shape[2]*8), detections, self.categories)
 
 				if targets is not None:
