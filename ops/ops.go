@@ -14,6 +14,7 @@ import (
 	_ "github.com/skyhookml/skyhookml/exec_ops/resample"
 	_ "github.com/skyhookml/skyhookml/exec_ops/segmentation_mask"
 	_ "github.com/skyhookml/skyhookml/exec_ops/simple_tracker"
+	_ "github.com/skyhookml/skyhookml/exec_ops/union"
 	_ "github.com/skyhookml/skyhookml/exec_ops/unsupervised_reid"
 	_ "github.com/skyhookml/skyhookml/exec_ops/video_sample"
 	_ "github.com/skyhookml/skyhookml/exec_ops/virtual_debug"
