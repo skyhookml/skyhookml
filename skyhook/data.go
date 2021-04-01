@@ -22,6 +22,7 @@ const (
 	StringType = "string"
 	ArrayType = "array"
 	FileType = "file"
+	TableType = "table"
 )
 
 var DataTypes = map[DataType]string{
@@ -35,6 +36,7 @@ var DataTypes = map[DataType]string{
 	TextType: "Text",
 	StringType: "String",
 	FileType: "File",
+	TableType: "Table",
 }
 
 func EncodeTypes(types []DataType) string {
@@ -69,6 +71,10 @@ type DataImpl struct {
 	// optional: some data types may not support this
 	Builder func() ChunkBuilder
 	ChunkType DataType
+
+	// optional: return default extension for a particular format
+	// Returns empty string for unknown formats or ones where extension doesn't matter.
+	GetExtGivenFormat func(format string) string
 }
 
 var DataImpls = make(map[DataType]DataImpl)
@@ -186,6 +192,17 @@ func (b *SliceBuilder) Close() (Data, error) {
 	return b.Data, nil
 }
 
+// Forwards call to DataImpl.GetExtGivenFormat if set.
+func GetExtGivenFormat(dtype DataType, format string) string {
+	impl := DataImpls[dtype]
+	if impl.GetExtGivenFormat == nil {
+		return ""
+	}
+	return impl.GetExtGivenFormat(format)
+}
+
+// Read multiple sequence-type Datas in a synchronized fashion, in chunks of length [n].
+// [f] is a callback to pass each chunk of data to.
 func SynchronizedReader(inputs []Data, n int, f func(pos int, length int, datas []Data) error) error {
 	readers := make([]DataReader, len(inputs))
 	for i, input := range inputs {
@@ -236,6 +253,7 @@ func SynchronizedReader(inputs []Data, n int, f func(pos int, length int, datas 
 	return nil
 }
 
+// Read multiple sequence-type datas one by one and pass to the callback [f].
 func PerFrame(inputs []Data, f func(pos int, datas []Data) error) error {
 	return SynchronizedReader(inputs, 32, func(pos int, length int, datas []Data) error {
 		for i := 0; i < length; i++ {
@@ -250,4 +268,19 @@ func PerFrame(inputs []Data, f func(pos int, datas []Data) error) error {
 		}
 		return nil
 	})
+}
+
+// Read multiple datas and try to break them up into chunks of length n.
+// If there are any non-sequence-type datas, then we pass all the datas to the callback in one call.
+// In that case, the length passed to the call is -1.
+func TrySynchronizedReader(inputs []Data, n int, f func(pos int, length int, datas []Data) error) error {
+	allSequence := true
+	for _, input := range inputs {
+		_, ok := input.(ReadableData)
+		allSequence = allSequence && ok
+	}
+	if allSequence {
+		return SynchronizedReader(inputs, n, f)
+	}
+	return f(0, -1, inputs)
 }

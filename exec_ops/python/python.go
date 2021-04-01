@@ -35,7 +35,6 @@ type ResponsePacket struct {
 	Type string
 	Key string
 	OutputKey string
-	Length int
 }
 
 type PythonOp struct {
@@ -108,11 +107,23 @@ func (e *PythonOp) readLoop() {
 			break
 		}
 
+		// For each job, Python script should emit:
+		// - data_data to produce more data output for that job
+		// - data_finish indicating that the job is done
+		// For sequence data (ChunkType != nil), we combine the data via ChunkBuilder as we receive it.
+		// For non-sequence data, usually only one data_data packet should be received, and the
+		// last received data is the one that is written to output dataset upon receiving data_finish.
 		if resp.Type == "data_data" {
 			// read the datas
 			datas := make([]skyhook.Data, len(e.outputDatasets))
 			for i, ds := range e.outputDatasets {
-				dtype := skyhook.DataImpls[ds.DataType].ChunkType
+				// receive ChunkType unless this is non-sequence data
+				var dtype skyhook.DataType
+				if skyhook.DataImpls[ds.DataType].ChunkType != "" {
+					dtype = skyhook.DataImpls[ds.DataType].ChunkType
+				} else {
+					dtype = ds.DataType
+				}
 				datas[i], err = skyhook.DataImpls[dtype].DecodeStream(e.stdout)
 				if err != nil {
 					break
@@ -122,19 +133,30 @@ func (e *PythonOp) readLoop() {
 				break
 			}
 
-			// append the datas to the existing ones for this output key
+			// for sequence types: append the datas to the existing ones using Builder for this output key
+			// for non-sequence types: just overwrite it in pk.outputs
 			e.mu.Lock()
 			pk := e.pending[resp.Key]
 			if pk.builders[resp.OutputKey] == nil {
 				pk.builders[resp.OutputKey] = make([]skyhook.ChunkBuilder, len(e.outputDatasets))
 				for i, ds := range e.outputDatasets {
+					if skyhook.DataImpls[ds.DataType].ChunkType == "" {
+						continue
+					}
 					pk.builders[resp.OutputKey][i] = skyhook.DataImpls[ds.DataType].Builder()
 				}
 			}
+			if pk.outputs[resp.OutputKey] == nil {
+				pk.outputs[resp.OutputKey] = make([]skyhook.Data, len(e.outputDatasets))
+			}
 			for i, builder := range pk.builders[resp.OutputKey] {
-				err = builder.Write(datas[i])
-				if err != nil {
-					break
+				if builder == nil {
+					pk.outputs[resp.OutputKey][i] = datas[i]
+				} else {
+					err = builder.Write(datas[i])
+					if err != nil {
+						break
+					}
 				}
 			}
 			e.mu.Unlock()
@@ -144,8 +166,14 @@ func (e *PythonOp) readLoop() {
 		} else if resp.Type == "data_finish" {
 			e.mu.Lock()
 			pk := e.pending[resp.Key]
-			pk.outputs[resp.OutputKey] = make([]skyhook.Data, len(e.outputDatasets))
+			if pk.outputs[resp.OutputKey] == nil {
+				pk.outputs[resp.OutputKey] = make([]skyhook.Data, len(e.outputDatasets))
+			}
 			for i, builder := range pk.builders[resp.OutputKey] {
+				if builder == nil {
+					// must've been non-sequence data
+					continue
+				}
 				pk.outputs[resp.OutputKey][i], err = builder.Close()
 				if err != nil {
 					break
@@ -214,7 +242,7 @@ func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 		inputDatas[i] = data
 	}
 
-	err = skyhook.SynchronizedReader(inputDatas, 32, func(pos int, length int, datas []skyhook.Data) error {
+	err = skyhook.TrySynchronizedReader(inputDatas, 32, func(pos int, length int, datas []skyhook.Data) error {
 		e.writeLock.Lock()
 
 		skyhook.WriteJsonData(JobPacket{

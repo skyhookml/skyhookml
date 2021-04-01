@@ -26,16 +26,25 @@ func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request
 
 	if format == "jpeg" {
 		w.Header().Set("Content-Type", "image/jpeg")
+	} else if format == "png" {
+		w.Header().Set("Content-Type", "image/png")
 	} else if format == "mp4" {
 		w.Header().Set("Content-Type", "video/mp4")
 	} else if format == "json" {
 		w.Header().Set("Content-Type", "application/json")
-	} else if format == "file" {
+	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
+		var filename string
 		if data.Type() == skyhook.FileType {
-			fileData := data.(skyhook.FileData)
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=\"%s\"", fileData.Metadata.Filename))
+			filename = data.(skyhook.FileData).Metadata.Filename
+		} else {
+			ext := skyhook.GetExtGivenFormat(item.Dataset.DataType, format)
+			if ext == "" {
+				ext = item.Ext
+			}
+			filename = item.Key + "." + ext
 		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=\"%s\"", filename))
 	}
 
 	if err := data.Encode(format, w); err != nil {

@@ -63,7 +63,11 @@ def data_stack(t, datas):
 		return datas
 
 # stack a bunch of regular data
+# this fails for non-sequence data, unless len(datas)==1, in which case it simply returns the data
 def data_concat(t, datas):
+	if len(datas) == 1:
+		return datas[0]
+
 	if t == 'image' or t == 'video' or t == 'array':
 		return numpy.concatenate(datas, axis=0)
 	elif t == 'shape':
@@ -163,7 +167,7 @@ def per_frame_decorate(f):
 		for i, t in enumerate(meta['OutputTypes']):
 			stacked = data_stack(t, [output[i] for output in outputs])
 			stack_outputs.append(stacked)
-		output_datas(job_desc['key'], job_desc['key'], len(outputs), stack_outputs)
+		output_datas(job_desc['key'], job_desc['key'], stack_outputs)
 	return wrap
 
 def all_decorate(f):
@@ -184,7 +188,7 @@ def all_decorate(f):
 			if not isinstance(outputs, tuple):
 				outputs = (outputs,)
 			output_len = data_len(meta['OutputTypes'][0], outputs[0])
-			output_datas(job_desc['key'], job_desc['key'], output_len, outputs)
+			output_datas(job_desc['key'], job_desc['key'], outputs)
 			output_data_finish(job_desc['key'], job_desc['key'])
 	return wrap
 
@@ -241,12 +245,11 @@ def output_array(x):
 	dt = dt.newbyteorder('>')
 	stdout.write(x.astype(dt, copy=False).tobytes())
 
-def output_datas(in_key, key, l, datas):
+def output_datas(in_key, key, datas):
 	output_json({
 		'Type': 'data_data',
 		'Key': in_key,
 		'OutputKey': key,
-		'Length': l,
 	})
 	for i, t in enumerate(meta['OutputTypes']):
 		if t == 'image' or t == 'video' or t == 'array':

@@ -121,5 +121,13 @@ func init() {
 			return &SliceBuilder{Data: ImageData{}}
 		},
 		ChunkType: ImageType,
+		GetExtGivenFormat: func(format string) string {
+			if format == "jpeg" {
+				return "jpg"
+			} else if format == "png" {
+				return "png"
+			}
+			return ""
+		},
 	}
 }

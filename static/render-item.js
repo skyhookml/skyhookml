@@ -7,6 +7,9 @@ export default {
 			metadata: {},
 
 			loadedJSON: null,
+
+			// for download as form, the format to download as
+			downloadFormat: '',
 		};
 	},
 	created: function() {
@@ -14,6 +17,7 @@ export default {
 		const itemKey = this.$route.params.itemkey;
 		utils.request(this, 'GET', '/datasets/'+dsID+'/items/'+itemKey, null, (item) => {
 			this.item = item;
+			this.downloadFormat = this.item.Format;
 			try {
 				this.metadata = JSON.parse(this.item.Metadata);
 				if(!this.metadata) {
@@ -27,6 +31,9 @@ export default {
 			utils.request(this, 'GET', '/datasets/'+this.item.Dataset.ID+'/items/'+this.item.Key+'/get?format=json', null, (obj) => {
 				this.loadedJSON = JSON.stringify(obj, null, 4);
 			});
+		},
+		downloadAs: function() {
+			window.location.href = '/datasets/'+this.item.Dataset.ID+'/items/'+this.item.Key+'/get?format='+this.downloadFormat;
 		},
 	},
 	template: `
@@ -96,6 +103,26 @@ export default {
 				<button class="btn btn-primary" v-on:click="loadJSON">Load JSON</button>
 			</template>
 		</template>
+		<div class="d-flex">
+			<form class="d-flex align-items-center" v-on:submit.prevent="downloadAs">
+				<label class="mx-2 text-nowrap">Download as Format:</label>
+				<select v-model="downloadFormat" class="form-select form-select-sm mx-2">
+					<template v-if="item.Dataset.DataType == 'image'">
+						<option value="png">PNG</option>
+						<option value="jpeg">JPEG</option>
+					</template>
+					<template v-else-if="item.Dataset.DataType == 'table'">
+						<option value="json">JSON</option>
+						<option value="csv">CSV</option>
+						<option value="sqlite3">SQLite3</option>
+					</template>
+					<template v-else>
+						<option :value="item.Format">{{ item.Format }}</option>
+					</template>
+				</select>
+				<button type="submit" class="btn btn-primary mx-2">Download</button>
+			</form>
+		</div>
 	</template>
 </div>
 	`,
