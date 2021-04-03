@@ -62,6 +62,10 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 				text = strconv.Itoa(x)
 			}
 			canvas.DrawText(skyhook.RichText{Text: text})
+		} else if data.Type() == skyhook.StringType {
+			strData := data.(skyhook.StringData)
+			text := strData.Strings[0]
+			canvas.DrawText(skyhook.RichText{Text: text})
 		} else if data.Type() == skyhook.ShapeType {
 			shapes := data.(skyhook.ShapeData).Shapes[0]
 			for _, shape := range shapes {

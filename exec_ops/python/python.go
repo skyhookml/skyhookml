@@ -57,8 +57,16 @@ type PythonOp struct {
 	// lock on internal structures (pending, err, counter, etc.)
 	mu sync.Mutex
 
+	/*
+	Fields below can be set by other ops to customize how Python op runs.
+	Python op itself always leaves them zero.
+	*/
+
 	// transform input data with these functions before passing them to python script
 	InputTransforms map[int]func(skyhook.Data) skyhook.Data
+
+	// Parallelism override.
+	NumThreads int
 }
 
 func NewPythonOp(cmd *skyhook.Cmd, url string, params Params, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
@@ -97,6 +105,10 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, params Params, inputDatasets []sk
 
 func (e *PythonOp) Parallelism() int {
 	// python process is single-threaded, so there's no reason to run more than one task at a time
+	// so we default to 1 unless NumThreads override is set
+	if e.NumThreads > 0 {
+		return e.NumThreads
+	}
 	return 1
 }
 
@@ -305,6 +317,12 @@ func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 			}
 		}
 	}
+
+	// cleanup pk
+	e.mu.Lock()
+	delete(e.pending, pk.key)
+	e.mu.Unlock()
+
 	return nil
 }
 

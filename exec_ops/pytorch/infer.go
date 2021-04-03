@@ -7,6 +7,7 @@ import (
 
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strconv"
 )
 
@@ -76,6 +77,13 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			}
 		}
 	}
+
+	// use up to four threads since ffmpeg can be a bottleneck
+	numThreads := runtime.NumCPU()/2
+	if numThreads > 4 {
+		numThreads = 4
+	}
+	op.NumThreads = numThreads
 
 	return op, nil
 }

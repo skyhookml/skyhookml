@@ -36,6 +36,13 @@ func truthiness(data skyhook.Data) bool {
 			}
 		}
 		return false
+	} else if data.Type() == skyhook.StringType {
+		for _, str := range data.(skyhook.StringData).Strings {
+			if str != "" {
+				return true
+			}
+		}
+		return false
 	}
 
 	return true
