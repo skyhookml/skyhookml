@@ -59,7 +59,6 @@ type PytorchComponentParams struct {
 
 type PytorchComponent struct {
 	ID string
-	Name string
 	Params PytorchComponentParams
 }
 

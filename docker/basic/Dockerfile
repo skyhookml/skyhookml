@@ -4,7 +4,7 @@ WORKDIR /usr/src/app/skyhook
 RUN mkdir items models
 
 COPY ./ ./
-RUN go build container.go
+RUN go build cmd/container.go
 
 EXPOSE 8080
-CMD go run container.go
+CMD ./container

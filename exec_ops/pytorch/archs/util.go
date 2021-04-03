@@ -2,7 +2,7 @@ package archs
 
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
-
+	"github.com/skyhookml/skyhookml/exec_ops"
 	"github.com/skyhookml/skyhookml/exec_ops/pytorch"
 )
 
@@ -58,6 +58,20 @@ func AddImpl(impl Impl) {
 	}
 	inferImpl.Inputs = impl.InferInputs
 	inferImpl.Outputs = impl.InferOutputs
+	inferImpl.GetTasks = func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+		// Ignore model input, but move all other inputs from the arch-specific names
+		// to the generic "inputs" list that pytorch_infer expects.
+		var inputItems [][]skyhook.Item
+		for _, input := range impl.InferInputs {
+			if input.Name == "model" {
+				continue
+			}
+			for _, itemList := range rawItems[input.Name] {
+				inputItems = append(inputItems, itemList)
+			}
+		}
+		return exec_ops.SimpleTasks(node, map[string][][]skyhook.Item{"inputs": inputItems})
+	}
 	inferImpl.Prepare = func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 		params, err := impl.InferPrepare(node)
 		if err != nil {
@@ -67,7 +81,7 @@ func AddImpl(impl Impl) {
 
 		// set input datasets: pytorch expects "inputs" and "model"
 		inputDatasets := make(map[string][]skyhook.Dataset)
-		for _, input := range impl.TrainInputs {
+		for _, input := range impl.InferInputs {
 			for _, ds := range node.InputDatasets[input.Name] {
 				if input.Name == "model" {
 					inputDatasets["model"] = append(inputDatasets["model"], ds)

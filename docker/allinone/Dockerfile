@@ -6,7 +6,9 @@ WORKDIR /usr/src/app/skyhook
 RUN mkdir items models
 
 COPY ./ ./
-RUN go build cmd/container.go
+RUN go build cmd/main.go && \
+	go build cmd/worker.go && \
+	go build cmd/container.go
 
 EXPOSE 8080
-CMD ./container
+CMD ./docker/allinone/entrypoint.sh

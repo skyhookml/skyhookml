@@ -21,7 +21,8 @@ func InitDB(init bool) {
 			type TEXT,
 			data_type TEXT,
 			-- only set if computed
-			hash TEXT
+			hash TEXT,
+			done INTEGER DEFAULT 1
 		)`)
 		db.Exec(`CREATE TABLE IF NOT EXISTS annotate_datasets (
 			id INTEGER PRIMARY KEY ASC,
