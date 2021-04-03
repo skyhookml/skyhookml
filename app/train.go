@@ -50,8 +50,8 @@ func init() {
 
 	Router.HandleFunc("/pytorch/archs", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		name := r.PostForm.Get("name")
-		arch := NewPytorchArch(name)
+		id := r.PostForm.Get("id")
+		arch := NewPytorchArch(id)
 		skyhook.JsonResponse(w, arch)
 	}).Methods("POST")
 

@@ -28,7 +28,7 @@ export default {
 		<div class="col-sm-10">
 			<select v-model.number="arch" class="form-select" @change="update">
 				<template v-for="arch in archs">
-					<option :key="arch.ID" :value="arch.Name">{{ arch.Name }}</option>
+					<option :key="arch.ID" :value="arch.ID">{{ arch.ID }}</option>
 				</template>
 			</select>
 		</div>

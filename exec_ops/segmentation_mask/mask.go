@@ -4,6 +4,8 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
+	gomapinfer "github.com/mitroadmaps/gomapinfer/common"
+
 	"encoding/json"
 	"fmt"
 	"runtime"
@@ -11,6 +13,7 @@ import (
 
 type Params struct {
 	Dims [2]int
+	Padding int
 }
 
 type Mask struct {
@@ -26,13 +29,14 @@ func (e *Mask) Parallelism() int {
 // TODO: handle numCategories>256
 func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byte, error) {
 	dims := e.Params.Dims
+	padding := e.Params.Padding
 	canvas := make([]byte, dims[0]*dims[1])
 
 	fillRectangle := func(sx, sy, ex, ey, cls int) {
-		sx = skyhook.Clip(sx, 0, dims[0])
-		sy = skyhook.Clip(sy, 0, dims[1])
-		ex = skyhook.Clip(ex, 0, dims[0])
-		ey = skyhook.Clip(ey, 0, dims[1])
+		sx = skyhook.Clip(sx-padding, 0, dims[0])
+		sy = skyhook.Clip(sy-padding, 0, dims[1])
+		ex = skyhook.Clip(ex+padding, 0, dims[0])
+		ey = skyhook.Clip(ey+padding, 0, dims[1])
 		for x := sx; x < ex; x++ {
 			for y := sy; y < ey; y++ {
 				canvas[y*dims[0] + x] = byte(cls)
@@ -78,7 +82,28 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 					catID,
 				)
 			} else if shape.Type == "line" {
-				panic(fmt.Errorf("line shape mask not implemented"))
+				sx := shape.Points[0][0]*dims[0]/shapeDims[0]
+				sy := shape.Points[0][1]*dims[1]/shapeDims[1]
+				ex := shape.Points[1][0]*dims[0]/shapeDims[0]
+				ey := shape.Points[1][1]*dims[1]/shapeDims[1]
+				catID := getCategoryID(shape.Category)
+				if catID == -1 {
+					return nil, fmt.Errorf("unknown category %s", shape.Category)
+				}
+				for _, p := range gomapinfer.DrawLineOnCells(sx, sy, ex, ey, dims[0], dims[1]) {
+					for ox := -padding; ox < padding; ox++ {
+						for oy := -padding; oy < padding; oy++ {
+							x := p[0]+ox
+							y := p[1]+oy
+							if x < 0 || x >= dims[0] || y < 0 || y >= dims[1] {
+								continue
+							}
+							canvas[y*dims[0] + x] = byte(catID)
+						}
+					}
+				}
+			} else {
+				panic(fmt.Errorf("mask for shape type %s not implemented", shape.Type))
 			}
 		}
 	} else if data.Type() == skyhook.DetectionType {

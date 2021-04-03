@@ -27,8 +27,8 @@ export default {
 			try {
 				params = JSON.parse(this.node.Params);
 			} catch(e) {}
-			if(!params.Arch) {
-				params.Arch = '';
+			if(!params.ArchID) {
+				params.ArchID = '';
 			}
 			if(!params.Dataset) {
 				params.Dataset = {
@@ -82,7 +82,7 @@ export default {
 		</ul>
 		<div class="tab-content mx-1">
 			<div class="tab-pane fade show active" id="pytorch-model-panel" role="tabpanel">
-				<pytorch-model v-bind:node="node" v-model="params.Arch"></pytorch-model>
+				<pytorch-model v-bind:node="node" v-model="params.ArchID"></pytorch-model>
 			</div>
 			<div class="tab-pane fade" id="pytorch-dataset-panel" role="tabpanel">
 				<pytorch-dataset v-bind:node="node" v-model="params.Dataset.Params"></pytorch-dataset>

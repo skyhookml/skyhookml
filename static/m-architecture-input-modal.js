@@ -63,7 +63,7 @@ export default {
 								<div class="col-sm-10">
 									<select v-model="componentIdx" class="form-select">
 										<template v-for="(comp, compIdx) in components">
-											<option :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ comp.Name }}</option>
+											<option :key="compIdx" :value="compIdx">Component #{{ compIdx }}: {{ comp.ID }}</option>
 										</template>
 									</select>
 								</div>

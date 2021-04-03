@@ -35,6 +35,7 @@ var DataTypes = map[DataType]string{
 	ImListType: "Image List",
 	TextType: "Text",
 	StringType: "String",
+	ArrayType: "Array",
 	FileType: "File",
 	TableType: "Table",
 }

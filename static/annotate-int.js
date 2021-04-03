@@ -55,6 +55,14 @@ export default AnnotateGenericUI({
 		}
 		this.ints = data.map((x) => x.toString());
 	},
+	on_image_loaded: function() {
+		// if range is 0, focus on the text input
+		Vue.nextTick(() => {
+			if(this.params.Range == 0 && this.$refs.input) {
+				this.$refs.input.focus();
+			}
+		});
+	},
 	getAnnotateData: function() {
 		let data = this.ints.map((str) => {
 			if(isNaN(parseInt(str))) {
@@ -108,7 +116,7 @@ export default AnnotateGenericUI({
 		<div class="col-auto">
 			<form class="row g-1 align-items-center" v-on:submit.prevent="submitInput">
 				<div class="col-auto">
-					<input type="text" class="form-control" v-model="ints[frameIdx]" />
+					<input type="text" class="form-control" v-model="ints[frameIdx]" ref="input" />
 				</div>
 				<div class="col-auto">
 					<button type="submit" class="btn btn-primary">Label</button>

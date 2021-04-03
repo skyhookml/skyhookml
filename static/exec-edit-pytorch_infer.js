@@ -5,7 +5,7 @@ export default {
 		return {
 			node: null,
 			params: {
-				arch: '',
+				archID: '',
 				inputOptions: [],
 				outputDatasets: [],
 			},
@@ -21,7 +21,7 @@ export default {
 
 		utils.request(this, 'GET', '/pytorch/archs', null, (archs) => {
 			archs.forEach((arch) => {
-				this.$set(this.archs, arch.Name, arch);
+				this.$set(this.archs, arch.ID, arch);
 			});
 		});
 		utils.request(this, 'GET', '/pytorch/components', null, (comps) => {
@@ -35,8 +35,8 @@ export default {
 			this.node = node;
 			try {
 				let s = JSON.parse(this.node.Params);
-				if(s.Arch) {
-					this.params.arch = s.Arch;
+				if(s.ArchID) {
+					this.params.archID = s.ArchID;
 				}
 				if(s.InputOptions) {
 					this.params.inputOptions = s.InputOptions;
@@ -95,7 +95,7 @@ export default {
 		},
 		save: function() {
 			let params = {
-				Arch: this.params.arch,
+				ArchID: this.params.archID,
 				InputOptions: this.params.inputOptions,
 				OutputDatasets: this.params.outputDatasets,
 			};
@@ -145,7 +145,7 @@ export default {
 	},
 	computed: {
 		arch: function() {
-			return this.archs[this.params.arch];
+			return this.archs[this.params.archID];
 		},
 	},
 	template: `
@@ -154,9 +154,9 @@ export default {
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Architecture</label>
 			<div class="col-sm-10">
-				<select v-model="params.arch" class="form-select">
+				<select v-model="params.archID" class="form-select">
 					<template v-for="arch in archs">
-						<option :key="arch.ID" :value="arch.Name">{{ arch.Name }}</option>
+						<option :key="arch.ID" :value="arch.ID">{{ arch.ID }}</option>
 					</template>
 				</select>
 			</div>
@@ -208,7 +208,7 @@ export default {
 						<tbody>
 							<tr v-for="(spec, i) in params.outputDatasets">
 								<td>
-									<template v-if="getComponent(spec.ComponentIdx)">{{ getComponent(spec.ComponentIdx).Name }}</template>
+									<template v-if="getComponent(spec.ComponentIdx)">{{ getComponent(spec.ComponentIdx).ID }}</template>
 									<template v-else>Component {{ spec.ComponentIdx }}</template>
 								</td>
 								<td>{{ spec.Layer }}</td>
@@ -221,7 +221,7 @@ export default {
 								<td>
 									<select v-model="addForms.outputComponentIdx" class="form-select">
 										<template v-for="(compSpec, compIdx) in arch.Params.Components">
-											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">{{ comps[compSpec.ID].Name }}</option>
+											<option v-if="compSpec.ID in comps" :key="compIdx" :value="compIdx">{{ comps[compSpec.ID].ID }}</option>
 										</template>
 									</select>
 								</td>

@@ -56,6 +56,9 @@ type PythonOp struct {
 
 	// lock on internal structures (pending, err, counter, etc.)
 	mu sync.Mutex
+
+	// transform input data with these functions before passing them to python script
+	InputTransforms map[int]func(skyhook.Data) skyhook.Data
 }
 
 func NewPythonOp(cmd *skyhook.Cmd, url string, params Params, inputDatasets []skyhook.Dataset, outputDatasets []skyhook.Dataset) (*PythonOp, error) {
@@ -238,6 +241,9 @@ func (e *PythonOp) Apply(task skyhook.ExecTask) error {
 		data, err := input[0].LoadData()
 		if err != nil {
 			return err
+		}
+		if e.InputTransforms[i] != nil {
+			data = e.InputTransforms[i](data)
 		}
 		inputDatas[i] = data
 	}

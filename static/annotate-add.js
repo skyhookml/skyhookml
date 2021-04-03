@@ -10,10 +10,16 @@ export default {
 				tool: null,
 				toolObj: null,
 
+				// either 'existing' or 'new', whether to create a new dataset
+				datasetMode: 'new',
+
 				// name and type of dataset in case datasetMode=='new'
 				// if toolObj.DataType is set (only one option), then datasetType is not configurable
 				datasetName: '',
 				datasetType: '',
+
+				// existing dataset ID to add annotations to
+				datasetID: '',
 
 				// input dataset IDs to use for annotation
 				// corresponds to toolObj.Inputs
@@ -30,10 +36,10 @@ export default {
 						DataTypes: ["image", "video"],
 						Help: "Select an image or video dataset to label. If you have not imported the data yet, first head to Dashboard and then Quickstart Import.",
 					}],
-					DataTypes: [
-						{ID: "detection", Label: "Object Detections. Choose this type if you are annotating bounding boxes for object detection."},
-						{ID: "shape", Label: "Shapes. Choose this type if you are annotating shapes other than bounding boxes, e.g., polygons for image segmentation."},
-					],
+					DataTypes: {
+						'detection': 'Object Detections. Choose this type if you are annotating bounding boxes for object detection.',
+						'shape': 'Shapes. Choose this type if you are annotating shapes other than bounding boxes, e.g., polygons for image segmentation.',
+					},
 				},
 				"int": {
 					ID: "int",
@@ -87,21 +93,27 @@ export default {
 		},
 		addAnnoset: function() {
 			let handle = async () => {
-				let dataset;
-				try {
-					let params = {
-						name: this.addForm.datasetName,
-						data_type: this.addForm.datasetType,
-					};
-					dataset = await utils.request(this, 'POST', '/datasets', params);
-				} catch(e) {
-					return;
+				let datasetID;
+				if(this.addForm.datasetMode == 'new') {
+					let dataset;
+					try {
+						let params = {
+							name: this.addForm.datasetName,
+							data_type: this.addForm.datasetType,
+						};
+						dataset = await utils.request(this, 'POST', '/datasets', params);
+					} catch(e) {
+						return;
+					}
+					datasetID = dataset.ID;
+				} else {
+					datasetID = this.addForm.datasetID;
 				}
 
 				let annoset;
 				try {
 					let params = {
-						ds_id: dataset.ID,
+						ds_id: datasetID,
 						inputs: this.addForm.inputIDs.join(','),
 						tool: this.addForm.tool,
 						params: '',
@@ -132,26 +144,59 @@ export default {
 	<template v-else>
 		<form v-on:submit.prevent="addAnnoset">
 			<div class="row mb-2">
-				<label class="col-sm-4 col-form-label">Name</label>
+				<label class="col-sm-4 col-form-label">Create Dataset?</label>
 				<div class="col-sm-8">
-					<input v-model="addForm.datasetName" type="text" class="form-control">
-					<small class="form-text text-muted">A name for these annotations.</small>
+					<div class="form-check">
+						<input class="form-check-input" type="radio" v-model="addForm.datasetMode" value="new">
+						<label class="form-check-label">Create a New Dataset</label>
+					</div>
+					<div class="form-check">
+						<input class="form-check-input" type="radio" v-model="addForm.datasetMode" value="existing">
+						<label class="form-check-label">Add Annotations to an Existing Dataset</label>
+					</div>
 				</div>
 			</div>
-			<div class="row mb-2" v-if="addForm.toolObj">
-				<label class="col-sm-4 col-form-label">Data Type</label>
-				<div class="col-sm-8">
-					<template v-if="!addForm.toolObj.DataType">
-						<div class="form-check" v-for="dt in addForm.toolObj.DataTypes">
-							<input class="form-check-input" type="radio" v-model="addForm.datasetType" :value="dt.ID">
-							<label class="form-check-label">{{ dt.Label }}</label>
-						</div>
-					</template>
-					<template v-else>
-						<input type="text" readonly class="form-control-plaintext" :value="addForm.datasetType" />
-					</template>
+			<template v-if="addForm.datasetMode == 'new'">
+				<div class="row mb-2">
+					<label class="col-sm-4 col-form-label">Name</label>
+					<div class="col-sm-8">
+						<input v-model="addForm.datasetName" type="text" class="form-control">
+						<small class="form-text text-muted">A name for these annotations.</small>
+					</div>
 				</div>
-			</div>
+				<div class="row mb-2" v-if="addForm.toolObj">
+					<label class="col-sm-4 col-form-label">Data Type</label>
+					<div class="col-sm-8">
+						<template v-if="!addForm.toolObj.DataType">
+							<div class="form-check" v-for="(label, dt) in addForm.toolObj.DataTypes">
+								<input class="form-check-input" type="radio" v-model="addForm.datasetType" :value="dt">
+								<label class="form-check-label">{{ label }}</label>
+							</div>
+						</template>
+						<template v-else>
+							<input type="text" readonly class="form-control-plaintext" :value="addForm.datasetType" />
+						</template>
+					</div>
+				</div>
+			</template>
+			<template v-if="addForm.datasetMode == 'existing'">
+				<div class="row mb-2" v-if="addForm.toolObj">
+					<label class="col-sm-4 col-form-label">Existing Dataset</label>
+					<div class="col-sm-8">
+						<select v-model="addForm.datasetID" class="form-select">
+							<template v-for="ds in datasets">
+								<option
+									v-if="ds.Type == 'data' && (!addForm.toolObj.DataTypes || addForm.toolObj.DataTypes[ds.DataType]) && (!addForm.toolObj.DataType || addForm.toolObj.DataType == ds.DataType)"
+									:key="ds.ID"
+									:value="ds.ID">
+									{{ ds.Name }}
+								</option>
+							</template>
+						</select>
+						<small class="form-text text-muted">An existing dataset to extend with new annotations.</small>
+					</div>
+				</div>
+			</template>
 			<template v-for="(input, i) in addForm.toolObj.Inputs">
 				<div class="row mb-2">
 					<label class="col-sm-4 col-form-label">Input {{ input.Name }}</label>

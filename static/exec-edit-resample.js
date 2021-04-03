@@ -36,6 +36,9 @@ export default {
 			<label class="col-sm-2 col-form-label">Fraction</label>
 			<div class="col-sm-10">
 				<input v-model="fraction" type="text" class="form-control">
+				<small class="form-text text-muted">
+					Re-sample input data by this fraction. For example, 1/2 will sample every other element (or reduce video framerate by half).
+				</small>
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>

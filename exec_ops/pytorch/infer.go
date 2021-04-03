@@ -47,7 +47,37 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 		flatOutputs = append(flatOutputs, node.OutputDatasets[output.Name])
 	}
 
-	return python.NewPythonOp(cmd, url, python.Params{}, inputDatasets["inputs"], flatOutputs)
+	op, err := python.NewPythonOp(cmd, url, python.Params{}, inputDatasets["inputs"], flatOutputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add relevant input transforms based on input options
+	// For example, if input options set a specific width/height for video input,
+	// then we can resize it via video metadata.
+	op.InputTransforms = make(map[int]func(skyhook.Data) skyhook.Data)
+	for _, opt := range params.InputOptions {
+		dtype := inputDatasets["inputs"][opt.Idx].DataType
+
+		if dtype == skyhook.VideoType || dtype == skyhook.ImageType {
+			var optval skyhook.PDDImageOptions
+			if err := json.Unmarshal([]byte(opt.Value), &optval); err != nil {
+				continue
+			}
+			if optval.Width == 0 || optval.Height == 0 {
+				continue
+			}
+			if dtype == skyhook.VideoType {
+				op.InputTransforms[opt.Idx] = func(data skyhook.Data) skyhook.Data {
+					data_ := data.(skyhook.VideoData)
+					data_.Metadata.Dims = [2]int{optval.Width, optval.Height}
+					return data_
+				}
+			}
+		}
+	}
+
+	return op, nil
 }
 
 var InferImpl = skyhook.ExecOpImpl{

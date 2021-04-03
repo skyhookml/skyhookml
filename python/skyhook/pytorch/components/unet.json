@@ -12,9 +12,13 @@
 		"down0",
 		"down1",
 		"down2",
+		"down3",
+		"down4",
 		"up0",
 		"up1",
-		"up2"
+		"up2",
+		"up3",
+		"up4"
 	],
 	"Losses": [
 		"loss"

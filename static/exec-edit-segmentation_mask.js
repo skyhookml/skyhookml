@@ -5,6 +5,7 @@ export default {
 		return {
 			node: null,
 			dims: [0, 0],
+			padding: 0,
 		};
 	},
 	created: function() {
@@ -14,6 +15,7 @@ export default {
 			try {
 				let s = JSON.parse(this.node.Params);
 				this.dims = s.Dims;
+				this.padding = s.Padding;
 			} catch(e) {}
 		});
 	},
@@ -21,6 +23,7 @@ export default {
 		save: function() {
 			let params = JSON.stringify({
 				Dims: this.dims,
+				Padding: this.padding,
 			});
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID, JSON.stringify({
 				Params: params,
@@ -42,6 +45,15 @@ export default {
 			<label class="col-sm-2 col-form-label">Output Height</label>
 			<div class="col-sm-10">
 				<input v-model.number="dims[1]" type="text" class="form-control">
+			</div>
+		</div>
+		<div class="form-group row">
+			<label class="col-sm-2 col-form-label">Padding</label>
+			<div class="col-sm-10">
+				<input v-model.number="padding" type="text" class="form-control">
+				<small class="form-text text-muted">
+					Padding to add when drawing shapes.
+				</small>
 			</div>
 		</div>
 		<button v-on:click="save" type="button" class="btn btn-primary">Save</button>

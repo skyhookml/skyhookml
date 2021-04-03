@@ -120,7 +120,7 @@ func init() {
 			return data, nil
 		},
 		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "json", "", nil
+			return "json", "{}", nil
 		},
 		Builder: func() ChunkBuilder {
 			return &SliceBuilder{Data: ShapeData{}}

@@ -1,16 +1,26 @@
+import skyhook.common as lib
 import torch
 
 class ClsHead(torch.nn.Module):
-	def __init__(self, params, example_inputs):
+	def __init__(self, info):
 		super(ClsHead, self).__init__()
+		example_inputs = info['example_inputs']
 		kernel = 3
 		self.ch = example_inputs[0].shape[1]
 		padding = kernel//2
 
+		# detect number of classes from int metadata
+		int_metadata = info['metadatas'][1]
+		if int_metadata and 'Categories' in int_metadata:
+			num_classes = len(int_metadata['Categories'])
+		else:
+			num_classes = 2
+
 		# configurable options
-		layers = params.get('layers', 1)
-		features = params.get('features', 128)
-		num_classes = params.get('num_classes', 2)
+		layers = info['params'].get('layers', 1)
+		features = info['params'].get('features', 128)
+		num_classes = info['params'].get('num_classes', num_classes)
+		lib.eprint('cls set num_classes={}'.format(num_classes))
 
 		self.relu = torch.nn.ReLU()
 
@@ -52,4 +62,4 @@ class ClsHead(torch.nn.Module):
 		return d
 
 def M(info):
-	return ClsHead(info['params'], info['example_inputs'])
+	return ClsHead(info)

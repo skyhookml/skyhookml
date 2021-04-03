@@ -1,22 +1,22 @@
+import skyhook.common as lib
 import torch
 
 # adapted from https://github.com/usuyama/pytorch-unet/
 
 class UNet(torch.nn.Module):
-	def __init__(self, params, example_inputs):
+	def __init__(self, info):
 		super(UNet, self).__init__()
-		input_channels = example_inputs[0].shape[1]
+		input_channels = info['example_inputs'][0].shape[1]
 
-		if params is None:
-			params = {}
-
-		kernel = params.get('kernel', 3)
-		channels_list = params.get('channels_list', [64, 128, 256, 512])
-		num_classes = params.get('num_classes', 2)
+		kernel = info['params'].get('kernel', 3)
+		channels_list = info['params'].get('channels_list', [64, 128, 256, 512])
+		num_classes = info['params'].get('num_classes', 2)
 		# reduction of input scale when computing output
 		# for example, 8 means we reduce width/height both by 8x
 		# must be a power of 2
-		scale = params.get('scale', 1)
+		scale = info['params'].get('scale', 1)
+
+		lib.eprint('unet set num_classes={}, scale={}'.format(num_classes, scale))
 
 		padding = kernel//2
 
@@ -91,4 +91,4 @@ class UNet(torch.nn.Module):
 		return outputs
 
 def M(info):
-	return UNet(info['params'], info['example_inputs'])
+	return UNet(info)
