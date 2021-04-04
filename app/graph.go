@@ -93,22 +93,52 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 
 	log.Printf("[run-tree %s] building graph", targetNode.Name)
 	graph := targetNode.GetGraph()
+	targetGraphID := targetNode.GetGraphID()
 
 	log.Printf("[run-tree %s] computing ready/needed nodes", targetNode.Name)
 	// graph ID to outputs at that node
 	// for datasets, the key is always "" (empty string)
 	ready := make(map[skyhook.GraphID]map[string]*DBDataset)
-	// stores GraphIDs that need to be executed
-	// (outputs not yet available in ready)
+	// stores GraphIDs whose outputs not yet available in ready
+	missing := make(map[skyhook.GraphID]skyhook.Node)
+	// Stores GraphIDs that need to be executed
+	// (missing and targetNode depends on it).
+	// If a node X is missing but not needed, it implies that there is some
+	// intermediate node between X and targetNode whose outputs were computed.
 	needed := make(map[skyhook.GraphID]skyhook.Node)
 	// map from ExecNode.ID to *DBExecNode instance
 	dbExecNodes := make(map[int]*DBExecNode)
 
-	// populate ready/needed depending on whether outputs are available
+	// Re-compute the nodes that are needed.
+	// This is called by populateReadyMissing whenever ready/missing are updated.
+	recomputeNeeded := func() {
+		if missing[targetGraphID] == nil {
+			return
+		}
+		q := []skyhook.GraphID{targetGraphID}
+		needed = map[skyhook.GraphID]skyhook.Node{targetGraphID: missing[targetGraphID]}
+		for len(q) > 0 {
+			cur := q[len(q)-1]
+			q = q[0:len(q)-1]
+
+			// add dependencies that are missing but not already in needed
+			vnode := needed[cur].(*skyhook.VirtualNode)
+			for _, plist := range vnode.Parents {
+				for _, vparent := range plist {
+					if missing[vparent.GraphID] == nil || needed[vparent.GraphID] != nil {
+						continue
+					}
+					q = append(q, vparent.GraphID)
+					needed[vparent.GraphID] = missing[vparent.GraphID]
+				}
+			}
+		}
+	}
+	// populate ready/missing depending on whether outputs are available
 	// also populate dbExecNodes
-	populateReadyNeeded := func() {
+	populateReadyMissing := func() {
 		for graphID, node := range graph {
-			if ready[graphID] != nil || needed[graphID] != nil {
+			if ready[graphID] != nil || missing[graphID] != nil {
 				continue
 			}
 			if graphID.Type == "dataset" {
@@ -127,7 +157,7 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 					}
 					ready[graphID] = datasets
 				} else {
-					needed[graphID] = node
+					missing[graphID] = node
 				}
 			} else {
 				execNode := dbExecNodes[graphID.ID]
@@ -139,18 +169,18 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 				if done {
 					ready[graphID] = datasets
 				} else {
-					needed[graphID] = node
+					missing[graphID] = node
 				}
 			}
 		}
+		recomputeNeeded()
 	}
 	if opts.Force {
-		targetGraphID := targetNode.GetGraphID()
-		needed[targetGraphID] = graph[targetGraphID]
+		missing[targetGraphID] = graph[targetGraphID]
 		dbExecNodes[targetNode.ID] = targetNode
 	}
-	populateReadyNeeded()
-	log.Printf("[run-tree %s] ... get %d ready, %d needed", targetNode.Name, len(ready), len(needed))
+	populateReadyMissing()
+	log.Printf("[run-tree %s] ... get %d ready, %d missing, %d needed", targetNode.Name, len(ready), len(missing), len(needed))
 	if len(needed) != 1 && opts.NoRunTree {
 		return fmt.Errorf("NoRunTree is set but more than one node needed")
 	}
@@ -201,9 +231,9 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 				IncorporateIntoGraph(graph, subgraph)
 				log.Printf("[run-tree %s] ... graph grew to size %d", targetNode.Name, len(graph))
 
-				// we also need to populate ready and needed with any new nodes
-				// so we call populateReadyNeeded with anything that's not already there
-				populateReadyNeeded()
+				// we also need to populate ready and missing with any new nodes
+				// so we call populateReadyMissing with anything that's not already there
+				populateReadyMissing()
 
 				// parents and stuff may have changed now
 				// so we need to re-evaluate whether parent datasets are available
