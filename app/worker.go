@@ -3,42 +3,82 @@ package app
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
+	"fmt"
 	"log"
-	"net/http"
 	"sync"
 )
 
-var Workers = make(map[string]bool)
-var workersMu sync.Mutex
+// Lock access to the backend worker or pool.
+// In the future (after worker_pool has more capabilities), we should just pass
+// requests if the configured endpoint is a pool.
 
-func AcquireWorker() string {
-	workersMu.Lock()
-	defer workersMu.Unlock()
-	for workerURL, ok := range Workers {
-		if !ok {
-			continue
-		}
-		Workers[workerURL] = false
-		return workerURL
+var workerMu sync.Mutex
+var workerCond *sync.Cond
+var workerInUse bool
+
+func AcquireWorker() {
+	workerMu.Lock()
+	defer workerMu.Unlock()
+	for workerInUse {
+		workerCond.Wait()
 	}
-	return ""
+	workerInUse = true
 }
 
-func ReleaseWorker(url string) {
-	workersMu.Lock()
-	Workers[url] = true
-	workersMu.Unlock()
+func ReleaseWorker() {
+	workerMu.Lock()
+	workerInUse = false
+	workerCond.Broadcast()
+	workerMu.Unlock()
 }
 
 func init() {
-	Router.HandleFunc("/worker/init", func(w http.ResponseWriter, r *http.Request) {
-		var request skyhook.WorkerInitRequest
-		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
-			return
+	workerCond = sync.NewCond(&workerMu)
+}
+
+// Allocate a container on the worker.
+// Caller is responsible for acquiring worker.
+type ContainerInfo struct {
+	UUID string
+	BaseURL string
+	Parallelism int
+}
+func AcquireContainer(node skyhook.Runnable, jobOp *AppJobOp) (ContainerInfo, error) {
+	println := func(s string) {
+		jobOp.Update([]string{s})
+		log.Printf("[acquire-container job-%d] %s", jobOp.Job.ID, s)
+	}
+
+	println("Acquiring container")
+	var info ContainerInfo
+	containerRequest := skyhook.ContainerRequest{
+		Node: node,
+		JobID: &jobOp.Job.ID,
+		CoordinatorURL: Config.CoordinatorURL,
+	}
+	var containerResponse skyhook.ContainerResponse
+	err := skyhook.JsonPost(Config.WorkerURL, "/container/request", containerRequest, &containerResponse)
+	if err != nil {
+		return info, err
+	}
+	info.UUID = containerResponse.UUID
+
+	// wait for container to become available
+	for {
+		request := skyhook.StatusRequest{UUID: info.UUID}
+		var response skyhook.StatusResponse
+		err := skyhook.JsonPost(Config.WorkerURL, "/container/status", request, &response)
+		if err != nil {
+			return info, err
 		}
-		log.Printf("[worker] add new worker at %s", request.BaseURL)
-		workersMu.Lock()
-		Workers[request.BaseURL] = true
-		workersMu.Unlock()
-	})
+		if !response.Ready {
+			println(fmt.Sprintf("... still waiting: %s", response.Message))
+			continue
+		}
+		info.BaseURL = response.BaseURL
+		info.Parallelism = response.ExecBeginResponse.Parallelism
+		break
+	}
+
+	return info, nil
 }

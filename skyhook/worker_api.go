@@ -1,25 +1,41 @@
 package skyhook
 
-// worker->coordinator
-type WorkerInitRequest struct {
+// coordinator->worker
+// request creation of a new container
+type ContainerRequest struct {
+	Node Runnable
+	JobID *int
+	CoordinatorURL string
+}
+type ContainerResponse struct {
+	// request/container UUID
+	UUID string
+}
+
+// coordinator->worker
+// sent repeatedly to get status of the ContainerRequest
+type StatusRequest struct {
+	UUID string
+}
+type StatusResponse struct {
+	// whether the container has been provisioned
+	Ready bool
+	// if not Ready, some message e.g. position in queue
+	Message string
+	// if Ready, forwarded ExecBeginResponse
+	ExecBeginResponse ExecBeginResponse
+	// if Ready, base URL where container can be accessed
 	BaseURL string
 }
 
-// either coordinator->worker or worker->container
+// worker->container
 type ExecBeginRequest struct {
 	Node Runnable
 	JobID *int
-
-	// only set for worker->container
 	CoordinatorURL string
 }
-
 type ExecBeginResponse struct {
 	Parallelism int
-
-	// filled in by worker for response back to coordinator
-	UUID string
-	BaseURL string
 }
 
 type JobUpdate struct {
@@ -27,6 +43,7 @@ type JobUpdate struct {
 	Lines []string
 }
 
+// release a container
 type EndRequest struct {
 	UUID string
 }

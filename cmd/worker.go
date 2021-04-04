@@ -18,21 +18,18 @@ import (
 	"time"
 )
 
-var coordinatorURL string
-
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("usage: ./worker [external IP] [port] [skyhook URL]")
-		fmt.Println("example: ./worker localhost 8081 http://localhost:8080")
+	if len(os.Args) < 3 {
+		fmt.Println("usage: ./worker [external IP] [port]")
+		fmt.Println("example: ./worker localhost 8081")
 		return
 	}
 	myIP := os.Args[1]
 	myPort := skyhook.ParseInt(os.Args[2])
-	coordinatorURL = os.Args[3]
 
 	mode := "docker"
-	if len(os.Args) >= 5 {
-		mode = os.Args[4]
+	if len(os.Args) >= 4 {
+		mode = os.Args[3]
 	}
 
 	workingDir, err := os.Getwd()
@@ -40,14 +37,22 @@ func main() {
 		panic(err)
 	}
 
-	type Cmd struct {
+	type Container struct {
+		// Cmd, Port, and BaseURL are zero if container hasn't been provisioned yet,
+		// or if there was an error provisioning it.
 		Cmd *exec.Cmd
 		Port int
 		BaseURL string
+		// Only set after container is ready.
+		Ready bool
+		ExecBeginResponse skyhook.ExecBeginResponse
+		// Set if we have error creating the container
+		Error error
 	}
-	containers := make(map[string]*Cmd)
+	containers := make(map[string]*Container)
 	ports := []int{8100, 8101, 8102, 8103}
 	var mu sync.Mutex
+	cond := sync.NewCond(&mu)
 
 	getPort := func() int {
 		usedSet := make(map[int]bool)
@@ -62,18 +67,13 @@ func main() {
 		panic(fmt.Errorf("no available port"))
 	}
 
-	// Returns (container base URL, uuid, error)
-	startContainer := func(imageName string, jobID *int) (string, string, error) {
-		uuid := gouuid.New().String()
-
+	// Returns (container base URL, error)
+	startContainer := func(uuid string, imageName string, jobID *int, coordinatorURL string) (string, error) {
 		mu.Lock()
 		containerPort := getPort()
-		containerBaseURL := fmt.Sprintf("http://localhost:%d", containerPort)
-		containers[uuid] = &Cmd{
-			Cmd: nil,
-			Port: containerPort,
-			BaseURL: containerBaseURL,
-		}
+		containerBaseURL := fmt.Sprintf("http://%s:%d", myIP, containerPort)
+		containers[uuid].Port = containerPort
+		containers[uuid].BaseURL = containerBaseURL
 		mu.Unlock()
 
 		var cmd *exec.Cmd
@@ -114,46 +114,95 @@ func main() {
 		stdoutRd := bufio.NewReader(stdout)
 		stdoutRd.ReadString('\n') // ignore error here since it'll be caught by readContainerOutput
 		// read stdout/stderr, and if JobID is set then pass the output lines to the coordinator
-		readContainerOutput(uuid, stdoutRd, bufio.NewReader(stderr), jobID)
+		readContainerOutput(uuid, stdoutRd, bufio.NewReader(stderr), jobID, coordinatorURL)
 
-		return containerBaseURL, uuid, nil
+		return containerBaseURL, nil
 	}
 
-	http.HandleFunc("/exec/start", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/container/request", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			w.WriteHeader(404)
 			return
 		}
 
-		var request skyhook.ExecBeginRequest
+		var request skyhook.ContainerRequest
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
 			return
 		}
+		uuid := gouuid.New().String()
+		mu.Lock()
+		containers[uuid] = &Container{}
+		mu.Unlock()
+		skyhook.JsonResponse(w, skyhook.ContainerResponse{uuid})
 
-		imageName, err := request.Node.GetOp().GetImageName(request.Node)
-		if err != nil {
-			panic(err)
+		go func() {
+			imageName, err := request.Node.GetOp().GetImageName(request.Node)
+			if err != nil {
+				panic(err)
+			}
+
+			baseURL, err := startContainer(uuid, imageName, request.JobID, request.CoordinatorURL)
+			if err != nil {
+				// don't really need to do anything since startContainer will set containers[uuid].Error
+				return
+			}
+
+			execRequest := skyhook.ExecBeginRequest{
+				Node: request.Node,
+				JobID: request.JobID,
+				CoordinatorURL: request.CoordinatorURL,
+			}
+
+			var response skyhook.ExecBeginResponse
+			err = skyhook.JsonPost(baseURL, "/exec/start", execRequest, &response)
+			if err != nil {
+				panic(err)
+			}
+
+			mu.Lock()
+			containers[uuid].ExecBeginResponse = response
+			containers[uuid].Ready = true
+			cond.Broadcast()
+			mu.Unlock()
+		}()
+	})
+
+	http.HandleFunc("/container/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.WriteHeader(404)
+			return
 		}
-
-		containerBaseURL, uuid, err := startContainer(imageName, request.JobID)
+		var request skyhook.StatusRequest
+		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			return
+		}
+		mu.Lock()
+		container := containers[request.UUID]
+		var response skyhook.StatusResponse
+		var err error
+		if container == nil {
+			err = fmt.Errorf("no container with that UUID")
+		} else {
+			for !container.Ready && container.Error == nil {
+				cond.Wait()
+			}
+			if container.Error != nil {
+				err = container.Error
+			} else {
+				response.Ready = true
+				response.ExecBeginResponse = container.ExecBeginResponse
+				response.BaseURL = container.BaseURL
+			}
+		}
+		mu.Unlock()
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-
-		request.CoordinatorURL = coordinatorURL
-		var response skyhook.ExecBeginResponse
-		err = skyhook.JsonPost(containerBaseURL, "/exec/start", request, &response)
-		if err != nil {
-			panic(err)
-		}
-
-		response.UUID = uuid
-		response.BaseURL = containerBaseURL
 		skyhook.JsonResponse(w, response)
 	})
 
-	http.HandleFunc("/end", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/container/end", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			w.WriteHeader(404)
 			return
@@ -166,11 +215,11 @@ func main() {
 		uuid := request.UUID
 
 		mu.Lock()
-		cmd := containers[uuid]
+		container := containers[uuid]
 		delete(containers, uuid)
 		mu.Unlock()
 
-		if cmd == nil {
+		if container == nil {
 			return
 		}
 
@@ -179,10 +228,10 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			cmd.Cmd.Wait()
+			container.Cmd.Wait()
 		} else if mode == "process" {
-			skyhook.JsonPost(cmd.BaseURL, "/exit", nil, nil)
-			if err := cmd.Cmd.Wait(); err != nil {
+			skyhook.JsonPost(container.BaseURL, "/exit", nil, nil)
+			if err := container.Cmd.Wait(); err != nil {
 				panic(err)
 			}
 		}
@@ -190,22 +239,13 @@ func main() {
 		log.Printf("[machine] container %s stopped", uuid)
 	})
 
-	// register with the coordinator
-	initRequest := skyhook.WorkerInitRequest{
-		BaseURL: fmt.Sprintf("http://%s:%d", myIP, myPort),
-	}
-	err = skyhook.JsonPost(coordinatorURL, "/worker/init", initRequest, nil)
-	if err != nil {
-		panic(err)
-	}
-
 	log.Printf("starting on :%d", myPort)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", myPort), nil); err != nil {
 		panic(err)
 	}
 }
 
-func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader, jobID *int) {
+func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader, jobID *int, coordinatorURL string) {
 	// Read lines from stdout and stderr simultaneously, printing to our output
 	// Every second, accumulate the lines (if any) and forward to coordinator (if jobID is set).
 	var mu sync.Mutex

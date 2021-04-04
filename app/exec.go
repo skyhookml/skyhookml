@@ -252,21 +252,19 @@ func (node *DBExecNode) PrepareRun(opts ExecRunOptions) (*RunData, error) {
 
 func (rd *RunData) Run() error {
 	name := rd.Name
-	// prepare op
-	log.Printf("[exec-node %s] [run] acquiring worker", name)
-	workerURL := AcquireWorker()
-	log.Printf("[exec-node %s] [run] ... acquired worker at %s", name, workerURL)
-	defer ReleaseWorker(workerURL)
 
-	beginRequest := skyhook.ExecBeginRequest{
-		Node: rd.Node,
-		JobID: &rd.JobOp.Job.ID,
-	}
-	var beginResponse skyhook.ExecBeginResponse
-	if err := skyhook.JsonPost(workerURL, "/exec/start", beginRequest, &beginResponse); err != nil {
+	// get container corresponding to rd.Node.Op
+	log.Printf("[exec-node %s] [run] acquiring container", name)
+	rd.JobOp.Update([]string{"Acquiring worker"})
+	AcquireWorker()
+	defer ReleaseWorker()
+	containerInfo, err := AcquireContainer(rd.Node, rd.JobOp)
+	if err != nil {
 		rd.Error = err
 		return err
 	}
+	log.Printf("[exec-node %s] [run] ... acquired container %s at %s", name, containerInfo.UUID, containerInfo.BaseURL)
+	defer ReleaseWorker()
 
 	// we want to de-allocate the container in two cases:
 	// (1) when we return from this function
@@ -276,14 +274,14 @@ func (rd *RunData) Run() error {
 	// - on return, call AppJobOp.Cleanup to only de-allocate if it hasn't been de-allocated already
 	// this is possible because AppJobOp will take care of unsetting CleanupFunc whenever it's called
 	rd.JobOp.SetCleanupFunc(func() {
-		err := skyhook.JsonPost(workerURL, "/end", skyhook.EndRequest{beginResponse.UUID}, nil)
+		err := skyhook.JsonPost(Config.WorkerURL, "/container/end", skyhook.EndRequest{containerInfo.UUID}, nil)
 		if err != nil {
 			log.Printf("[exec-node %s] [run] error ending exec container: %v", name, err)
 		}
 	})
 	defer rd.JobOp.Cleanup()
 
-	nthreads := beginResponse.Parallelism
+	nthreads := containerInfo.Parallelism
 	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", name, len(rd.Tasks), nthreads)
 
 	counter := 0
@@ -306,7 +304,7 @@ func (rd *RunData) Run() error {
 				mu.Unlock()
 
 				log.Printf("[exec-node %s] [run] apply on %s", name, task.Key)
-				err := skyhook.JsonPost(beginResponse.BaseURL, "/exec/task", skyhook.ExecTaskRequest{task}, nil)
+				err := skyhook.JsonPost(containerInfo.BaseURL, "/exec/task", skyhook.ExecTaskRequest{task}, nil)
 
 				if err != nil {
 					mu.Lock()

@@ -18,8 +18,9 @@ import (
 
 func main() {
 	addr := flag.String("addr", ":8080", "bind address")
-	coordinatorURL := flag.String("url", "http://127.0.0.1:PORT", "coordinator URL")
+	coordinatorURL := flag.String("url", "http://127.0.0.1:PORT", "coordinator URL, workers must be able to reach it")
 	initdb := flag.Bool("initdb", false, "initialize the database before starting up")
+	workerURL := flag.String("worker", "http://127.0.0.1:8081", "worker or worker-pool URL")
 	flag.Parse()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
@@ -28,6 +29,7 @@ func main() {
 	}
 
 	app.Config.CoordinatorURL = strings.ReplaceAll(*coordinatorURL, "PORT", strconv.Itoa(tcpAddr.Port))
+	app.Config.WorkerURL = *workerURL
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	skyhook.SeedRand()
