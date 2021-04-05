@@ -22,7 +22,7 @@ params = json.loads(params_arg)
 
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
-model_path = 'items/{}/model.pt'.format(in_dataset_id)
+model_path = 'data/items/{}/model.pt'.format(in_dataset_id)
 save_dict = torch.load(model_path)
 
 # overwrite parameters in save_dict['arch'] with parameters from

@@ -25,7 +25,7 @@ func GetDB() *Database {
 }
 
 func init() {
-	sdb, err := sql.Open("sqlite3", "./skyhook.sqlite3")
+	sdb, err := sql.Open("sqlite3", "data/skyhook.sqlite3")
 	if err != nil {
 		panic(err)
 	}

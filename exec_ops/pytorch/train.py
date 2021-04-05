@@ -193,7 +193,7 @@ class StopCondition(object):
 		return False
 
 def save_model():
-	torch.save(net.get_save_dict(), 'items/{}/model.pt'.format(out_dataset_id))
+	torch.save(net.get_save_dict(), 'data/items/{}/model.pt'.format(out_dataset_id))
 
 class ModelSaver(object):
 	def __init__(self, params):
@@ -243,7 +243,7 @@ if params.get('Restore', None) and parent_models:
 		skip_prefixes = [prefix.strip() for prefix in restore['SkipPrefixes'].split(',') if prefix.strip()]
 		print('restore model to', dst_prefix)
 		# load save dict based on dataset ID
-		fname = 'items/{}/model.pt'.format(parent_model['ID'])
+		fname = 'data/items/{}/model.pt'.format(parent_model['ID'])
 		save_dict = torch.load(fname)
 		# update the parameter names based on src/dst/skip prefixes
 		state_dict = save_dict['model']

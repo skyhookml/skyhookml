@@ -19,7 +19,7 @@ in_dataset_id = int(sys.argv[1])
 
 device = torch.device('cuda:0')
 #device = torch.device('cpu')
-model_path = 'items/{}/model.pt'.format(in_dataset_id)
+model_path = 'data/items/{}/model.pt'.format(in_dataset_id)
 save_dict = torch.load(model_path)
 net = model.Net(save_dict['arch'], save_dict['comps'], save_dict['example_inputs'], save_dict['example_metadatas'], output_datasets=params['OutputDatasets'], infer=True)
 net.to(device)

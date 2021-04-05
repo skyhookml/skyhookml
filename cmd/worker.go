@@ -80,8 +80,7 @@ func main() {
 		if mode == "docker" {
 			cmd = exec.Command(
 				"docker", "run",
-				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/items,type=bind", filepath.Join(workingDir, "items")),
-				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/models,type=bind", filepath.Join(workingDir, "models")),
+				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/data,type=bind", filepath.Join(workingDir, "data")),
 				"--gpus", "all",
 				"-p", fmt.Sprintf("%d:8080", containerPort),
 				"--name", uuid,

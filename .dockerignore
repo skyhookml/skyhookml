@@ -1,5 +1,4 @@
-items
-models
+data
 **/*.sqlite3
 **/__pycache__
 lib

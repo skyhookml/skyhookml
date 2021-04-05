@@ -101,7 +101,7 @@ def data_len(t, data):
 # The output corresponds to what we would get from input_datas.
 # It can be passed to data_index, data_concat, data_len, etc.
 def load_item(dataset, item):
-	fname = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
+	fname = 'data/items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
 	t = dataset['DataType']
 	metadata, format = item['Metadata'], item['Format']
 
@@ -141,7 +141,7 @@ def load_item(dataset, item):
 		return data
 
 def load_video(dataset, item):
-	fname = 'items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
+	fname = 'data/items/{}/{}.{}'.format(dataset['ID'], item['Key'], item['Ext'])
 	metadata = json.loads(item['Metadata'])
 	return ffmpeg.Ffmpeg(fname, metadata['Dims'], metadata['Framerate'])
 

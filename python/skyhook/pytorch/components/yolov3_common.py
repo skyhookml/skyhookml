@@ -5,7 +5,7 @@ import torch
 
 class ImportContext(object):
 	def __init__(self):
-		self.expected_path = os.path.join('.', 'models', hashlib.sha256(b'https://github.com/ultralytics/yolov3.git').hexdigest())
+		self.expected_path = os.path.join('.', 'data', 'models', hashlib.sha256(b'https://github.com/ultralytics/yolov3.git').hexdigest())
 
 	def __enter__(self):
 		# from github.com/ultralytics/yolov3

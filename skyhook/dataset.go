@@ -32,7 +32,7 @@ type Item struct {
 }
 
 func (ds Dataset) Dirname() string {
-	return fmt.Sprintf("items/%d", ds.ID)
+	return fmt.Sprintf("data/items/%d", ds.ID)
 }
 
 func (ds Dataset) Mkdir() {
@@ -72,7 +72,7 @@ func (item Item) LoadData() (Data, error) {
 }
 
 func (ds Dataset) Remove() {
-	os.RemoveAll(fmt.Sprintf("items/%d", ds.ID))
+	os.RemoveAll(fmt.Sprintf("data/items/%d", ds.ID))
 }
 
 func (item Item) Remove() {
@@ -107,7 +107,7 @@ func (item Item) CopyTo(fname string, format string, symlink bool) error {
 }
 
 func (ds Dataset) DBFname() string {
-	return fmt.Sprintf("items/%d/db.sqlite3", ds.ID)
+	return fmt.Sprintf("data/items/%d/db.sqlite3", ds.ID)
 }
 
 func (ds Dataset) LocalHash() []byte {
@@ -173,7 +173,7 @@ func init() {
 			return nil
 		},
 		Fname: func(item Item) string {
-			return fmt.Sprintf("items/%d/%s.%s", item.Dataset.ID, item.Key, item.Ext)
+			return fmt.Sprintf("data/items/%d/%s.%s", item.Dataset.ID, item.Key, item.Ext)
 		},
 	}
 

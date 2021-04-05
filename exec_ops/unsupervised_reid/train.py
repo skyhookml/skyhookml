@@ -218,7 +218,7 @@ while stop_count < 20:
 	if best_loss is None or val_loss < best_loss:
 		best_loss = val_loss
 		stop_count = 0
-		torch.save(net.get_save_dict(), 'items/{}/model.pt'.format(out_dataset_id))
+		torch.save(net.get_save_dict(), 'data/items/{}/model.pt'.format(out_dataset_id))
 	else:
 		stop_count += 1
 		if not updated_lr and stop_count > 10:

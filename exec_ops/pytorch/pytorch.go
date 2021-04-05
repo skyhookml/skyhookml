@@ -38,7 +38,7 @@ func EnsureRepository(repo skyhook.PytorchRepository) error {
 	hash := repo.Hash()
 
 	// does it already exist?
-	path := filepath.Join("models", hash)
+	path := filepath.Join("data/models", hash)
 	if _, err := os.Stat(path); err == nil {
 		return nil
 	}
