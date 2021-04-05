@@ -57,11 +57,13 @@ export default {
 		submitUpload: function() {
 			var data = new FormData();
 			data.append('file', this.file);
-			this.percent = null;
+			this.percent = 0;
 			$.ajax({
 				type: 'POST',
 				url: this.importEndpoint+'?mode=upload',
 				error: (req, status, errorMsg) => {
+					this.percent = null;
+					$(this.$refs.modal).modal('hide');
 					app.setError(errorMsg);
 				},
 				data: data,
@@ -73,15 +75,16 @@ export default {
 						if(!e.lengthComputable) {
 							return;
 						}
-						this.percent = parseInt(e.loaded * 100 / e.total);
+						this.percent = Math.min(parseInt(e.loaded * 100 / e.total), 99);
 					});
 					return xhr;
 				},
 				success: (job) => {
+					this.percent = null;
+					$(this.$refs.modal).modal('hide');
 					this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 				},
 			});
-			$(this.$refs.modal).modal('hide');
 		},
 		submitURL: function() {
 			let params = {
@@ -156,43 +159,62 @@ export default {
 							</form>
 						</div>
 						<div class="tab-pane" id="import-upload-tab">
-							<form v-on:submit.prevent="submitUpload">
-								<div class="row mb-2">
-									<label class="col-sm-2 col-form-label">File</label>
-									<div class="col-sm-10">
-										<input class="form-control" type="file" @change="onFileChange" />
-										<small class="form-text text-muted">
-											<template v-if="mode == 'add'">
-												<template v-if="dataset.DataType == 'video'">
-													Video files (e.g., mp4) or a zip file that contains them.
+							<template v-if="percent === null">
+								<form v-on:submit.prevent="submitUpload">
+									<div class="row mb-2">
+										<label class="col-sm-2 col-form-label">File</label>
+										<div class="col-sm-10">
+											<input class="form-control" type="file" @change="onFileChange" />
+											<small class="form-text text-muted">
+												<template v-if="mode == 'add'">
+													<template v-if="dataset.DataType == 'video'">
+														Video files (e.g., mp4) or a zip file that contains them.
+													</template>
+													<template v-else-if="dataset.DataType == 'image'">
+														Image files (PNG or JPG) or a zip file that contains them.
+													</template>
+													<template v-else-if="dataset.DataType == 'detection' || dataset.DataType == 'int' || dataset.DataType == 'shape' || dataset.DataType == 'floats'">
+														Data in SkyhookML JSON format (either .json file or zip file containing .json).
+														To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
+													</template>
+													<template v-else-if="dataset.DataType == 'file'">
+														Either files or a zip file.
+													</template>
+													<template v-else>
+														Data in a SkyhookML-supported format.
+														To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
+													</template>
 												</template>
-												<template v-else-if="dataset.DataType == 'image'">
-													Image files (PNG or JPG) or a zip file that contains them.
+												<template v-else-if="mode == 'new'">
+													A SkyhookML-formatted dataset archive (.zip containing db.sqlite3 and files).
 												</template>
-												<template v-else-if="dataset.DataType == 'detection' || dataset.DataType == 'int' || dataset.DataType == 'shape' || dataset.DataType == 'floats'">
-													Data in SkyhookML JSON format (either .json file or zip file containing .json).
-													To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
-												</template>
-												<template v-else-if="dataset.DataType == 'file'">
-													Either files or a zip file.
-												</template>
-												<template v-else>
-													Data in a SkyhookML-supported format.
-													To import data in other formats, use <router-link :to="'/ws/'+$route.params.ws+'/quickstart/import'">Quickstart/Import</router-link>.
-												</template>
-											</template>
-											<template v-else-if="mode == 'new'">
-												A SkyhookML-formatted dataset archive (.zip containing db.sqlite3 and files).
-											</template>
-										</small>
+											</small>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-sm-10">
+											<button type="submit" class="btn btn-primary">Import</button>
+										</div>
+									</div>
+								</form>
+							</template>
+							<template v-else>
+								<h2>Uploading...</h2>
+								<div class="mt-2">
+									<div class="progress">
+										<div
+											class="progress-bar"
+											role="progressbar"
+											v-bind:style="{width: percent+'%'}"
+											:aria-valuenow="percent"
+											aria-valuemin="0"
+											aria-valuemax="100"
+											>
+											{{ percent }}%
+										</div>
 									</div>
 								</div>
-								<div class="row">
-									<div class="col-sm-10">
-										<button type="submit" class="btn btn-primary">Import</button>
-									</div>
-								</div>
-							</form>
+							</template>
 						</div>
 						<div class="tab-pane" id="import-url-tab">
 							<form v-on:submit.prevent="submitURL">

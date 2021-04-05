@@ -120,7 +120,7 @@ export default {
 				// upload the archive
 				var data = new FormData();
 				data.append('file', this.file);
-				this.percent = null;
+				this.percent = 0;
 				let importJob;
 				try {
 					importJob = await $.ajax({
@@ -135,7 +135,7 @@ export default {
 								if(!e.lengthComputable) {
 									return;
 								}
-								this.percent = parseInt(e.loaded * 100 / e.total);
+								this.percent = Math.min(parseInt(e.loaded * 100 / e.total), 99);
 							});
 							return xhr;
 						},
@@ -161,7 +161,6 @@ export default {
 				// otherwise we need to do that
 				if(!convertOp) {
 					this.phase = 'done';
-					cleanup();
 					return;
 				}
 
@@ -332,6 +331,20 @@ export default {
 	</template>
 	<template v-else-if="phase == 'uploading'">
 		<h3>Uploading...</h3>
+		<div class="mt-2" v-if="percent != null">
+			<div class="progress">
+				<div
+					class="progress-bar"
+					role="progressbar"
+					v-bind:style="{width: percent+'%'}"
+					:aria-valuenow="percent"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					>
+					{{ percent }}%
+				</div>
+			</div>
+		</div>
 	</template>
 	<template v-else-if="phase == 'importing' || phase == 'converting'">
 		<h3>

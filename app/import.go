@@ -514,7 +514,6 @@ func init() {
 		}
 
 		jobName := fmt.Sprintf("Import Into %s", dataset.Name)
-		fmt.Println(mode, jobName, "???")
 		if mode == "local" {
 			path := r.PostForm.Get("path")
 			opts := makeImportOptions(jobName, symlink)
