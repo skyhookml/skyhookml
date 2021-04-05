@@ -6,6 +6,7 @@ type ContainerRequest struct {
 	Node Runnable
 	JobID *int
 	CoordinatorURL string
+	InstanceID string
 }
 type ContainerResponse struct {
 	// request/container UUID

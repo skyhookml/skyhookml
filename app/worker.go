@@ -55,6 +55,7 @@ func AcquireContainer(node skyhook.Runnable, jobOp *AppJobOp) (ContainerInfo, er
 		Node: node,
 		JobID: &jobOp.Job.ID,
 		CoordinatorURL: Config.CoordinatorURL,
+		InstanceID: Config.InstanceID,
 	}
 	var containerResponse skyhook.ContainerResponse
 	err := skyhook.JsonPost(Config.WorkerURL, "/container/request", containerRequest, &containerResponse)

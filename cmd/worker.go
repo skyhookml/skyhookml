@@ -68,7 +68,7 @@ func main() {
 	}
 
 	// Returns (container base URL, error)
-	startContainer := func(uuid string, imageName string, jobID *int, coordinatorURL string) (string, error) {
+	startContainer := func(uuid string, imageName string, jobID *int, coordinatorURL string, instanceID string) (string, error) {
 		mu.Lock()
 		containerPort := getPort()
 		containerBaseURL := fmt.Sprintf("http://%s:%d", myIP, containerPort)
@@ -78,9 +78,13 @@ func main() {
 
 		var cmd *exec.Cmd
 		if mode == "docker" {
+			dataDir := filepath.Join(workingDir, "data")
+			if instanceID != "" {
+				dataDir = filepath.Join(dataDir, filepath.Base(instanceID))
+			}
 			cmd = exec.Command(
 				"docker", "run",
-				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/data,type=bind", filepath.Join(workingDir, "data")),
+				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/data,type=bind", dataDir),
 				"--gpus", "all",
 				"-p", fmt.Sprintf("%d:8080", containerPort),
 				"--name", uuid,
@@ -140,7 +144,7 @@ func main() {
 				panic(err)
 			}
 
-			baseURL, err := startContainer(uuid, imageName, request.JobID, request.CoordinatorURL)
+			baseURL, err := startContainer(uuid, imageName, request.JobID, request.CoordinatorURL, request.InstanceID)
 			if err != nil {
 				// don't really need to do anything since startContainer will set containers[uuid].Error
 				return

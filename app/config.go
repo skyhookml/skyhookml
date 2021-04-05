@@ -9,4 +9,7 @@ var Config struct {
 	// URL where the worker is, which runs as a separate program.
 	// Can also point to a worker pool.
 	WorkerURL string
+	// Optional instance ID.
+	// If set, the worker should launch container in a subdirectory with this name.
+	InstanceID string
 }
