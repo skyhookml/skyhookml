@@ -1,7 +1,7 @@
 FROM skyhookml/base
 
 WORKDIR /usr/src/app/skyhook
-RUN mkdir items models
+RUN mkdir data
 
 COPY ./ ./
 RUN go build cmd/container.go

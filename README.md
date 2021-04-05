@@ -38,7 +38,7 @@ Then:
 
 	git clone https://github.com/skyhookml/skyhookml.git
 	cd skyhookml
-	docker build -t skyhookml/allinone -f docker/allinone/Dockerfile .
+	docker/allinone/build.sh
 	docker/allinone/run.sh
 
 Access your deployment at http://localhost:8080.
