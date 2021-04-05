@@ -204,32 +204,38 @@ export default {
 					}]
 				}
 
-				// create the node
+				// set node params
 				let nodeParams = {};
 				if(this.form.mode) {
 					nodeParams['Mode'] = this.form.mode;
 				}
+				// batch size
 				nodeParams['Train'] = {
 					'Op': 'default',
 					'Params': JSON.stringify({
 						'BatchSize': 8,
 					}),
 				}
-				if(this.form.model.ID == 'pytorch_yolov3') {
-					// exclude last layer which is dependent on # categories
-					nodeParams['Restore'] = [{
-						'SrcPrefix': '',
-						'DstPrefix': '',
-						'SkipPrefixes': 'mlist.0.model.model.28.',
-					}];
-				} else if(this.form.model.ID == 'pytorch_yolov5') {
-					// exclude last layer which is dependent on # categories
-					nodeParams['Restore'] = [{
-						'SrcPrefix': '',
-						'DstPrefix': '',
-						'SkipPrefixes': 'mlist.0.model.model.24.',
-					}];
+				// if pre-train, set SkipPrefixes as necessary
+				if(this.form.pretrain) {
+					if(this.form.model.ID == 'pytorch_yolov3') {
+						// exclude last layer which is dependent on # categories
+						nodeParams['Restore'] = [{
+							'SrcPrefix': '',
+							'DstPrefix': '',
+							'SkipPrefixes': 'mlist.0.model.model.28.',
+						}];
+					} else if(this.form.model.ID == 'pytorch_yolov5') {
+						// exclude last layer which is dependent on # categories
+						nodeParams['Restore'] = [{
+							'SrcPrefix': '',
+							'DstPrefix': '',
+							'SkipPrefixes': 'mlist.0.model.model.24.',
+						}];
+					}
 				}
+
+				// create the node
 				let params = {
 					Name: this.form.name,
 					Op: this.form.model.ID+'_train',
