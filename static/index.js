@@ -20,21 +20,7 @@ import MArch from './m-architecture.js';
 import MComp from './m-component.js';
 
 import Queries from './queries.js';
-import ExecCropResize from './exec-edit-cropresize.js';
-import ExecDetectionFilter from './exec-edit-detection_filter.js';
-import ExecResample from './exec-edit-resample.js';
-import ExecSegmentationMask from './exec-edit-segmentation_mask.js';
-import ExecSimpleTracker from './exec-edit-simple_tracker.js';
-import ExecReidTracker from './exec-edit-reid_tracker.js';
-import ExecPython from './exec-edit-python.js';
-import ExecPytorchTrain from './exec-edit-pytorch_train.js';
-import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
-import ExecPytorchYolov3Train from './exec-edit-pytorch_yolov3_train.js';
-import ExecPytorchYolov3Infer from './exec-edit-pytorch_yolov3_infer.js';
-import ExecYolov3Train from './exec-edit-yolov3_train.js';
-import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
-import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
-import ExecVideoSample from './exec-edit-video_sample.js';
+import ExecEdit from './exec-edit.js';
 import Compare from './compare.js';
 import Interactive from './interactive.js';
 
@@ -65,21 +51,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/models/comp/:compid', component: MComp},
 
 		{path: '/ws/:ws/queries', component: Queries},
-		{path: '/ws/:ws/exec/cropresize/:nodeid', component: ExecCropResize},
-		{path: '/ws/:ws/exec/detection_filter/:nodeid', component: ExecDetectionFilter},
-		{path: '/ws/:ws/exec/segmentation_mask/:nodeid', component: ExecSegmentationMask},
-		{path: '/ws/:ws/exec/simple_tracker/:nodeid', component: ExecSimpleTracker},
-		{path: '/ws/:ws/exec/reid_tracker/:nodeid', component: ExecReidTracker},
-		{path: '/ws/:ws/exec/resample/:nodeid', component: ExecResample},
-		{path: '/ws/:ws/exec/python/:nodeid', component: ExecPython},
-		{path: '/ws/:ws/exec/pytorch_train/:nodeid', component: ExecPytorchTrain},
-		{path: '/ws/:ws/exec/pytorch_infer/:nodeid', component: ExecPytorchInfer},
-		{path: '/ws/:ws/exec/pytorch_yolov3_train/:nodeid', component: ExecPytorchYolov3Train},
-		{path: '/ws/:ws/exec/pytorch_yolov3_infer/:nodeid', component: ExecPytorchYolov3Infer},
-		{path: '/ws/:ws/exec/yolov3_train/:nodeid', component: ExecYolov3Train},
-		{path: '/ws/:ws/exec/yolov3_infer/:nodeid', component: ExecYolov3Infer},
-		{path: '/ws/:ws/exec/unsupervised_reid/:nodeid', component: ExecUnsupervisedReid},
-		{path: '/ws/:ws/exec/video_sample/:nodeid', component: ExecVideoSample},
+		{path: '/ws/:ws/exec/:nodeid', component: ExecEdit},
 		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
 		{path: '/ws/:ws/interactive/:nodeid', component: Interactive},
 

@@ -15,6 +15,7 @@ export default {
 				Ops: [
 					'pytorch_train', 'pytorch_infer',
 					'pytorch_yolov3_train', 'pytorch_yolov3_infer',
+					'pytorch_yolov5_train', 'pytorch_yolov5_infer',
 					'yolov3_train', 'yolov3_infer',
 					'unsupervised_reid'
 				],

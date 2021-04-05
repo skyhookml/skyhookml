@@ -3,7 +3,6 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			node: null,
 			params: {
 				archID: '',
 				inputOptions: [],
@@ -16,6 +15,7 @@ export default {
 			addForms: null,
 		};
 	},
+	props: ['node'],
 	created: function() {
 		this.resetForm();
 
@@ -30,58 +30,54 @@ export default {
 			});
 		});
 
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			try {
-				let s = JSON.parse(this.node.Params);
-				if(s.ArchID) {
-					this.params.archID = s.ArchID;
-				}
-				if(s.InputOptions) {
-					this.params.inputOptions = s.InputOptions;
-				}
-				if(s.OutputDatasets) {
-					this.params.outputDatasets = s.OutputDatasets;
-				}
-			} catch(e) {}
-
-			// given an array of objects, get index of the object in the array
-			// that has a certain value at some key
-			let getIndexByKeyValue = function(array, key, value) {
-				let index = -1;
-				array.forEach((obj, i) => {
-					if(obj[key] != value) {
-						return;
-					}
-					index = i;
-				});
-				return index;
-			};
-
-			let inputs = [];
-			if(this.node.Parents && this.node.Parents['inputs']) {
-				inputs = this.node.Parents['inputs'];
+		try {
+			let s = JSON.parse(this.node.Params);
+			if(s.ArchID) {
+				this.params.archID = s.ArchID;
 			}
-			this.parents = [];
-			inputs.forEach((parent, idx) => {
-				this.parents.push({
-					Name: 'unknown',
-					DataType: 'unknown',
-				});
-				if(parent.Type == 'n') {
-					utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
-						this.parents[idx].Name = node.Name;
-						let index = getIndexByKeyValue(node.Outputs, 'Name', parent.Name);
-						this.parents[idx].DataType = node.Outputs[index].DataType;
-					});
-				} else if(parent.Type == 'd') {
-					utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {
-						this.parents[idx].Name = ds.Name;
-						this.parents[idx].DataType = ds.DataType;
-					});
+			if(s.InputOptions) {
+				this.params.inputOptions = s.InputOptions;
+			}
+			if(s.OutputDatasets) {
+				this.params.outputDatasets = s.OutputDatasets;
+			}
+		} catch(e) {}
+
+		// given an array of objects, get index of the object in the array
+		// that has a certain value at some key
+		let getIndexByKeyValue = function(array, key, value) {
+			let index = -1;
+			array.forEach((obj, i) => {
+				if(obj[key] != value) {
+					return;
 				}
+				index = i;
 			});
+			return index;
+		};
+
+		let inputs = [];
+		if(this.node.Parents && this.node.Parents['inputs']) {
+			inputs = this.node.Parents['inputs'];
+		}
+		this.parents = [];
+		inputs.forEach((parent, idx) => {
+			this.parents.push({
+				Name: 'unknown',
+				DataType: 'unknown',
+			});
+			if(parent.Type == 'n') {
+				utils.request(this, 'GET', '/exec-nodes/'+parent.ID, null, (node) => {
+					this.parents[idx].Name = node.Name;
+					let index = getIndexByKeyValue(node.Outputs, 'Name', parent.Name);
+					this.parents[idx].DataType = node.Outputs[index].DataType;
+				});
+			} else if(parent.Type == 'd') {
+				utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {
+					this.parents[idx].Name = ds.Name;
+					this.parents[idx].DataType = ds.DataType;
+				});
+			}
 		});
 	},
 	methods: {

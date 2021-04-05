@@ -3,7 +3,6 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			node: null,
 			velocitySteps: 5,
 			minIOU: 0.1,
 			maxAge: 10,
@@ -11,17 +10,14 @@ export default {
 			addCategoryInput: '',
 		};
 	},
+	props: ['node'],
 	created: function() {
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			try {
-				let s = JSON.parse(this.node.Params);
-				this.velocitySteps = s.VelocitySteps;
-				this.minIOU = s.MinIOU;
-				this.maxAge = s.MaxAge;
-			} catch(e) {}
-		});
+		try {
+			let s = JSON.parse(this.node.Params);
+			this.velocitySteps = s.VelocitySteps;
+			this.minIOU = s.MinIOU;
+			this.maxAge = s.MaxAge;
+		} catch(e) {}
 	},
 	methods: {
 		save: function() {

@@ -18,7 +18,7 @@ export default {
 	props: ['node', 'nodes', 'datasets', 'workspaces'],
 	methods: {
 		editNode: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.node.Op+'/'+this.node.ID);
+			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.node.ID);
 		},
 		runNode: function() {
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID+'/run', null, (job) => {

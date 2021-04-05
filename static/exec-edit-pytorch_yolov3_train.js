@@ -11,44 +11,40 @@ export default {
 	},
 	data: function() {
 		return {
-			node: null,
 			params: null,
 		};
 	},
+	props: ['node'],
 	created: function() {
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			let params = {};
-			try {
-				params = JSON.parse(this.node.Params);
-			} catch(e) {}
-			if(!params.Augment) {
-				params.Augment = [];
-			}
-			if(!params.Train) {
-				params.Train = {
-					Op: 'default',
-					Params: '',
-				};
-			}
-			if(!params.Restore) {
-				params.Restore = [];
-			}
-			if(!params.Mode) {
-				params.Mode = 'yolov3';
-			}
-			if(!params.Width) {
-				params.Width = 0;
-			}
-			if(!params.Height) {
-				params.Height = 0;
-			}
-			if(!params.ValPercent) {
-				params.ValPercent = 20;
-			}
-			this.params = params;
-		});
+		let params = {};
+		try {
+			params = JSON.parse(this.node.Params);
+		} catch(e) {}
+		if(!params.Augment) {
+			params.Augment = [];
+		}
+		if(!params.Train) {
+			params.Train = {
+				Op: 'default',
+				Params: '',
+			};
+		}
+		if(!params.Restore) {
+			params.Restore = [];
+		}
+		if(!params.Mode) {
+			params.Mode = 'yolov3';
+		}
+		if(!params.Width) {
+			params.Width = 0;
+		}
+		if(!params.Height) {
+			params.Height = 0;
+		}
+		if(!params.ValPercent) {
+			params.ValPercent = 20;
+		}
+		this.params = params;
 	},
 	methods: {
 		save: function() {

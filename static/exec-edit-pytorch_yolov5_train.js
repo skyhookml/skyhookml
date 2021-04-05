@@ -1,14 +1,10 @@
 import utils from './utils.js';
-import PytorchModel from './pytorch-model.js';
-import PytorchDataset from './pytorch-dataset.js';
 import PytorchAugment from './pytorch-augment.js';
 import PytorchRestore from './pytorch-restore.js';
 import PytorchTrain from './pytorch-train.js';
 
 export default {
 	components: {
-		'pytorch-model': PytorchModel,
-		'pytorch-dataset': PytorchDataset,
 		'pytorch-augment': PytorchAugment,
 		'pytorch-restore': PytorchRestore,
 		'pytorch-train': PytorchTrain,
@@ -24,26 +20,29 @@ export default {
 		try {
 			params = JSON.parse(this.node.Params);
 		} catch(e) {}
-		if(!params.ArchID) {
-			params.ArchID = '';
-		}
-		if(!params.Dataset) {
-			params.Dataset = {
-				Op: 'default',
-				Params: '',
-			};
-		}
 		if(!params.Augment) {
 			params.Augment = [];
-		}
-		if(!params.Restore) {
-			params.Restore = [];
 		}
 		if(!params.Train) {
 			params.Train = {
 				Op: 'default',
 				Params: '',
 			};
+		}
+		if(!params.Restore) {
+			params.Restore = [];
+		}
+		if(!params.Mode) {
+			params.Mode = 'x';
+		}
+		if(!params.Width) {
+			params.Width = 0;
+		}
+		if(!params.Height) {
+			params.Height = 0;
+		}
+		if(!params.ValPercent) {
+			params.ValPercent = 20;
 		}
 		this.params = params;
 	},
@@ -61,10 +60,7 @@ export default {
 	<template v-if="node != null">
 		<ul class="nav nav-tabs" id="m-nav" role="tablist">
 			<li class="nav-item">
-				<a class="nav-link active" id="pytorch-model-tab" data-toggle="tab" href="#pytorch-model-panel" role="tab">Model</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" id="pytorch-dataset-tab" data-toggle="tab" href="#pytorch-dataset-panel" role="tab">Datasets</a>
+				<a class="nav-link active" id="pytorch-model-tab" data-toggle="tab" href="#pytorch-basic-panel" role="tab">Basic</a>
 			</li>
 			<li class="nav-item">
 				<a class="nav-link" id="pytorch-augment-tab" data-toggle="tab" href="#pytorch-augment-panel" role="tab">Data Augmentation</a>
@@ -77,11 +73,50 @@ export default {
 			</li>
 		</ul>
 		<div class="tab-content mx-1">
-			<div class="tab-pane fade show active" id="pytorch-model-panel" role="tabpanel">
-				<pytorch-model v-bind:node="node" v-model="params.ArchID"></pytorch-model>
-			</div>
-			<div class="tab-pane fade" id="pytorch-dataset-panel" role="tabpanel">
-				<pytorch-dataset v-bind:node="node" v-model="params.Dataset.Params"></pytorch-dataset>
+			<div class="tab-pane fade show active" id="pytorch-basic-panel" role="tabpanel">
+				<div class="small-container">
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Mode</label>
+						<div class="col-sm-8">
+							<select v-model="params.Mode" class="form-select">
+								<option value="s">YOLOv5s</option>
+								<option value="m">YOLOv5m</option>
+								<option value="l">YOLOv5l</option>
+								<option value="x">YOLOv5x</option>
+							</select>
+							<small class="form-text text-muted">
+								Choose a model size: small (s), medium (m), large (l), and x-large (x).
+							</small>
+						</div>
+					</div>
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Width</label>
+						<div class="col-sm-8">
+							<input v-model.number="params.Width" type="text" class="form-control">
+							<small class="form-text text-muted">
+								Resize the image to this width. Leave as 0 to use the input image without resizing.
+							</small>
+						</div>
+					</div>
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Height</label>
+						<div class="col-sm-8">
+							<input v-model.number="params.Height" type="text" class="form-control">
+							<small class="form-text text-muted">
+								Resize the image to this height. Leave as 0 to use the input image without resizing.
+							</small>
+						</div>
+					</div>
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Validation Percentage</label>
+						<div class="col-sm-8">
+							<input v-model.number="params.ValPercent" type="text" class="form-control">
+							<small class="form-text text-muted">
+								Use this percentage of the input data for validation. The rest will be used for training.
+							</small>
+						</div>
+					</div>
+				</div>
 			</div>
 			<div class="tab-pane fade" id="pytorch-augment-panel" role="tabpanel">
 				<pytorch-augment v-bind:node="node" v-model="params.Augment"></pytorch-augment>

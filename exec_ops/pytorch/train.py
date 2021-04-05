@@ -136,8 +136,9 @@ train_loader = torch.utils.data.DataLoader(
 
 for example_inputs in train_loader:
 	break
+util.inputs_to_device(example_inputs, device)
 example_metadatas = train_set.get_metadatas(0)
-net = model.Net(arch, comps, example_inputs, example_metadatas)
+net = model.Net(arch, comps, example_inputs, example_metadatas, device=device)
 net.to(device)
 learning_rate = train_params.get('LearningRate', 1e-3)
 optimizer_name = train_params.get('Optimizer', 'adam')

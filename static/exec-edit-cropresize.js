@@ -3,23 +3,19 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			node: null,
 			start: [0, 0],
 			cropDims: [0, 0],
 			resizeDims: [0, 0],
 		};
 	},
+	props: ['node'],
 	created: function() {
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			try {
-				let s = JSON.parse(this.node.Params);
-				this.start = s.Start;
-				this.cropDims = s.CropDims;
-				this.resizeDims = s.ResizeDims;
-			} catch(e) {}
-		});
+		try {
+			let s = JSON.parse(this.node.Params);
+			this.start = s.Start;
+			this.cropDims = s.CropDims;
+			this.resizeDims = s.ResizeDims;
+		} catch(e) {}
 	},
 	methods: {
 		save: function() {

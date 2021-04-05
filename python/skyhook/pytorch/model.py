@@ -9,7 +9,7 @@ import sys
 import skyhook.common as lib
 
 class Net(torch.nn.Module):
-	def __init__(self, arch, comps, example_inputs, example_metadatas, output_datasets=None, infer=False):
+	def __init__(self, arch, comps, example_inputs, example_metadatas, output_datasets=None, infer=False, device=None):
 		super(Net, self).__init__()
 
 		self.arch = arch
@@ -50,6 +50,7 @@ class Net(torch.nn.Module):
 				'example_inputs': cur_inputs,
 				'metadatas': cur_metadatas,
 				'infer': infer,
+				'device': device,
 			}
 
 			module_spec = comp['Params']['Module']
@@ -73,6 +74,7 @@ class Net(torch.nn.Module):
 			else:
 				raise Exception('invalid module {}: none of BuiltInModule, RepositoryModule, or Code are set'.format(comp['ID']))
 
+			m.to(device)
 			self.mlist.append(m)
 
 			# get example layers by running forward pass with only the inputs (no targets)

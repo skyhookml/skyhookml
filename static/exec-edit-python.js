@@ -4,21 +4,17 @@ export default {
 	data: function() {
 		return {
 			addOutputForm: null,
-			node: null,
 			code: '',
 			outputs: [],
 		};
 	},
+	props: ['node'],
 	created: function() {
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			try {
-				let params = JSON.parse(this.node.Params);
-				this.code = params.Code;
-				this.outputs = params.Outputs;
-			} catch(e) {}
-		});
+		try {
+			let params = JSON.parse(this.node.Params);
+			this.code = params.Code;
+			this.outputs = params.Outputs;
+		} catch(e) {}
 		this.resetForm();
 	},
 	methods: {

@@ -68,21 +68,22 @@ export default {
 								Name: 'COCO',
 							}],
 						},
-						'pytorch_scaled_yolov4': {
-							ID: 'pytorch_scaled_yolov4',
-							Name: 'Scaled-YOLOv4',
-						},
 						'pytorch_yolov5': {
 							ID: 'pytorch_yolov5',
 							Name: 'YOLOv5',
-						},
-						'pytorch_maskrcnn': {
-							ID: 'pytorch_maskrcnn',
-							Name: 'Mask R-CNN',
-						},
-						'pytorch_efficientdet': {
-							ID: 'pytorch_efficientdet',
-							Name: 'EfficientDet',
+							Modes: [
+								{ID: 'x', Name: 'YOLOv5x'},
+								{ID: 'l', Name: 'YOLOv5l'},
+								{ID: 'm', Name: 'YOLOv5m'},
+								{ID: 's', Name: 'YOLOv5s'},
+							],
+							ModeHelp: `
+								Larger models like YOLOv5l and YOLOv5x provide greater accuracy but slower inference than smaller models like YOLOv5s.
+							`,
+							Pretrain: [{
+								ID: 'coco',
+								Name: 'COCO',
+							}],
 						},
 						'pytorch_mobilenetssd': {
 							ID: 'pytorch_mobilenetssd',
@@ -208,10 +209,31 @@ export default {
 				if(this.form.mode) {
 					nodeParams['Mode'] = this.form.mode;
 				}
+				nodeParams['Train'] = {
+					'Op': 'default',
+					'Params': JSON.stringify({
+						'BatchSize': 8,
+					}),
+				}
+				if(this.form.model.ID == 'pytorch_yolov3') {
+					// exclude last layer which is dependent on # categories
+					nodeParams['Restore'] = [{
+						'SrcPrefix': '',
+						'DstPrefix': '',
+						'SkipPrefixes': 'mlist.0.model.model.28.',
+					}];
+				} else if(this.form.model.ID == 'pytorch_yolov5') {
+					// exclude last layer which is dependent on # categories
+					nodeParams['Restore'] = [{
+						'SrcPrefix': '',
+						'DstPrefix': '',
+						'SkipPrefixes': 'mlist.0.model.model.24.',
+					}];
+				}
 				let params = {
 					Name: this.form.name,
 					Op: this.form.model.ID+'_train',
-					Params: '',
+					Params: JSON.stringify(nodeParams),
 					Parents: parents,
 					Workspace: this.$route.params.ws,
 				};
@@ -223,7 +245,7 @@ export default {
 					return;
 				}
 
-				this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+node.Op+'/'+node.ID);
+				this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+node.ID);
 			};
 			handle();
 		},

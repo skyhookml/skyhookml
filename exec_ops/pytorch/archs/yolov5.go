@@ -29,8 +29,8 @@ func init() {
 	}
 
 	AddImpl(Impl{
-		ID: "pytorch_yolov3",
-		Name: "YOLOv3-pytorch",
+		ID: "pytorch_yolov5",
+		Name: "YOLOv5-pytorch",
 		TrainInputs: []skyhook.ExecInput{
 			{Name: "images", DataTypes: []skyhook.DataType{skyhook.ImageType}},
 			{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}},
@@ -65,7 +65,7 @@ func init() {
 				0: string(skyhook.JsonMarshal(modelParams)),
 			}
 
-			p.ArchID = "yolov3"
+			p.ArchID = "yolov5"
 			return p, nil
 		},
 		InferPrepare: func(node skyhook.Runnable) (skyhook.PytorchInferParams, error) {
@@ -74,7 +74,7 @@ func init() {
 				return skyhook.PytorchInferParams{}, fmt.Errorf("node is not configured: %v", err)
 			}
 			p := skyhook.PytorchInferParams{
-				ArchID: "yolov3",
+				ArchID: "yolov5",
 				OutputDatasets: []skyhook.PIOutputDataset{{
 					ComponentIdx: 0,
 					Layer: "detections",

@@ -3,7 +3,6 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			node: null,
 			params: {
 				inputWidth: '',
 				inputHeight: '',
@@ -11,21 +10,18 @@ export default {
 			},
 		};
 	},
+	props: ['node'],
 	created: function() {
-		const nodeID = this.$route.params.nodeid;
-		utils.request(this, 'GET', '/exec-nodes/'+nodeID, null, (node) => {
-			this.node = node;
-			try {
-				let s = JSON.parse(this.node.Params);
-				if(s.InputSize) {
-					this.params.inputWidth = s.InputSize[0];
-					this.params.inputHeight = s.InputSize[1];
-				}
-				if(s.ConfigPath) {
-					this.params.configPath = s.ConfigPath;
-				}
-			} catch(e) {}
-		});
+		try {
+			let s = JSON.parse(this.node.Params);
+			if(s.InputSize) {
+				this.params.inputWidth = s.InputSize[0];
+				this.params.inputHeight = s.InputSize[1];
+			}
+			if(s.ConfigPath) {
+				this.params.configPath = s.ConfigPath;
+			}
+		} catch(e) {}
 	},
 	methods: {
 		save: function() {

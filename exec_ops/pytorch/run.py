@@ -38,7 +38,10 @@ if params.get('Components', None):
 			comp_params.update(json.loads(overwrite_comp_params[comp_idx]))
 		comp_spec['Params'] = json.dumps(comp_params)
 
-net = model.Net(arch, save_dict['comps'], save_dict['example_inputs'], save_dict['example_metadatas'], output_datasets=params['OutputDatasets'], infer=True)
+example_inputs = save_dict['example_inputs']
+util.inputs_to_device(example_inputs, device)
+
+net = model.Net(arch, save_dict['comps'], example_inputs, save_dict['example_metadatas'], output_datasets=params['OutputDatasets'], infer=True, device=device)
 net.to(device)
 
 net.load_state_dict(save_dict['model'])
