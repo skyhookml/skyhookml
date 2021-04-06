@@ -2,9 +2,7 @@ package archs
 
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
-
-	"encoding/json"
-	"fmt"
+	"github.com/skyhookml/skyhookml/exec_ops"
 )
 
 func init() {
@@ -45,8 +43,8 @@ func init() {
 		},
 		TrainPrepare: func(node skyhook.Runnable) (skyhook.PytorchTrainParams, error) {
 			var params TrainParams
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				return skyhook.PytorchTrainParams{}, fmt.Errorf("node is not configured: %v", err)
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return skyhook.PytorchTrainParams{}, err
 			}
 			p := params.PytorchTrainParams
 			p.Dataset.Op = "default"
@@ -70,8 +68,8 @@ func init() {
 		},
 		InferPrepare: func(node skyhook.Runnable) (skyhook.PytorchInferParams, error) {
 			var params InferParams
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				return skyhook.PytorchInferParams{}, fmt.Errorf("node is not configured: %v", err)
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return skyhook.PytorchInferParams{}, err
 			}
 			p := skyhook.PytorchInferParams{
 				ArchID: "yolov5",

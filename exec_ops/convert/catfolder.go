@@ -4,9 +4,7 @@ import (
 	"github.com/skyhookml/skyhookml/exec_ops"
 	"github.com/skyhookml/skyhookml/skyhook"
 
-	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +14,8 @@ import (
 // Here we just have one folder per category, and put images into folder based on their category.
 
 func init() {
+	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
 			ID: "to_catfolder",
@@ -35,8 +35,8 @@ func init() {
 			var params struct {
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: to_catfolder node is not configured, using defaults")
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 
 			outDS := node.OutputDatasets["output"]
@@ -128,8 +128,8 @@ func init() {
 			var params struct {
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: from_catfolder node is not configured, using defaults")
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 			imageDS := node.OutputDatasets["images"]
 			labelDS := node.OutputDatasets["labels"]
@@ -157,14 +157,8 @@ func init() {
 				key := fname[0:len(fname)-len(filepath.Ext(fname))]
 
 				// copy the image
-				var ext, format string
-				if inItem.Ext == "jpg" || inItem.Ext == "jpeg" {
-					ext = "jpg"
-					format = "jpeg"
-				} else if inItem.Ext == "png" {
-					ext = "png"
-					format = "png"
-				}
+				format, _, _ := imageImpl.GetDefaultMetadata(fname)
+				ext := imageImpl.GetExtGivenFormat(format)
 				outImageItem, err := exec_ops.AddItem(url, imageDS, key, ext, format, "")
 				if err != nil {
 					return err

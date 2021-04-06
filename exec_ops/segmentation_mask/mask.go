@@ -6,7 +6,6 @@ import (
 
 	gomapinfer "github.com/mitroadmaps/gomapinfer/common"
 
-	"encoding/json"
 	"fmt"
 	"runtime"
 )
@@ -195,8 +194,8 @@ func init() {
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				return nil, fmt.Errorf("node has not been configured")
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return nil, err
 			}
 			return &Mask{
 				Params: params,

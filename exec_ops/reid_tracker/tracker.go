@@ -7,10 +7,8 @@ import (
 
 	"bufio"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"runtime"
 	"strconv"
@@ -50,8 +48,8 @@ func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	var params Params
 	// try to decode parameters, but it's okay if it's not configured
 	// since we have default settings
-	if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-		log.Printf("[reid_tracker] warning: error decoding parameters: %v", err)
+	if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+		return nil, err
 	}
 
 	cmd := skyhook.Command(

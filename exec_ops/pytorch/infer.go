@@ -25,7 +25,9 @@ func GetInferOutputs(params skyhook.PytorchInferParams) []skyhook.ExecOutput {
 func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	// check the ArchID just to make sure we have all git repositories
 	var params skyhook.PytorchInferParams
-	skyhook.JsonUnmarshal([]byte(node.Params), &params)
+	if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+		return nil, err
+	}
 	_, components, err := GetTrainArgs(url, params.ArchID)
 	if err != nil {
 		return nil, err

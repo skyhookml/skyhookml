@@ -4,9 +4,7 @@ import (
 	"github.com/skyhookml/skyhookml/exec_ops"
 	"github.com/skyhookml/skyhookml/skyhook"
 
-	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 )
@@ -17,6 +15,8 @@ import (
 // An obj.names file is also created for the category names.
 
 func init() {
+	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
 			ID: "to_yolo",
@@ -49,20 +49,11 @@ func init() {
 				Format string
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: to_yolo node is not configured, using defaults")
-				params.Format = "jpeg"
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
-
-			// TODO: this should probably be a shared function in skyhook/data_image.go
-			formatToExt := func(format string) string {
-				if format == "jpeg" {
-					return "jpg"
-				} else if format == "png" {
-					return "png"
-				} else {
-					return format
-				}
+			if node.Params == "" {
+				params.Format = "jpeg"
 			}
 
 			outDS := node.OutputDatasets["output"]
@@ -77,7 +68,11 @@ func init() {
 				if outImageFormat == "" {
 					outImageFormat = inImageItem.Format
 				}
-				outImageExt := formatToExt(outImageFormat)
+				outImageExt := imageImpl.GetExtGivenFormat(outImageFormat)
+				if outImageExt == "" {
+					// unknown format...? just use the format as ext
+					outImageExt = outImageFormat
+				}
 				outImageMetadata := string(skyhook.JsonMarshal(skyhook.FileMetadata{
 					Filename: task.Key+"."+outImageExt,
 				}))
@@ -213,8 +208,8 @@ func init() {
 			var params struct {
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: from_yolo node is not configured, using defaults")
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 			imageDS := node.OutputDatasets["images"]
 			labelDS := node.OutputDatasets["detections"]
@@ -280,15 +275,11 @@ func init() {
 				}
 
 				// add the image
-				// we use the original extension to determine skyhook ext/format
-				var ext, format string
-				if inImageItem.Ext == "jpg" || inImageItem.Ext == "jpeg" {
-					ext = "jpg"
-					format = "jpeg"
-				} else if inImageItem.Ext == "png" {
-					ext = "png"
-					format = "png"
-				}
+				// we use the original filename to determine skyhook ext/format
+				var imageFileMetadata skyhook.FileMetadata
+				skyhook.JsonUnmarshal([]byte(inImageItem.Metadata), &imageFileMetadata)
+				format, _, _ := imageImpl.GetDefaultMetadata(imageFileMetadata.Filename)
+				ext := imageImpl.GetExtGivenFormat(format)
 				outImageItem, err := exec_ops.AddItem(url, imageDS, task.Key, ext, format, "")
 				if err != nil {
 					return err

@@ -3,7 +3,9 @@ package exec_ops
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
+	"encoding/json"
 	"fmt"
+	"log"
 	urllib "net/url"
 )
 
@@ -233,4 +235,25 @@ func GetOutputsSimilarToInputs(params string, inputTypes map[string][]skyhook.Da
 		})
 	}
 	return outputs
+}
+
+// Decode node parameters.
+// If decoding fails, returns an error, except if the error is because no
+// parameters were provided and emptyOK is set.
+func DecodeParams(node skyhook.Runnable, x interface{}, emptyOK bool) error {
+	if node.Params == "" {
+		if emptyOK {
+			log.Printf("warning: node %s (op=%s) is not configured, using defaults", node.Name, node.Op)
+			return nil
+		} else {
+			return fmt.Errorf("node %s has not been configured", node.Name)
+		}
+	}
+
+	err := json.Unmarshal([]byte(node.Params), &x)
+	if err != nil {
+		return fmt.Errorf("error decoding parameters of node %s: %v", node.Name, err)
+	}
+
+	return nil
 }

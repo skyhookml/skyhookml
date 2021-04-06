@@ -4,7 +4,6 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -136,9 +135,8 @@ func init() {
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
-			err := json.Unmarshal([]byte(node.Params), &params)
-			if err != nil {
-				return nil, fmt.Errorf("node has not been configured", err)
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return nil, err
 			}
 			op := &Resample{
 				URL: url,

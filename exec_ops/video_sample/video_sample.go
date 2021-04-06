@@ -222,7 +222,7 @@ func init() {
 			var params Params
 			err := json.Unmarshal([]byte(node.Params), &params)
 			if err != nil {
-				return nil, fmt.Errorf("node has not been configured", err)
+				return nil, fmt.Errorf("node has not been configured: %v", err)
 			}
 
 			groupedItems := exec_ops.GroupItems(allItems)
@@ -303,9 +303,8 @@ func init() {
 		},
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			var params Params
-			err := json.Unmarshal([]byte(node.Params), &params)
-			if err != nil {
-				return nil, fmt.Errorf("node has not been configured", err)
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return nil, err
 			}
 			op := &VideoSample{
 				URL: url,

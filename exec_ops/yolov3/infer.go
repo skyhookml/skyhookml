@@ -16,7 +16,9 @@ import (
 
 func Prepare(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 	var params Params
-	skyhook.JsonUnmarshal([]byte(node.Params), &params)
+	if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+		return nil, err
+	}
 
 	modelDataset := node.InputDatasets["model"][0]
 

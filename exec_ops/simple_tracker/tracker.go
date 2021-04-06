@@ -4,8 +4,6 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"encoding/json"
-	"log"
 	"runtime"
 
 	"github.com/mitroadmaps/gomapinfer/common"
@@ -262,8 +260,8 @@ func init() {
 			var params Params
 			// try to decode parameters, but it's okay if it's not configured
 			// since we have default settings
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("[simple_tracker] warning: error decoding parameters: %v", err)
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 
 			op := &Tracker{url, node.OutputDatasets["tracks"], params}

@@ -76,6 +76,13 @@ func main() {
 		containers[uuid].BaseURL = containerBaseURL
 		mu.Unlock()
 
+		setError := func(err error) {
+			mu.Lock()
+			containers[uuid].Error = err
+			cond.Broadcast()
+			mu.Unlock()
+		}
+
 		var cmd *exec.Cmd
 		if mode == "docker" {
 			dataDir := filepath.Join(workingDir, "data")
@@ -98,16 +105,19 @@ func main() {
 
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			panic(err)
+			setError(err)
+			return "", err
 		}
 		stderr, err := cmd.StderrPipe()
 		if err != nil {
-			panic(err)
+			setError(err)
+			return "", err
 		}
 		if err := cmd.Start(); err != nil {
-			panic(err)
+			setError(err)
+			return "", err
 		}
-		log.Printf("[machine] container %s started", uuid)
+		log.Printf("[worker] container %s started", uuid)
 
 		mu.Lock()
 		containers[uuid].Cmd = cmd
@@ -120,6 +130,22 @@ func main() {
 		readContainerOutput(uuid, stdoutRd, bufio.NewReader(stderr), jobID, coordinatorURL)
 
 		return containerBaseURL, nil
+	}
+
+	stopContainer := func(uuid string, container *Container) {
+		if mode == "docker" {
+			err := exec.Command("docker", "rm", "--force", uuid).Run()
+			if err != nil {
+				log.Printf("error stopping docker container: %v", err)
+			}
+			container.Cmd.Wait()
+		} else if mode == "process" {
+			skyhook.JsonPost(container.BaseURL, "/exit", nil, nil)
+			if err := container.Cmd.Wait(); err != nil {
+				log.Printf("error waiting for process to exit: %v", err)
+			}
+		}
+		log.Printf("[worker] container %s stopped", uuid)
 	}
 
 	http.HandleFunc("/container/request", func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +185,13 @@ func main() {
 			var response skyhook.ExecBeginResponse
 			err = skyhook.JsonPost(baseURL, "/exec/start", execRequest, &response)
 			if err != nil {
-				panic(err)
+				mu.Lock()
+				container := containers[uuid]
+				container.Error = err
+				cond.Broadcast()
+				mu.Unlock()
+				stopContainer(uuid, container)
+				return
 			}
 
 			mu.Lock()
@@ -226,26 +258,11 @@ func main() {
 			return
 		}
 
-		if mode == "docker" {
-			err := exec.Command("docker", "rm", "--force", uuid).Run()
-			if err != nil {
-				panic(err)
-			}
-			container.Cmd.Wait()
-		} else if mode == "process" {
-			skyhook.JsonPost(container.BaseURL, "/exit", nil, nil)
-			if err := container.Cmd.Wait(); err != nil {
-				panic(err)
-			}
-		}
-
-		log.Printf("[machine] container %s stopped", uuid)
+		stopContainer(uuid, container)
 	})
 
 	log.Printf("starting on :%d", myPort)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", myPort), nil); err != nil {
-		panic(err)
-	}
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", myPort), nil))
 }
 
 func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader, jobID *int, coordinatorURL string) {
@@ -300,7 +317,8 @@ func readContainerOutput(uuid string, stdout *bufio.Reader, stderr *bufio.Reader
 				}
 				err := skyhook.JsonPost(coordinatorURL, "/worker/job-update", request, nil)
 				if err != nil {
-					panic(err)
+					log.Printf("error posting job update: %v", err)
+					continue
 				}
 			}
 		}()

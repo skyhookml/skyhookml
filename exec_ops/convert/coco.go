@@ -6,7 +6,6 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 )
@@ -79,6 +78,8 @@ type CocoJSON struct {
 }
 
 func init() {
+	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
 			ID: "to_coco",
@@ -113,25 +114,19 @@ func init() {
 				Format string
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: to_coco node is not configured, using defaults")
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 
 			if params.Format == "" {
 				params.Format = "jpeg"
 			}
 
-			// TODO: this should probably be a shared function in skyhook/data_image.go
-			formatToExt := func(format string) string {
-				if format == "jpeg" {
-					return "jpg"
-				} else if format == "png" {
-					return "png"
-				} else {
-					return format
-				}
+			outputExt := imageImpl.GetExtGivenFormat(params.Format)
+			if outputExt == "" {
+				// unknown format...? just use the format as ext
+				outputExt = params.Format
 			}
-			outputExt := formatToExt(params.Format)
 
 			outDS := node.OutputDatasets["output"]
 			applyFunc := func(task skyhook.ExecTask) error {
@@ -262,8 +257,8 @@ func init() {
 			var params struct {
 				Symlink bool
 			}
-			if err := json.Unmarshal([]byte(node.Params), &params); err != nil {
-				log.Printf("warning: from_coco node is not configured, using defaults")
+			if err := exec_ops.DecodeParams(node, &params, true); err != nil {
+				return nil, err
 			}
 			imageDS := node.OutputDatasets["images"]
 			labelDS := node.OutputDatasets["detections"]
@@ -283,14 +278,10 @@ func init() {
 
 				if inItem.Ext != "json" {
 					// just copy the image
-					var ext, format string
-					if inItem.Ext == "jpg" || inItem.Ext == "jpeg" {
-						ext = "jpg"
-						format = "jpeg"
-					} else if inItem.Ext == "png" {
-						ext = "png"
-						format = "png"
-					}
+					var imageFileMetadata skyhook.FileMetadata
+					skyhook.JsonUnmarshal([]byte(inItem.Metadata), &imageFileMetadata)
+					format, _, _ := imageImpl.GetDefaultMetadata(imageFileMetadata.Filename)
+					ext := imageImpl.GetExtGivenFormat(format)
 
 					// determine key to save this file under
 					var metadata skyhook.FileMetadata

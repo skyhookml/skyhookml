@@ -29,6 +29,7 @@ func main() {
 
 		var request skyhook.ExecBeginRequest
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			http.Error(w, fmt.Sprintf("error parsing request: %v", err), 400)
 			return
 		}
 
@@ -36,7 +37,8 @@ func main() {
 		var err error
 		execOp, err = request.Node.GetOp().Prepare(coordinatorURL, request.Node)
 		if err != nil {
-			panic(err)
+			http.Error(w, fmt.Sprintf("error preparing node: %v", err), 400)
+			return
 		}
 
 		skyhook.JsonResponse(w, skyhook.ExecBeginResponse{
@@ -52,6 +54,7 @@ func main() {
 
 		var request skyhook.ExecTaskRequest
 		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			http.Error(w, fmt.Sprintf("error parsing request: %v", err), 400)
 			return
 		}
 
