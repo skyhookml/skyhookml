@@ -8,6 +8,8 @@ import ExecReidTracker from './exec-edit-reid_tracker.js';
 import ExecPython from './exec-edit-python.js';
 import ExecPytorchTrain from './exec-edit-pytorch_train.js';
 import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
+import ExecPytorchResnetTrain from './exec-edit-pytorch_resnet_train.js';
+import ExecPytorchResnetInfer from './exec-edit-pytorch_resnet_infer.js';
 import ExecPytorchYolov3Train from './exec-edit-pytorch_yolov3_train.js';
 import ExecPytorchYolov3Infer from './exec-edit-pytorch_yolov3_infer.js';
 import ExecPytorchYolov5Train from './exec-edit-pytorch_yolov5_train.js';
@@ -27,6 +29,8 @@ let components = {
 	'python': ExecPython,
 	'pytorch_train': ExecPytorchTrain,
 	'pytorch_infer': ExecPytorchInfer,
+	'pytorch_resnet_train': ExecPytorchResnetTrain,
+	'pytorch_resnet_infer': ExecPytorchResnetInfer,
 	'pytorch_yolov3_train': ExecPytorchYolov3Train,
 	'pytorch_yolov3_infer': ExecPytorchYolov3Infer,
 	'pytorch_yolov5_train': ExecPytorchYolov5Train,

@@ -8,14 +8,13 @@ export default {
 	},
 	props: ['node'],
 	created: function() {
-		let params;
+		let params = {};
 		try {
 			let s = JSON.parse(this.node.Params);
 			params = s;
 		} catch(e) {}
-		if(!('Width' in params)) params.Width = 0;
-		if(!('Height' in params)) params.Height = 0;
-		if(!('ConfidenceThreshold' in params)) params.ConfidenceThreshold = 0.1;
+		if(!('Width' in params)) params.Width = 224;
+		if(!('Height' in params)) params.Height = 224;
 		this.params = params;
 	},
 	methods: {
@@ -35,7 +34,7 @@ export default {
 			<div class="col-sm-10">
 				<input v-model.number="params.Width" type="text" class="form-control">
 				<small class="form-text text-muted">
-					Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
+					Resize the image to this width (must be at least 224). Leave as 0 to use the input image without resizing.
 				</small>
 			</div>
 		</div>
@@ -44,16 +43,7 @@ export default {
 			<div class="col-sm-10">
 				<input v-model.number="params.Height" type="text" class="form-control">
 				<small class="form-text text-muted">
-					Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
-				</small>
-			</div>
-		</div>
-		<div class="row mb-2">
-			<label class="col-sm-2 col-form-label">Confidence Threshold</label>
-			<div class="col-sm-10">
-				<input v-model.number="params.ConfidenceThreshold" type="text" class="form-control">
-				<small class="form-text text-muted">
-					Only output detections with confidence score above this threshold.
+					Resize the image to this height (must be at least 224). Leave as 0 to use the input image without resizing.
 				</small>
 			</div>
 		</div>

@@ -28,9 +28,9 @@ export default {
 			};
 		}
 		if(!('Restore' in params)) params.Restore = [];
-		if(!('Mode' in params)) params.Mode = 'x';
-		if(!('Width' in params)) params.Width = 0;
-		if(!('Height' in params)) params.Height = 0;
+		if(!('Mode' in params)) params.Mode = 'resnet34';
+		if(!('Width' in params)) params.Width = 224;
+		if(!('Height' in params)) params.Height = 224;
 		if(!('ValPercent' in params)) params.ValPercent = 20;
 		this.params = params;
 	},
@@ -67,13 +67,14 @@ export default {
 						<label class="col-sm-4 col-form-label">Mode</label>
 						<div class="col-sm-8">
 							<select v-model="params.Mode" class="form-select">
-								<option value="s">YOLOv5s</option>
-								<option value="m">YOLOv5m</option>
-								<option value="l">YOLOv5l</option>
-								<option value="x">YOLOv5x</option>
+								<option value="resnet18">Resnet18</option>
+								<option value="resnet34">Resnet34</option>
+								<option value="resnet50">Resnet50</option>
+								<option value="resnet101">Resnet101</option>
+								<option value="resnet152">Resnet152</option>
 							</select>
 							<small class="form-text text-muted">
-								Choose a model size: small (s), medium (m), large (l), and x-large (x).
+								Select a model architecture. For example, Resnet34 consists of 34 layers, and is suitable for small to medium sized datasets.
 							</small>
 						</div>
 					</div>
@@ -82,7 +83,7 @@ export default {
 						<div class="col-sm-8">
 							<input v-model.number="params.Width" type="text" class="form-control">
 							<small class="form-text text-muted">
-								Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
+								Resize the image to this width (must be at least 224). Leave as 0 to use the input image without resizing.
 							</small>
 						</div>
 					</div>
@@ -91,7 +92,7 @@ export default {
 						<div class="col-sm-8">
 							<input v-model.number="params.Height" type="text" class="form-control">
 							<small class="form-text text-muted">
-								Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
+								Resize the image to this height (must be at least 224). Leave as 0 to use the input image without resizing.
 							</small>
 						</div>
 					</div>

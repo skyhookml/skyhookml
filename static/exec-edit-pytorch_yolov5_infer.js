@@ -3,19 +3,20 @@ import utils from './utils.js';
 export default {
 	data: function() {
 		return {
-			params: {
-				Width: 0,
-				Height: 0,
-				ConfidenceThreshold: 0,
-			},
+			params: null,
 		};
 	},
 	props: ['node'],
 	created: function() {
+		let params;
 		try {
 			let s = JSON.parse(this.node.Params);
-			this.params = s;
+			params = s;
 		} catch(e) {}
+		if(!('Width' in params)) params.Width = 0;
+		if(!('Height' in params)) params.Height = 0;
+		if(!('ConfidenceThreshold' in params)) params.ConfidenceThreshold = 0.1;
+		this.params = params;
 	},
 	methods: {
 		save: function() {
@@ -34,7 +35,7 @@ export default {
 			<div class="col-sm-10">
 				<input v-model.number="params.Width" type="text" class="form-control">
 				<small class="form-text text-muted">
-					Resize the image to this width. Leave as 0 to use the input image without resizing.
+					Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
 				</small>
 			</div>
 		</div>
@@ -43,7 +44,7 @@ export default {
 			<div class="col-sm-10">
 				<input v-model.number="params.Height" type="text" class="form-control">
 				<small class="form-text text-muted">
-					Resize the image to this height. Leave as 0 to use the input image without resizing.
+					Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
 				</small>
 			</div>
 		</div>

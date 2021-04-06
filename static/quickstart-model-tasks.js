@@ -73,11 +73,25 @@ export default {
 			Help: "An integer dataset containing category labels corresponding to each input image.",
 		}],
 		Models: {
-			'pytorch_resnet34': {
-				ID: 'pytorch_resnet34',
-				Name: 'Resnet34',
+			'pytorch_resnet': {
+				ID: 'pytorch_resnet',
+				Name: 'ResNet',
+				Modes: [
+					{ID: 'resnet18', Name: 'ResNet18'},
+					{ID: 'resnet34', Name: 'ResNet34'},
+					{ID: 'resnet50', Name: 'ResNet50'},
+					{ID: 'resnet101', Name: 'ResNet101'},
+					{ID: 'resnet152', Name: 'ResNet152'},
+				],
+				ModeHelp: `
+					Select a model architecture. For example, Resnet34 consists of 34 layers, and is suitable for small to medium sized datasets.
+				`,
+				Pretrain: [{
+					ID: 'imagenet',
+					Name: 'ImageNet',
+				}],
 			},
-			'pytorch_efficientnet': {
+			/*'pytorch_efficientnet': {
 				ID: 'pytorch_efficientnet',
 				Name: 'EfficientNet',
 			},
@@ -88,7 +102,7 @@ export default {
 			'pytorch_vgg': {
 				ID: 'pytorch_vgg',
 				Name: 'VGG',
-			},
+			},*/
 		},
 	},
 };

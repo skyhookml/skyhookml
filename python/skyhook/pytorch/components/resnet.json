@@ -1,0 +1,16 @@
+{
+	"Module": {"BuiltInModule": "resnet"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Outputs": {
+		"probs": "floats",
+		"cls": "int"
+	},
+	"Layers": [
+		"scores",
+		"cls"
+	],
+	"Losses": [
+		"loss"
+	]
+}

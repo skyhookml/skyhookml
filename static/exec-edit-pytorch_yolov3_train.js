@@ -20,30 +20,18 @@ export default {
 		try {
 			params = JSON.parse(this.node.Params);
 		} catch(e) {}
-		if(!params.Augment) {
-			params.Augment = [];
-		}
-		if(!params.Train) {
+		if(!('Augment' in params)) params.Augment = [];
+		if(!('Train' in params)) {
 			params.Train = {
 				Op: 'default',
 				Params: '',
 			};
 		}
-		if(!params.Restore) {
-			params.Restore = [];
-		}
-		if(!params.Mode) {
-			params.Mode = 'yolov3';
-		}
-		if(!params.Width) {
-			params.Width = 0;
-		}
-		if(!params.Height) {
-			params.Height = 0;
-		}
-		if(!params.ValPercent) {
-			params.ValPercent = 20;
-		}
+		if(!('Restore' in params)) params.Restore = [];
+		if(!('Mode' in params)) params.Mode = 'yolov3';
+		if(!('Width' in params)) params.Width = 0;
+		if(!('Height' in params)) params.Height = 0;
+		if(!('ValPercent' in params)) params.ValPercent = 20;
 		this.params = params;
 	},
 	methods: {
@@ -94,7 +82,7 @@ export default {
 						<div class="col-sm-8">
 							<input v-model.number="params.Width" type="text" class="form-control">
 							<small class="form-text text-muted">
-								Resize the image to this width. Leave as 0 to use the input image without resizing.
+								Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
 							</small>
 						</div>
 					</div>
@@ -103,7 +91,7 @@ export default {
 						<div class="col-sm-8">
 							<input v-model.number="params.Height" type="text" class="form-control">
 							<small class="form-text text-muted">
-								Resize the image to this height. Leave as 0 to use the input image without resizing.
+								Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
 							</small>
 						</div>
 					</div>
