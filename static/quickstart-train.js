@@ -129,20 +129,18 @@ export default {
 				}
 				// if pre-train, set SkipPrefixes as necessary
 				if(this.form.pretrain) {
+					nodeParams['Restore'] = [{
+						'SrcPrefix': '',
+						'DstPrefix': '',
+						'SkipPrefixes': '',
+					}];
+					// exclude last layer which is dependent on # categories
 					if(this.form.model.ID == 'pytorch_yolov3') {
-						// exclude last layer which is dependent on # categories
-						nodeParams['Restore'] = [{
-							'SrcPrefix': '',
-							'DstPrefix': '',
-							'SkipPrefixes': 'mlist.0.model.model.28.',
-						}];
+						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.model.28.';
 					} else if(this.form.model.ID == 'pytorch_yolov5') {
-						// exclude last layer which is dependent on # categories
-						nodeParams['Restore'] = [{
-							'SrcPrefix': '',
-							'DstPrefix': '',
-							'SkipPrefixes': 'mlist.0.model.model.24.',
-						}];
+						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.model.24.';
+					} else if(this.form.model.ID == 'pytorch_resnet') {
+						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.fc.';
 					}
 				}
 

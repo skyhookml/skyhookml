@@ -11,6 +11,7 @@ func init() {
 		Mode string
 		Width int
 		Height int
+		NumClasses int
 		ValPercent int
 	}
 
@@ -22,6 +23,8 @@ func init() {
 	type ModelParams struct {
 		// "resnet15", "resnet34", etc. (see python/skyhook/pytorch/components/resnet.py)
 		Mode string `json:"mode,omitempty"`
+
+		NumClasses int `json:"num_classes,omitempty"`
 	}
 
 	AddImpl(Impl{
@@ -56,6 +59,7 @@ func init() {
 
 			modelParams := ModelParams{
 				Mode: params.Mode,
+				NumClasses: params.NumClasses,
 			}
 			p.Components = map[int]string{
 				0: string(skyhook.JsonMarshal(modelParams)),

@@ -27,7 +27,7 @@ def read_input(dataset, item):
 def prepare_input(t, data, opt):
 	if t == 'image' or t == 'video' or t == 'array':
 		im = data
-		if 'Width' in opt and 'Height' in opt:
+		if opt.get('Width', 0) and opt.get('Height', 0):
 			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype(im.dtype)
 		return im.transpose(2, 0, 1)
 	elif t == 'int':

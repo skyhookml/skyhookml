@@ -31,6 +31,7 @@ export default {
 		if(!('Mode' in params)) params.Mode = 'resnet34';
 		if(!('Width' in params)) params.Width = 224;
 		if(!('Height' in params)) params.Height = 224;
+		if(!('NumClasses' in params)) params.NumClasses = 0;
 		if(!('ValPercent' in params)) params.ValPercent = 20;
 		this.params = params;
 	},
@@ -93,6 +94,15 @@ export default {
 							<input v-model.number="params.Height" type="text" class="form-control">
 							<small class="form-text text-muted">
 								Resize the image to this height (must be at least 224). Leave as 0 to use the input image without resizing.
+							</small>
+						</div>
+					</div>
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Number of Classes</label>
+						<div class="col-sm-8">
+							<input v-model.number="params.NumClasses" type="text" class="form-control">
+							<small class="form-text text-muted">
+								The number of image classification categories, or 0 to take it from the label dataset metadata.
 							</small>
 						</div>
 					</div>
