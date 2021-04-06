@@ -113,4 +113,25 @@ export default {
 			},*/
 		},
 	},
+	"segmentation": {
+		Name: "Image Segmentation",
+		Help: "Train a model to classify each pixel in an input image into a set of categories.",
+		Inputs: [{
+			ID: "images",
+			Name: "Images",
+			DataType: "image",
+			Help: "An image dataset containing example inputs.",
+		}, {
+			ID: "labels",
+			Name: "Segmentation Labels",
+			DataType: "array",
+			Help: "An array dataset containing labels for each pixel in each input image.",
+		}],
+		Models: {
+			'pytorch_unet': {
+				ID: 'pytorch_unet',
+				Name: 'UNet',
+			},
+		},
+	},
 };
