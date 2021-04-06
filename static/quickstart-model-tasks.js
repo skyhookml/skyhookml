@@ -48,9 +48,17 @@ export default {
 					Name: 'COCO',
 				}],
 			},
-			'pytorch_mobilenetssd': {
-				ID: 'pytorch_mobilenetssd',
+			'pytorch_ssd': {
+				ID: 'pytorch_ssd',
 				Name: 'MobileNet+SSD',
+				Modes: [
+					{ID: 'vgg16-ssd', Name: 'VGG+SSD'},
+					{ID: 'mb1-ssd', Name: 'MobileNetv1+SSD'},
+					{ID: 'mb2-ssd-lite', Name: 'MobileNetv2+SSD-Lite'},
+				],
+				ModeHelp: `
+					MobileNetv2+SSD yields higher speed while VGG+SSD yields higher accuracy.
+				`,
 				Pretrain: [{
 					ID: 'voc2007',
 					Name: 'VOC 2007',

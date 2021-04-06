@@ -1,0 +1,20 @@
+{
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Components": [{
+		"ID": "ssd",
+		"Inputs": [{
+			"Type": "dataset",
+			"DatasetIdx": 0
+		}],
+		"Targets": [{
+			"Type": "dataset",
+			"DatasetIdx": 1
+		}]
+	}],
+	"Losses": [{
+		"ComponentIdx": 0,
+		"Layer": "loss",
+		"Weight": 1
+	}]
+}

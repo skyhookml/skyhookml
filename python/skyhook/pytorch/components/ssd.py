@@ -42,10 +42,9 @@ def M(info):
 		from vision.ssd.config import squeezenet_ssd_config
 		from vision.utils import box_utils
 
-		def predict(boxes, scores, config):
+		def predict(boxes, scores, config, prob_threshold=0.01):
 			# adapted from predictor.py
 			# we need to copy this code because in pytorch-ssd the Predictor wraps entire network rather than being modular
-			prob_threshold = 0.01
 			candidate_size = 200
 			iou_threshold = config.iou_threshold
 			sigma = 0.5
@@ -117,11 +116,14 @@ def M(info):
 					create_net = lambda num: create_mobilenetv3_small_ssd_lite(num, is_test=is_test)
 					config = mobilenetv1_ssd_config
 
+				config.iou_threshold = info['params'].get('iou_threshold', config.iou_threshold)
+				self.prob_threshold = info['params'].get('confidence_threshold', 0.01)
 				self.config = config
+
 				self.model = create_net(self.num_classes, is_test=self.infer)
-				self.criterion = MultiboxLoss(config.priors, iou_threshold=0.5, neg_pos_ratio=3, center_variance=0.1, size_variance=0.2, device=torch.device('cuda:0'))
+				self.criterion = MultiboxLoss(config.priors, iou_threshold=0.5, neg_pos_ratio=3, center_variance=0.1, size_variance=0.2, device=info['device'])
 				self.match_prior = MatchPrior(config.priors, config.center_variance, config.size_variance, 0.5)
-				self.image_mean = torch.tensor(self.config.image_mean, dtype=torch.float32).reshape(1, 3, 1, 1)
+				self.image_mean = torch.tensor(self.config.image_mean, dtype=torch.float32).reshape(1, 3, 1, 1).to(info['device'])
 
 			def forward(self, x, targets=None):
 				device = x.device
@@ -130,7 +132,7 @@ def M(info):
 				# pre-process image:
 				# (1) subtract config.image_mean
 				# (2) divide by config.image_std
-				x = (x.float() - self.image_mean.to(device=device)) / self.config.image_std
+				x = (x.float() - self.image_mean) / self.config.image_std
 
 				# pre-process boxes
 				if targets is not None:
@@ -167,7 +169,7 @@ def M(info):
 					counts = []
 					dlists = []
 					for i in range(boxes.shape[0]):
-						cur_boxes, cur_labels, cur_probs = predict(boxes[i], scores[i], self.config)
+						cur_boxes, cur_labels, cur_probs = predict(boxes[i], scores[i], self.config, prob_threshold=self.prob_threshold)
 						counts.append(cur_boxes.shape[0])
 
 						# convert from xywh to xyxy and make it [cls, xyxy, conf]

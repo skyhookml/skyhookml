@@ -136,11 +136,13 @@ export default {
 					}];
 					// exclude last layer which is dependent on # categories
 					if(this.form.model.ID == 'pytorch_yolov3') {
-						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.model.28.';
+						nodeParams['Restore'][0]['SkipPrefixes'] = 'mlist.0.model.model.28.';
 					} else if(this.form.model.ID == 'pytorch_yolov5') {
-						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.model.24.';
+						nodeParams['Restore'][0]['SkipPrefixes'] = 'mlist.0.model.model.24.';
 					} else if(this.form.model.ID == 'pytorch_resnet') {
-						nodeParams['Restore']['SkipPrefixes'] = 'mlist.0.model.fc.';
+						nodeParams['Restore'][0]['SkipPrefixes'] = 'mlist.0.model.fc.';
+					} else if(this.form.model.ID == 'pytorch_ssd') {
+						nodeParams['Restore'][0]['SkipPrefixes'] = 'mlist.0.model.classification_headers.';
 					}
 				}
 
