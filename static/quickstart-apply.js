@@ -28,12 +28,17 @@ export default {
 				model: '',
 				// model mode option, only set if Model.Modes is set
 				mode: '',
-				// whether to use pre-training, and if so, which dataset?
+				// use custom/existing model or get a pre-trained one?
+				// must be either 'pretrain' or 'custom'
+				modelType: 'pretrain',
+				// if modelType==pretrain, pretrain on which dataset?
 				// refers to Models[..].Pretrain[..].ID
 				pretrain: '',
-				// input parents indexes, which should correspond to task.Inputs
-				// each element is an index in options
-				inputParentIdxs: [],
+				// if modelType==custom, which file dataset to get the model from?
+				// this is an index in options
+				customParentIdx: null,
+				// input parent (index in this.options)
+				inputParentIdx: null,
 			},
 
 			// (1) 'form': submitting the form
@@ -54,18 +59,20 @@ export default {
 	methods: {
 		selectTask: function(task) {
 			this.form.task = task;
-			this.form.inputParentIdxs = [];
-			for(let i = 0; i < task.Inputs.length; i++) {
-				this.form.inputParentIdxs.push(null);
-			}
 		},
 		changedModel: function() {
 			this.form.model = null;
+			this.form.modelType = 'pretrain';
+			this.form.pretrain = '';
 			if(this.form.task.Models[this.form.modelID]) {
 				this.form.model = this.form.task.Models[this.form.modelID];
+				if(this.form.model.Pretrain) {
+					this.form.pretrain = this.form.model.Pretrain[0].ID;
+				} else {
+					this.form.modelType = 'custom';
+				}
 			}
 			this.form.mode = '';
-			this.form.pretrain = '';
 		},
 		addNode: function() {
 			let handle = async () => {
@@ -75,15 +82,12 @@ export default {
 					this.errorMsg = errorMsg;
 				}
 
-				// get ExecParents corresponding to inputParentIdxs
-				let parents = {};
-				for(let [inputIdx, optionIdx] of this.form.inputParentIdxs.entries()) {
-					let input = this.form.task.Inputs[inputIdx];
-					parents[input.ID] = [this.options[optionIdx]];
-				}
-
-				// import pre-trained model if needed
-				if(this.form.pretrain) {
+				// get the model ExecParent
+				// if modelType=='pretrain', we need to import the pre-trained model
+				// if modelType=='custom', it is just customParent
+				let modelParent;
+				if(this.form.modelType == 'pretrain') {
+					// import pre-trained model if needed
 					let importParams = {
 						mode: 'url',
 						url: 'https://favyen.com/files/skyhookml/'+this.form.model.ID+'-'+this.form.mode+'-'+this.form.pretrain+'.zip',
@@ -105,51 +109,31 @@ export default {
 						return;
 					}
 					console.log('import job completed, found dataset', importJob.Metadata);
-
-					// update parents
-					// the dataset ID created by import should be set in job metadata
-					parents['models'] = [{
+					modelParent = {
 						Type: 'd',
 						ID: parseInt(importJob.Metadata),
 						DataType: 'file',
-					}]
+					};
+				} else if(this.form.modelType == 'custom') {
+					modelParent = this.options[this.form.customParentIdx];
 				}
+
+				// create parents dict
+				let parents = {
+					'input': [this.options[this.form.inputParentIdx]],
+					'model': [modelParent],
+				};
 
 				// set node params
 				let nodeParams = {};
 				if(this.form.mode) {
 					nodeParams['Mode'] = this.form.mode;
 				}
-				// batch size
-				nodeParams['Train'] = {
-					'Op': 'default',
-					'Params': JSON.stringify({
-						'BatchSize': 8,
-					}),
-				}
-				// if pre-train, set SkipPrefixes as necessary
-				if(this.form.pretrain) {
-					if(this.form.model.ID == 'pytorch_yolov3') {
-						// exclude last layer which is dependent on # categories
-						nodeParams['Restore'] = [{
-							'SrcPrefix': '',
-							'DstPrefix': '',
-							'SkipPrefixes': 'mlist.0.model.model.28.',
-						}];
-					} else if(this.form.model.ID == 'pytorch_yolov5') {
-						// exclude last layer which is dependent on # categories
-						nodeParams['Restore'] = [{
-							'SrcPrefix': '',
-							'DstPrefix': '',
-							'SkipPrefixes': 'mlist.0.model.model.24.',
-						}];
-					}
-				}
 
 				// create the node
 				let params = {
 					Name: this.form.name,
-					Op: this.form.model.ID+'_train',
+					Op: this.form.model.ID+'_infer',
 					Params: JSON.stringify(nodeParams),
 					Parents: parents,
 					Workspace: this.$route.params.ws,
@@ -171,7 +155,7 @@ export default {
 <div class="flex-container">
 	<template v-if="phase == 'form'">
 		<div class="small-container">
-			<h3>Train a Model</h3>
+			<h3>Apply a Model</h3>
 			<template v-if="!form.task">
 				<p>Select a task:</p>
 				<template v-for="task in tasks">
@@ -211,34 +195,46 @@ export default {
 						</div>
 					</div>
 					<div v-if="form.model && form.model.Pretrain" class="row mb-2">
+						<label class="col-sm-4 col-form-label">Model Type</label>
+						<div class="col-sm-8">
+							<select v-model="form.modelType" class="form-select">
+								<option value="pretrain">Pre-trained Model</option>
+								<option value="custom">Custom Model</option>
+							</select>
+						</div>
+					</div>
+					<div v-if="form.modelType == 'pretrain'" class="row mb-2">
 						<label class="col-sm-4 col-form-label">Pre-training</label>
 						<div class="col-sm-8">
 							<select v-model="form.pretrain" class="form-select">
-								<option value="">None</option>
 								<template v-for="opt in form.model.Pretrain">
 									<option :key="opt.ID" :value="opt.ID">{{ opt.Name }}</option>
 								</template>
 							</select>
-							<small class="form-text text-muted">Fine-tune a pre-trained model instead of training from scratch.</small>
+							<small class="form-text text-muted">Select a pre-trained model.</small>
 						</div>
 					</div>
-					<template v-for="(input, i) in form.task.Inputs">
-						<div class="row mb-2">
-							<label class="col-sm-4 col-form-label">{{ input.Name }}</label>
-							<div class="col-sm-8">
-								<select v-model="form.inputParentIdxs[i]" class="form-select">
-									<template v-for="(opt, idx) in options">
-										<option
-											v-if="input.DataType == opt.DataType"
-											:value="idx">
-											{{ opt.Label }}
-										</option>
-									</template>
-								</select>
-								<small v-if="input.Help" class="form-text text-muted">{{ input.Help }}</small>
-							</div>
+					<div v-if="form.modelType == 'custom'" class="row mb-2">
+						<label class="col-sm-4 col-form-label">Custom Model</label>
+						<div class="col-sm-8">
+							<select v-model="form.customParentIdx" class="form-select">
+								<template v-for="(opt, idx) in options">
+									<option v-if="opt.DataType == 'file'" :value="idx">{{ opt.Label }}</option>
+								</template>
+							</select>
 						</div>
-					</template>
+					</div>
+					<div class="row mb-2">
+						<label class="col-sm-4 col-form-label">Input Dataset</label>
+						<div class="col-sm-8">
+							<select v-model="form.inputParentIdx" class="form-select">
+								<template v-for="(opt, idx) in options">
+									<option v-if="opt.DataType == 'video' || opt.DataType == 'image'" :value="idx">{{ opt.Label }}</option>
+								</template>
+							</select>
+							<small class="form-text text-muted">The image or video dataset to apply the model on.</small>
+						</div>
+					</div>
 					<div class="row mb-2">
 						<div class="col-sm-12">
 							<button type="submit" class="btn btn-primary">Add Node</button>

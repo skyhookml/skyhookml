@@ -4,6 +4,7 @@ import Dashboard from './dashboard.js';
 
 import QuickstartImport from './quickstart-import.js';
 import QuickstartTrain from './quickstart-train.js';
+import QuickstartApply from './quickstart-apply.js';
 
 import Datasets from './datasets.js';
 import Dataset from './dataset.js';
@@ -35,6 +36,7 @@ const router = new VueRouter({
 
 		{path: '/ws/:ws/quickstart/import', component: QuickstartImport},
 		{path: '/ws/:ws/quickstart/train', component: QuickstartTrain},
+		{path: '/ws/:ws/quickstart/apply', component: QuickstartApply},
 
 		{path: '/ws/:ws/datasets', component: Datasets},
 		{path: '/ws/:ws/datasets/:dsid', component: Dataset},
