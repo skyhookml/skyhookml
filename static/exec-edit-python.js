@@ -111,7 +111,7 @@ export default {
 			<tbody>
 				<tr v-for="(output, i) in outputs" :key="output.Name">
 					<td>{{ output.Name }}</td>
-					<td>{{ output.DataType }}</td>
+					<td>{{ $globals.dataTypes[output.DataType] }}</td>
 					<td>
 						<button type="button" class="btn btn-danger" v-on:click="removeOutput(i)">Remove</button>
 					</td>
