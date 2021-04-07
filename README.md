@@ -4,7 +4,7 @@ SkyhookML
 SkyhookML is a data science platform for image and video data.
 It provides an easy-to-use interface that makes computer vision and machine learning more accessible.
 
-Website: https://skyhookml.org
+Website: https://www.skyhookml.org
 
 
 Features
@@ -85,4 +85,4 @@ Built-in model components can be easily combined together and configured to form
 About
 -----
 
-- Website: https://skyhookml.org
+- Website: https://www.skyhookml.org
