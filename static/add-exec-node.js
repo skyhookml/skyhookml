@@ -76,7 +76,7 @@ export default {
 					<div class="row mb-2">
 						<label class="col-sm-2 col-form-label">Name</label>
 						<div class="col-sm-10">
-							<input v-model="name" class="form-control" type="text" />
+							<input v-model="name" class="form-control" type="text" required />
 						</div>
 					</div>
 					<div class="row mb-2">

@@ -128,7 +128,7 @@ export default {
 								<div class="row mb-2">
 									<label class="col-sm-2 col-form-label">Path</label>
 									<div class="col-sm-10">
-										<input class="form-control" type="text" v-model="path" />
+										<input class="form-control" type="text" v-model="path" required />
 										<small class="form-text text-muted">
 											<template v-if="mode == 'add'">
 												The path to a file or directory from which to import files.
@@ -164,7 +164,7 @@ export default {
 									<div class="row mb-2">
 										<label class="col-sm-2 col-form-label">File</label>
 										<div class="col-sm-10">
-											<input class="form-control" type="file" @change="onFileChange" />
+											<input class="form-control" type="file" @change="onFileChange" required />
 											<small class="form-text text-muted">
 												<template v-if="mode == 'add'">
 													<template v-if="dataset.DataType == 'video'">
@@ -221,7 +221,7 @@ export default {
 								<div class="row mb-2">
 									<label class="col-sm-2 col-form-label">URL</label>
 									<div class="col-sm-10">
-										<input class="form-control" type="text" v-model="url" />
+										<input class="form-control" type="text" v-model="url" required />
 										<small class="form-text text-muted">
 											<template v-if="mode == 'add'">
 												The URL of a zip file from which to import files.

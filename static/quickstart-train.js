@@ -188,7 +188,7 @@ export default {
 					<div class="row mb-2">
 						<label class="col-sm-4 col-form-label">Name</label>
 						<div class="col-sm-8">
-							<input v-model="form.name" type="text" class="form-control">
+							<input v-model="form.name" type="text" class="form-control" required />
 							<small class="form-text text-muted">A name for this node.</small>
 						</div>
 					</div>

@@ -54,7 +54,7 @@ export default {
 						<div class="row mb-2">
 							<label class="col-sm-4 col-form-label">ID</label>
 							<div class="col-sm-8">
-								<input class="form-control" type="text" v-model="addForm.id" />
+								<input class="form-control" type="text" v-model="addForm.id" required />
 							</div>
 						</div>
 						<div class="row">

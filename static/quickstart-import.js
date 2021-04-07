@@ -316,9 +316,9 @@ export default {
 			<div class="row mb-2">
 				<label class="col-sm-4 col-form-label">Dataset Name</label>
 				<div class="col-sm-8">
-					<input class="form-control" type="text" v-model="name" />
+					<input class="form-control" type="text" v-model="name" required />
 					<small class="form-text text-muted">
-						A label for this dataset.
+						A name for this dataset.
 					</small>
 				</div>
 			</div>
