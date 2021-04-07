@@ -24,7 +24,7 @@ export default {
 				],
 			}, {
 				ID: "video",
-				Name: "Video Manipulation",
+				Name: "Image and Video",
 				Ops: ['video_sample', 'render', 'cropresize'],
 			}, {
 				ID: "code",

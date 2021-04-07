@@ -207,8 +207,8 @@ func init() {
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
 			ID: "render",
-			Name: "Render video",
-			Description: "Render video from various input data types",
+			Name: "Render Images or Video",
+			Description: "Render images/video from various input data types",
 		},
 		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
 		GetOutputs: func(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
