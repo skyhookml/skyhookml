@@ -86,7 +86,7 @@ export default {
 				if(this.form.pretrain) {
 					let importParams = {
 						mode: 'url',
-						url: 'https://favyen.com/files/skyhookml/'+this.form.model.ID+'-'+this.form.mode+'-'+this.form.pretrain+'.zip',
+						url: 'https://skyhookml.org/datasets/'+this.form.model.ID+'-'+this.form.mode+'-'+this.form.pretrain+'.zip',
 					};
 					let importJob;
 					try {
