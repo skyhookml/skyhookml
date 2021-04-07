@@ -164,7 +164,7 @@ export default {
 		<button type="button" class="btn btn-primary" v-on:click="showNewNodeModal">Add Node</button>
 	</div>
 	<div class="flex-content scroll-content">
-		<table class="table table-row-select">
+		<table class="table table-sm table-row-select">
 			<thead>
 				<tr>
 					<th>Name</th>

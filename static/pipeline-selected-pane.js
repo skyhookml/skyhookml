@@ -13,9 +13,18 @@ export default {
 				nodeID: null,
 			},
 			wsNodes: null,
+
+			// map from output name to the dataset (if it's created)
+			outputDatasets: {},
 		};
 	},
 	props: ['node', 'nodes', 'datasets', 'workspaces'],
+	created: function() {
+		// load the output datasets for this node
+		utils.request(this, 'GET', '/exec-nodes/'+this.node.ID+'/datasets', null, (datasets) => {
+			this.outputDatasets = datasets;
+		});
+	},
 	methods: {
 		editNode: function() {
 			this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+this.node.ID);
@@ -73,32 +82,58 @@ export default {
 	template: `
 <div>
 	<hr />
-	<h4 class="my-2">{{ node.Name }} ({{ node.Op }})</h4>
 	<div>
-		<button type="button" class="btn btn-primary" v-on:click="editNode">Edit</button>
-		<button type="button" class="btn btn-primary" v-on:click="runNode">Run</button>
-		<button type="button" class="btn btn-primary" v-on:click="viewInteractive">Interactive</button>
-		<button type="button" class="btn btn-danger" v-on:click="deleteNode">Delete</button>
+		<strong>{{ node.Name }} ({{ node.Op }})</strong>
+		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="editNode">Edit</button>
+		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="runNode">Run</button>
+		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="viewInteractive">Interactive</button>
+		<button type="button" class="btn btn-sm btn-danger mx-2" v-on:click="deleteNode">Delete</button>
 	</div>
-	<h5 class="my-2">Inputs</h5>
-	<div v-for="input in node.Inputs" class="my-2">
-		<exec-node-parents
-			:node="node"
-			:input="input"
-			:nodes="nodes"
-			:datasets="datasets"
-			v-on:add="addParent(input.Name, $event)"
-			v-on:remove="removeParent(input.Name, $event)"
-			v-on:set="setParent(input.Name, $event)"
-			>
-		</exec-node-parents>
+	<div class="flex-x-container">
+		<div class="mx-4">
+			<h5 class="my-2">Inputs</h5>
+			<div v-for="input in node.Inputs" class="my-2">
+				<exec-node-parents
+					:node="node"
+					:input="input"
+					:nodes="nodes"
+					:datasets="datasets"
+					v-on:add="addParent(input.Name, $event)"
+					v-on:remove="removeParent(input.Name, $event)"
+					v-on:set="setParent(input.Name, $event)"
+					>
+				</exec-node-parents>
+			</div>
+		</div>
+		<div class="mx-4">
+			<h5 class="my-2">Outputs</h5>
+			<div>
+				<table class="table table-sm">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Data Type</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="output in node.Outputs">
+							<td>{{ output.Name }}</td>
+							<td>{{ $globals.dataTypes[output.DataType] }}</td>
+							<td>
+								<template v-if="outputDatasets[output.Name]">
+									<router-link class="btn btn-sm btn-primary" :to="'/ws/'+$route.params.ws+'/datasets/'+outputDatasets[output.Name].ID">View</router-link>
+								</template>
+								<template v-else>
+									Not Computed
+								</template>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
 	</div>
-	<h5 class="my-2">Outputs</h5>
-	<ul>
-		<li v-for="output in node.Outputs">
-			{{ output.Name }} ({{ output.DataType }})
-		</li>
-	</ul>
 
 	<div>
 		<form v-on:submit.prevent="compareTo" class="d-flex align-items-center">
