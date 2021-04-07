@@ -180,12 +180,15 @@ func (ds *DBDataset) ImportIntoFileDataset(fnames []string, opts ImportOptions) 
 			metadata := skyhook.FileMetadata{
 				Filename: curPath,
 			}
-			item := ds.AddItem(skyhook.Item{
+			item, err := ds.AddItem(skyhook.Item{
 				Key: key,
 				Ext: ext,
 				Format: "",
 				Metadata: string(skyhook.JsonMarshal(metadata)),
 			})
+			if err != nil {
+				return err
+			}
 
 			err = skyhook.CopyOrSymlink(path, item.Fname(), opts.Symlink)
 			if err != nil {
@@ -238,12 +241,15 @@ func (ds *DBDataset) ImportFiles(fnames []string, opts ImportOptions) error {
 		if len(ext) > 0 && ext[0] == '.' {
 			ext = ext[1:]
 		}
-		item := ds.AddItem(skyhook.Item{
+		item, err := ds.AddItem(skyhook.Item{
 			Key: key,
 			Ext: ext,
 			Format: "",
 			Metadata: "",
 		})
+		if err != nil {
+			return err
+		}
 
 		// copy the file
 		if err := skyhook.CopyOrSymlink(fname, item.Fname(), opts.Symlink); err != nil {

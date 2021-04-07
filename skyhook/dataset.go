@@ -55,16 +55,12 @@ func (item Item) GetProvider() ItemProvider {
 	}
 }
 
-func (item Item) UpdateData(data Data) {
+func (item Item) UpdateData(data Data) error {
 	provider := item.GetProvider()
 	if provider.UpdateData == nil {
 		panic(fmt.Errorf("UpdateData not supported in dataset %s", item.Dataset.Name))
 	}
-	err := provider.UpdateData(item, data)
-	if err != nil {
-		// TODO
-		panic(err)
-	}
+	return provider.UpdateData(item, data)
 }
 
 func (item Item) LoadData() (Data, error) {
@@ -159,7 +155,11 @@ func VirtualProvider(f func(item Item, data Data) (Data, error), visibleFname bo
 func init() {
 	DefaultItemProvider = ItemProvider{
 		LoadData: func(item Item) (Data, error) {
-			return DecodeFile(item.Dataset.DataType, item.Format, item.Metadata, item.Fname())
+			data, err := DecodeFile(item.Dataset.DataType, item.Format, item.Metadata, item.Fname())
+			if err != nil {
+				return nil, fmt.Errorf("error reading item %s: %v", item.Key, err)
+			}
+			return data, nil
 		},
 		UpdateData: func(item Item, data Data) error {
 			item.Dataset.Mkdir()

@@ -36,10 +36,18 @@ func (d ImageData) Encode(format string, w io.Writer) error {
 	}
 	image := d.Images[0]
 	if format == "jpeg" {
-		_, err := w.Write(image.AsJPG())
+		bytes, err := image.AsJPG()
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(bytes)
 		return err
 	} else if format == "png" {
-		_, err := w.Write(image.AsPNG())
+		bytes, err := image.AsPNG()
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(bytes)
 		return err
 	}
 	return fmt.Errorf("unknown format %s", format)
@@ -97,12 +105,16 @@ func init() {
 		},
 		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
 			var image Image
+			var err error
 			if format == "jpeg" {
-				image = ImageFromJPGReader(r)
+				image, err = ImageFromJPGReader(r)
 			} else if format == "png" {
-				image = ImageFromPNGReader(r)
+				image, err = ImageFromPNGReader(r)
 			} else {
-				return nil, fmt.Errorf("unknown format %s", format)
+				err = fmt.Errorf("unknown format %s", format)
+			}
+			if err != nil {
+				return nil, err
 			}
 			return ImageData{
 				Images: []Image{image},
@@ -115,7 +127,7 @@ func init() {
 			} else if ext == ".png" {
 				return "png", "", nil
 			}
-			return "", "", fmt.Errorf("unrecognized image extension %s", ext)
+			return "", "", fmt.Errorf("unrecognized image extension %s in [%s]", ext, fname)
 		},
 		Builder: func() ChunkBuilder {
 			return &SliceBuilder{Data: ImageData{}}

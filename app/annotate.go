@@ -167,10 +167,18 @@ func init() {
 
 		if item == nil {
 			// new key
-			ds.WriteItem(request.Key, data)
+			_, err := ds.WriteItem(request.Key, data)
+			if err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
 		} else {
 			item.SetMetadata(request.Format, request.Metadata)
-			item.UpdateData(data)
+			err := item.UpdateData(data)
+			if err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
 		}
 	}).Methods("POST")
 }

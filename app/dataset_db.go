@@ -210,13 +210,21 @@ func (ds *DBDataset) ListItems() []*DBItem {
 	return items
 }
 
-func (ds *DBDataset) AddItem(item skyhook.Item) *DBItem {
+func (ds *DBDataset) AddItem(item skyhook.Item) (*DBItem, error) {
 	db := ds.getDB()
-	db.Exec(
+	// We use underlying Exec directly here since it is expected that we may encounter
+	// a unique key constraint error.
+	_, err := db.db.Exec(
 		"INSERT INTO items (k, ext, format, metadata, provider, provider_info) VALUES (?, ?, ?, ?, ?, ?)",
 		item.Key, item.Ext, item.Format, item.Metadata, item.Provider, item.ProviderInfo,
 	)
-	return ds.GetItem(item.Key)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return nil, fmt.Errorf("item with key %s already exists in the dataset", item.Key)
+		}
+		return nil, err
+	}
+	return ds.GetItem(item.Key), nil
 }
 
 func (ds *DBDataset) GetItem(key string) *DBItem {
@@ -233,17 +241,23 @@ func (ds *DBDataset) GetItem(key string) *DBItem {
 	}
 }
 
-func (ds *DBDataset) WriteItem(key string, data skyhook.Data) *DBItem {
+func (ds *DBDataset) WriteItem(key string, data skyhook.Data) (*DBItem, error) {
 	// TODO: might want to write the item before updating database
 	ext, format := data.GetDefaultExtAndFormat()
-	item := ds.AddItem(skyhook.Item{
+	item, err := ds.AddItem(skyhook.Item{
 		Key: key,
 		Ext: ext,
 		Format: format,
 		Metadata: string(skyhook.JsonMarshal(data.GetMetadata())),
 	})
-	item.UpdateData(data)
-	return item
+	if err != nil {
+		return nil, err
+	}
+	err = item.UpdateData(data)
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func (ds *DBDataset) Delete() {

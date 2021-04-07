@@ -35,20 +35,20 @@ func ImageFromBytes(width int, height int, bytes []byte) Image {
 	}
 }
 
-func ImageFromJPGReader(rd io.Reader) Image {
+func ImageFromJPGReader(rd io.Reader) (Image, error) {
 	im, err := jpeg.Decode(rd)
 	if err != nil {
-		panic(err)
+		return Image{}, err
 	}
-	return ImageFromGoImage(im)
+	return ImageFromGoImage(im), nil
 }
 
-func ImageFromPNGReader(rd io.Reader) Image {
+func ImageFromPNGReader(rd io.Reader) (Image, error) {
 	im, err := png.Decode(rd)
 	if err != nil {
-		panic(err)
+		return Image{}, err
 	}
-	return ImageFromGoImage(im)
+	return ImageFromGoImage(im), nil
 }
 
 func ImageFromGoImage(im image.Image) Image {
@@ -71,14 +71,17 @@ func ImageFromGoImage(im image.Image) Image {
 	}
 }
 
-func ImageFromFile(fname string) Image {
+func ImageFromFile(fname string) (Image, error) {
 	file, err := os.Open(fname)
 	if err != nil {
-		panic(err)
+		return Image{}, err
 	}
-	im := ImageFromJPGReader(file)
+	im, err := ImageFromJPGReader(file)
+	if err != nil {
+		return Image{}, err
+	}
 	file.Close()
-	return im
+	return im, nil
 }
 
 func (im Image) AsImage() image.Image {
@@ -103,20 +106,20 @@ func (im Image) AsImage() image.Image {
 	return img
 }
 
-func (im Image) AsJPG() []byte {
+func (im Image) AsJPG() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := jpeg.Encode(buf, im.AsImage(), nil); err != nil {
-		panic(err)
+		return nil, err
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
-func (im Image) AsPNG() []byte {
+func (im Image) AsPNG() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := png.Encode(buf, im.AsImage()); err != nil {
-		panic(err)
+		return nil, err
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 func (im Image) ToBytes() []byte {

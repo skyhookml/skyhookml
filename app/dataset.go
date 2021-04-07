@@ -125,7 +125,11 @@ func init() {
 			*item.ProviderInfo = providerInfo
 		}
 
-		item_ := dataset.AddItem(item)
+		item_, err := dataset.AddItem(item)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
 		skyhook.JsonResponse(w, item_)
 	}).Methods("POST")
 

@@ -174,8 +174,7 @@ func WriteItemWithFormat(url string, dataset skyhook.Dataset, key string, data s
 	if err != nil {
 		return err
 	}
-	item.UpdateData(data)
-	return nil
+	return item.UpdateData(data)
 }
 
 func WriteItem(url string, dataset skyhook.Dataset, key string, data skyhook.Data) error {
