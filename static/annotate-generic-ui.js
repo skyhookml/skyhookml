@@ -23,9 +23,17 @@ export default function(impl) {
 				frameIdx: null,
 				numFrames: 0,
 
+				// annotation mode
+				// 'existing': looking over already annotated items
+				// 'new': sampling new items to label
+				mode: 'new',
+
 				// list of keys for iteration over previously labeled items
 				keyList: null,
 				itemIdx: 0,
+
+				// error message to display e.g. if we ran out of images to label
+				message: null,
 			};
 			if(impl.data) {
 				let impl_data = impl.data.call(this);
@@ -84,17 +92,38 @@ export default function(impl) {
 			},
 			update: function() {
 				let url = this.url;
-				if(this.keyList != null) {
+				if(this.mode == 'existing') {
+					if(this.keyList == null || this.keyList.length == 0) {
+						return;
+					}
 					url += '?key='+this.keyList[this.itemIdx];
 				}
-				let response, itemMeta;
-				utils.request(this, 'GET', url, null, (data) => {
-					response = data;
-				}).then(() => {
-					return utils.request(this, 'GET', '/datasets/'+this.source.ID+'/items/'+response.Key+'/get?format=meta', null, (data) => {
-						itemMeta = data;
-					});
-				}).then(() => {
+
+				let handler = async () => {
+					// get response that details the item key and such
+					let response;
+					try {
+						response = await utils.request(null, 'GET', url);
+					} catch(e) {
+						if(e.responseText.includes('everything has been labeled already')) {
+							this.resetItem();
+							this.message = 'Everything has been labeled already. Switch to View Existing Labels to go through previously annotated items.';
+						} else {
+							this.$globals.app.setError(e.responseText);
+						}
+						return;
+					}
+
+					// get the item metadata
+					let itemMeta;
+					try {
+						itemMeta = await utils.request(this, 'GET', '/datasets/'+this.source.ID+'/items/'+response.Key+'/get?format=meta');
+					} catch(e) {
+						this.$globals.app.setError(e.responseText);
+						return;
+					}
+
+
 					this.resetItem();
 					this.itemMeta = itemMeta;
 
@@ -124,7 +153,8 @@ export default function(impl) {
 							});
 						}
 					});
-				});
+				};
+				handler();
 			},
 			imageLoaded: function() {
 				this.imageDims = {
@@ -136,19 +166,29 @@ export default function(impl) {
 				}
 			},
 			getNewItem: function() {
+				this.mode = 'new';
+				this.message = null;
 				this.keyList = null;
 				this.itemIdx = 0;
 				this.update();
 			},
 			getOldItem: function(i) {
-				if(!this.keyList) {
+				this.mode = 'existing';
+				this.message = null;
+
+				if(this.keyList == null) {
 					utils.request(this, 'GET', '/datasets/'+this.annoset.Dataset.ID+'/items', null, (items) => {
-						if(!items || items.length == 0) {
-							return;
+						if(!items) {
+							items = [];
 						}
 						this.keyList = items.map((item) => item.Key);
 						this.getOldItem(0);
 					});
+					return;
+				}
+				if(this.keyList.length == 0) {
+					this.resetItem();
+					this.message = 'There are no labels in this dataset yet. Switch to Annotate New Items to add new labels based on the source image dataset.';
 					return;
 				}
 
@@ -181,7 +221,7 @@ export default function(impl) {
 					Metadata: JSON.stringify(data[1]),
 				};
 				utils.request(this, 'POST', this.url, JSON.stringify(request), () => {
-					if(this.keyList == null) {
+					if(this.mode == 'new') {
 						this.getNewItem();
 					} else {
 						this.getOldItem(this.itemIdx+1);
@@ -199,24 +239,57 @@ export default function(impl) {
 
 			<div class="row align-items-center g-1 mb-2">
 				<div class="col-auto">
-					<button v-on:click="getOldItem(itemIdx-1)" type="button" class="btn btn-primary">Prev</button>
+					<div class="btn-group">
+						<button
+							class="btn btn-sm btn-outline-secondary shadow-none"
+							:class="{active: mode == 'new'}"
+							v-on:click="getNewItem()"
+							>
+							Annotate New Items
+						</button>
+						<button
+							class="btn btn-sm btn-outline-secondary shadow-none"
+							:class="{active: mode == 'existing'}"
+							v-on:click="getOldItem(0)"
+							>
+							View Existing Labels
+						</button>
+					</div>
 				</div>
-				<div class="col-auto">
-					<template v-if="response != null">
-						<span>{{ response.Key }}</span>
-						<span v-if="keyList != null">({{ itemIdx }} of {{ keyList.length }})</span>
-					</template>
-				</div>
-				<div class="col-auto">
-					<button v-on:click="getOldItem(itemIdx+1)" type="button" class="btn btn-primary">Next</button>
-				</div>
-				<div class="col-auto">
-					<button v-on:click="getNewItem" type="button" class="btn btn-primary">New</button>
-				</div>
-				<div class="col-auto" v-if="response != null">
-					<button type="button" class="btn btn-primary" v-on:click="annotateItem">Done</button>
-				</div>
+				<template v-if="mode == 'new'">
+					<div class="col-auto">
+						<template v-if="response != null">
+							<span>{{ response.Key }}</span>
+						</template>
+					</div>
+					<div class="col-auto">
+						<button v-on:click="getNewItem" type="button" class="btn btn-sm btn-primary">Skip</button>
+					</div>
+					<div class="col-auto" v-if="response != null">
+						<button type="button" class="btn btn-sm btn-primary" v-on:click="annotateItem">Save Labels</button>
+					</div>
+				</template>
+				<template v-if="mode == 'existing'">
+					<div class="col-auto">
+						<button v-on:click="getOldItem(itemIdx-1)" type="button" class="btn btn-sm btn-primary">Prev</button>
+					</div>
+					<div class="col-auto">
+						<template v-if="response != null">
+							<span>{{ response.Key }}</span>
+							<span v-if="keyList != null">({{ itemIdx }} of {{ keyList.length }})</span>
+						</template>
+					</div>
+					<div class="col-auto">
+						<button v-on:click="getOldItem(itemIdx+1)" type="button" class="btn btn-sm btn-primary">Next</button>
+					</div>
+				</template>
 			</div>
+
+			<template v-if="message != null">
+				<div class="my-2">
+					<p>{{ message }}</p>
+				</div>
+			</template>
 
 			[IM_ABOVE]
 

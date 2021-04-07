@@ -6,6 +6,9 @@ function request(comp, method, endpoint, params, successFunc, completeFunc, opts
 			if(!comp) {
 				return;
 			}
+			if(req && req.responseText) {
+				errorMsg = req.responseText;
+			}
 			if(comp.setError) {
 				comp.setError(errorMsg);
 			} else if(comp.$globals.app) {
@@ -28,6 +31,10 @@ function request(comp, method, endpoint, params, successFunc, completeFunc, opts
 	if(opts) {
 		if(opts.dataType) {
 			args.dataType = opts.dataType;
+		}
+		if(opts.error) {
+			// override the error handler we set above
+			args.error = opts.error;
 		}
 	}
 	return $.ajax(args);
