@@ -83,7 +83,7 @@ export default {
 	</div>
 	<div class="flex-content scroll-content my-2">
 		<h3>Nodes</h3>
-		<router-link class="btn btn-primary" :to="'/ws/'+$route.params.ws+'/queries'">Manage</router-link>
+		<router-link class="btn btn-primary" :to="'/ws/'+$route.params.ws+'/pipeline'">Manage</router-link>
 		<table class="table table-sm align-middle">
 			<thead>
 				<tr>

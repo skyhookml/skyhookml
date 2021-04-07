@@ -1,10 +1,10 @@
 import utils from './utils.js';
-import QueriesSelectedPane from './queries-selected-pane.js';
+import PipelineSelectedPane from './pipeline-selected-pane.js';
 import AddExecNode from './add-exec-node.js';
 
 export default {
 	components: {
-		'queries-selected-pane': QueriesSelectedPane,
+		'pipeline-selected-pane': PipelineSelectedPane,
 		'add-exec-node': AddExecNode,
 	},
 	data: function() {
@@ -361,7 +361,7 @@ export default {
 		<div ref="layer"></div>
 	</div>
 	<div v-if="selectedNode">
-		<queries-selected-pane :node="selectedNode" :nodes="nodes" :datasets="datasets" :workspaces="workspaces" v-on:update="update"></queries-selected-pane>
+		<pipeline-selected-pane :node="selectedNode" :nodes="nodes" :datasets="datasets" :workspaces="workspaces" v-on:update="update"></pipeline-selected-pane>
 	</div>
 	<add-exec-node v-if="showingNewNodeModal" v-on:closed="onNewNodeModalClosed"></add-exec-node>
 </div>

@@ -59,21 +59,22 @@
 					</router-link>
 				</li>
 				<li class="nav-item">
-					<router-link class="nav-link" :to="wsPrefix + '/models'" active-class="active" exact>
-						<span data-feather="package"></span>
-						Models
-					</router-link>
-				</li>
-				<li class="nav-item">
-					<router-link class="nav-link" :to="wsPrefix + '/queries'" active-class="active" exact>
+					<router-link class="nav-link" :to="wsPrefix + '/pipeline'" active-class="active" exact>
 						<span data-feather="search"></span>
-						Queries
+						Pipeline
 					</router-link>
 				</li>
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/jobs'" active-class="active" exact>
 						<span data-feather="activity"></span>
 						Jobs
+					</router-link>
+				</li>
+				<hr />
+				<li class="nav-item">
+					<router-link class="nav-link" :to="wsPrefix + '/models'" active-class="active" exact>
+						<span data-feather="package"></span>
+						Model Architectures
 					</router-link>
 				</li>
 			</ul>

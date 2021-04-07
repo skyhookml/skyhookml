@@ -1,11 +1,11 @@
 import utils from './utils.js';
-import QueriesTable from './queries-table.js';
-import QueriesGraph from './queries-graph.js';
+import PipelineTable from './pipeline-table.js';
+import PipelineGraph from './pipeline-graph.js';
 
 export default {
 	components: {
-		'queries-table': QueriesTable,
-		'queries-graph': QueriesGraph,
+		'pipeline-table': PipelineTable,
+		'pipeline-graph': PipelineGraph,
 	},
 	data: function() {
 		return {
@@ -33,8 +33,8 @@ export default {
 		</div>
 	</div>
 	<div class="flex-content">
-		<queries-table v-if="mode == 'table'"></queries-table>
-		<queries-graph v-if="mode == 'graph'"></queries-graph>
+		<pipeline-table v-if="mode == 'table'"></pipeline-table>
+		<pipeline-graph v-if="mode == 'graph'"></pipeline-graph>
 	</div>
 </div>
 	`,

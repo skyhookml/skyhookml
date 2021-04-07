@@ -20,7 +20,7 @@ import Models from './models.js';
 import MArch from './m-architecture.js';
 import MComp from './m-component.js';
 
-import Queries from './queries.js';
+import Pipeline from './pipeline.js';
 import ExecEdit from './exec-edit.js';
 import Compare from './compare.js';
 import Interactive from './interactive.js';
@@ -52,7 +52,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/models/arch/:archid', component: MArch},
 		{path: '/ws/:ws/models/comp/:compid', component: MComp},
 
-		{path: '/ws/:ws/queries', component: Queries},
+		{path: '/ws/:ws/pipeline', component: Pipeline},
 		{path: '/ws/:ws/exec/:nodeid', component: ExecEdit},
 		{path: '/ws/:ws/compare/:nodeid/:otherws/:othernodeid', component: Compare},
 		{path: '/ws/:ws/interactive/:nodeid', component: Interactive},
