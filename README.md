@@ -38,6 +38,7 @@ Then:
 
 	git clone https://github.com/skyhookml/skyhookml.git
 	cd skyhookml
+	mkdir -p data/items data/models
 	docker/allinone/build.sh
 	docker/allinone/run.sh
 
