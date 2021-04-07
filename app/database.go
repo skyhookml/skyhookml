@@ -38,7 +38,10 @@ func (this *Database) Query(q string, args ...interface{}) *Rows {
 		log.Printf("[db] Query: %v", q)
 	}
 	rows, err := this.db.Query(q, args...)
-	checkErr(err)
+	if err != nil {
+		this.mu.Unlock()
+		panic(err)
+	}
 	return &Rows{this, true, rows}
 }
 
@@ -58,19 +61,23 @@ func (this *Database) Exec(q string, args ...interface{}) Result {
 		log.Printf("[db] Exec: %v", q)
 	}
 	result, err := this.db.Exec(q, args...)
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 	return Result{result}
 }
 
 func (this *Database) Transaction(f func(tx Tx)) {
 	this.mu.Lock()
+	defer this.mu.Unlock()
 	f(Tx{this})
-	this.mu.Unlock()
 }
 
 func (this *Database) Close() {
 	err := this.db.Close()
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 }
 
 type Rows struct {
@@ -81,10 +88,12 @@ type Rows struct {
 
 func (r *Rows) Close() {
 	err := r.rows.Close()
-	checkErr(err)
 	if r.locked {
 		r.db.mu.Unlock()
 		r.locked = false
+	}
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -99,7 +108,13 @@ func (r *Rows) Next() bool {
 
 func (r *Rows) Scan(dest ...interface{}) {
 	err := r.rows.Scan(dest...)
-	checkErr(err)
+	if err != nil {
+		if r.locked {
+			r.db.mu.Unlock()
+			r.locked = false
+		}
+		panic(err)
+	}
 }
 
 type Row struct {
@@ -110,10 +125,12 @@ type Row struct {
 
 func (r Row) Scan(dest ...interface{}) {
 	err := r.row.Scan(dest...)
-	checkErr(err)
 	if r.locked {
 		r.db.mu.Unlock()
 		r.locked = false
+	}
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -123,13 +140,17 @@ type Result struct {
 
 func (r Result) LastInsertId() int {
 	id, err := r.result.LastInsertId()
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 	return int(id)
 }
 
 func (r Result) RowsAffected() int {
 	count, err := r.result.RowsAffected()
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 	return int(count)
 }
 
@@ -139,7 +160,9 @@ type Tx struct {
 
 func (tx Tx) Query(q string, args ...interface{}) Rows {
 	rows, err := tx.db.db.Query(q, args...)
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 	return Rows{tx.db, false, rows}
 }
 
@@ -150,6 +173,8 @@ func (tx Tx) QueryRow(q string, args ...interface{}) Row {
 
 func (tx Tx) Exec(q string, args ...interface{}) Result {
 	result, err := tx.db.db.Exec(q, args...)
-	checkErr(err)
+	if err != nil {
+		panic(err)
+	}
 	return Result{result}
 }
