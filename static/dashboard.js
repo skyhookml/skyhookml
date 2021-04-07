@@ -1,25 +1,6 @@
 import utils from './utils.js';
 
 export default {
-	data: function() {
-		return {
-			datasets: [],
-			nodes: [],
-		};
-	},
-	created: function() {
-		this.fetch();
-	},
-	methods: {
-		fetch: function() {
-			utils.request(this, 'GET', '/datasets', null, (datasets) => {
-				this.datasets = datasets;
-			});
-			utils.request(this, 'GET', '/exec-nodes?ws='+this.$route.params.ws, null, (nodes) => {
-				this.nodes = nodes;
-			});
-		},
-	},
 	template: `
 <div class="flex-container">
 	<div class="flex-content-big">
@@ -56,50 +37,6 @@ export default {
 				</div>
 			</router-link>
 		</div>
-	</div>
-	<div class="flex-content scroll-content my-2">
-		<h3>Datasets</h3>
-		<router-link class="btn btn-primary" :to="'/ws/'+$route.params.ws+'/datasets'">Manage</router-link>
-		<table class="table table-sm align-middle">
-			<thead>
-				<tr>
-					<th>Name</th>
-					<th>Type</th>
-					<th>Data Type</th>
-					<th></th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr v-for="ds in datasets">
-					<td>{{ ds.Name }}</td>
-					<td>{{ ds.Type }}</td>
-					<td>{{ ds.DataType }}</td>
-					<td>
-						<router-link class="btn btn-sm btn-primary" :to="'/ws/'+$route.params.ws+'/datasets/'+ds.ID">View</router-link>
-					</td>
-				</tr>
-			</tbody>
-		</table>
-	</div>
-	<div class="flex-content scroll-content my-2">
-		<h3>Nodes</h3>
-		<router-link class="btn btn-primary" :to="'/ws/'+$route.params.ws+'/pipeline'">Manage</router-link>
-		<table class="table table-sm align-middle">
-			<thead>
-				<tr>
-					<th>Name</th>
-					<th>Operation</th>
-					<th>Data Type</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr v-for="ds in datasets">
-					<td>{{ ds.Name }}</td>
-					<td>{{ ds.Type }}</td>
-					<td>{{ ds.DataType }}</td>
-				</tr>
-			</tbody>
-		</table>
 	</div>
 </div>
 	`,
