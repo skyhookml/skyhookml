@@ -214,7 +214,6 @@ func init() {
 			{Name: "video", DataTypes: []skyhook.DataType{skyhook.VideoType}},
 			{Name: "others", Variable: true},
 		},
-		Outputs: []skyhook.ExecOutput{{Name: "samples", DataType: skyhook.ImageType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
