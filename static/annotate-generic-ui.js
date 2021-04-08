@@ -282,6 +282,9 @@ export default function(impl) {
 					<div class="col-auto">
 						<button v-on:click="getOldItem(itemIdx+1)" type="button" class="btn btn-sm btn-primary">Next</button>
 					</div>
+					<div class="col-auto" v-if="response != null">
+						<button type="button" class="btn btn-sm btn-primary" v-on:click="annotateItem">Save Labels</button>
+					</div>
 				</template>
 			</div>
 

@@ -83,11 +83,11 @@ export default {
 <div>
 	<hr />
 	<div>
-		<strong>{{ node.Name }} ({{ node.Op }})</strong>
-		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="editNode">Edit</button>
-		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="runNode">Run</button>
-		<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="viewInteractive">Interactive</button>
-		<button type="button" class="btn btn-sm btn-danger mx-2" v-on:click="deleteNode">Delete</button>
+		<strong class="mx-1">{{ node.Name }} ({{ node.Op }})</strong>
+		<button type="button" class="btn btn-sm btn-primary" v-on:click="editNode">Edit</button>
+		<button type="button" class="btn btn-sm btn-primary" v-on:click="runNode">Run</button>
+		<button type="button" class="btn btn-sm btn-primary" v-on:click="viewInteractive">Interactive</button>
+		<button type="button" class="btn btn-sm btn-danger" v-on:click="deleteNode">Delete</button>
 	</div>
 	<div class="flex-x-container">
 		<div class="mx-4">
