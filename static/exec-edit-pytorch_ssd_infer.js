@@ -8,7 +8,7 @@ export default {
 	},
 	props: ['node'],
 	created: function() {
-		let params;
+		let params = {};
 		try {
 			let s = JSON.parse(this.node.Params);
 			params = s;
