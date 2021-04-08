@@ -95,6 +95,8 @@ func main() {
 				"--gpus", "all",
 				"-p", fmt.Sprintf("%d:8080", containerPort),
 				"--name", uuid,
+				// pytorch DataLoader needs more than tiny default 64MB shared memory
+				"--shm-size", "1G",
 				imageName,
 			)
 		} else if mode == "process" {
