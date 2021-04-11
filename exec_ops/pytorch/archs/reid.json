@@ -1,0 +1,23 @@
+{
+	"NumInputs": 2,
+	"NumTargets": 1,
+	"Components": [{
+		"ID": "reid",
+		"Inputs": [{
+			"Type": "dataset",
+			"DatasetIdx": 0
+		}, {
+			"Type": "dataset",
+			"DatasetIdx": 1
+		}],
+		"Targets": [{
+			"Type": "dataset",
+			"DatasetIdx": 2
+		}]
+	}],
+	"Losses": [{
+		"ComponentIdx": 0,
+		"Layer": "loss",
+		"Weight": 1
+	}]
+}

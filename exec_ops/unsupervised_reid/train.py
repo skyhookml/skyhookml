@@ -34,7 +34,6 @@ comps = json.loads(comps_arg)
 datasets = json.loads(datasets_arg)
 
 arch = arch['Params']
-comps = {int(comp_id): comp['Params'] for comp_id, comp in comps.items()}
 
 def clip(x, lo, hi):
 	if x > hi:
@@ -58,7 +57,7 @@ class MyDataset(torch.utils.data.Dataset):
 		self.data = {}
 		self.options = []
 		for key in self.keys:
-			print('loading from', key)
+			print('loading from', key, flush=True)
 			cur_items = self.items[key]
 			video_item, detection_item = cur_items[video_ds['ID']], cur_items[detection_ds['ID']]
 			detections = lib.load_item(detection_ds, detection_item)['Detections']
@@ -141,11 +140,10 @@ def get_datasets():
 	dataset_list = [ds.copy() for ds in datasets]
 	for ds in dataset_list:
 		ds['Options'] = {}
-	for spec in params['InputOptions']:
-		dataset_list[spec['Idx']]['Options'] = json.loads(spec['Value'])
 
 	# get items
 	# only fetch once per unique dataset
+	print('fetching items', flush=True)
 	items = {}
 	unique_ds_ids = set([ds['ID'] for ds in datasets])
 	for ds_id in unique_ds_ids:
@@ -162,6 +160,7 @@ def get_datasets():
 			del items[key]
 
 	keys = list(items.keys())
+	print('splitting {} keys into training/validation sets'.format(len(keys)), flush=True)
 	random.shuffle(keys)
 	num_val = len(keys)//5
 	val_keys = keys[0:num_val]
@@ -179,8 +178,11 @@ train_set, val_set = get_datasets()
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=None, shuffle=True, num_workers=4)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=None, shuffle=True, num_workers=4)
 
-example_inputs = train_set[0]
-net = model.Net(arch, comps, example_inputs)
+for example_inputs in train_loader:
+	break
+util.inputs_to_device(example_inputs, device)
+example_metadatas = [None, None, None]
+net = model.Net(arch, comps, example_inputs, example_metadatas, device=device)
 net.to(device)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 updated_lr = False
