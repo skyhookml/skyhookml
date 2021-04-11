@@ -331,19 +331,18 @@ func init() {
 				Metadata: metadata,
 			}, nil
 		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
+		GetDefaultMetadata: func(fname string) (string, string, error) {
 			width, height, duration, probeErr := Ffprobe(fname)
 			if probeErr != nil {
-				err = probeErr
-				return
+				return "", "", probeErr
 			}
 			metadata := VideoMetadata{
 				Dims: [2]int{width, height},
 				Framerate: [2]int{10, 1},
 				Duration: duration,
 			}
-			metadataRaw = string(JsonMarshal(metadata))
-			return
+			metadataRaw := string(JsonMarshal(metadata))
+			return "mp4", metadataRaw, nil
 		},
 		Builder: func() ChunkBuilder {
 			return &VideoBuilder{}
