@@ -14,6 +14,23 @@ import (
 	"strconv"
 )
 
+type Params struct {
+	skyhook.PytorchTrainParams
+	// MatchLengths should be TrackDuration/8, /4, /2, /1
+	TrackDuration float64
+}
+
+// Return match lengths for PreprocessMatches based on framerate and p.TrackDuration.
+func (p Params) GetMatchLengths(framerate [2]int) []int {
+	var matchLengths []int
+	for _, factor := range []float64{0.125, 0.25, 0.5, 1.0} {
+		duration := p.TrackDuration * factor
+		numFrames := int(duration * float64(framerate[0]) / float64(framerate[1]))
+		matchLengths = append(matchLengths, numFrames)
+	}
+	return matchLengths
+}
+
 type TrainOp struct {
 	url string
 	node skyhook.Runnable
@@ -25,7 +42,7 @@ func (e *TrainOp) Parallelism() int {
 }
 
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
-	var params skyhook.PytorchTrainParams
+	var params Params
 	if err := exec_ops.DecodeParams(e.node, &params, false); err != nil {
 		return err
 	}
@@ -52,17 +69,24 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return fmt.Errorf("could not mkdir %s: %v", matchesPath, err)
 	}
 	defer func() {
-		//os.RemoveAll(matchesPath)
+		os.RemoveAll(matchesPath)
 	}()
 	for _, l := range items {
-		key := l[1].Key
-		log.Printf("[reid] pre-processing key %s", key)
-		labelData, err := l[1].LoadData()
+		videoItem, detectionItem := l[0], l[1]
+		key := detectionItem.Key
+
+		// compute match lengths for this key based on the video framerate
+		var videoMetadata skyhook.VideoMetadata
+		skyhook.JsonUnmarshal([]byte(videoItem.Metadata), &videoMetadata)
+		matchLengths := params.GetMatchLengths(videoMetadata.Framerate)
+
+		log.Printf("[reid] pre-processing key %s with match_lengths=%v", key, matchLengths)
+		labelData, err := detectionItem.LoadData()
 		if err != nil {
 			return fmt.Errorf("error loading label (detection) data: %v", err)
 		}
 		detections := labelData.(skyhook.DetectionData).Detections
-		matches := PreprocessMatches(detections)
+		matches := PreprocessMatches(detections, matchLengths)
 		var matchList [][4]int
 		for k, v := range matches {
 			for _, id := range v {

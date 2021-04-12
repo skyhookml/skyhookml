@@ -9,12 +9,10 @@ import (
 )
 
 const MaxMatchAge = 10
-var MatchLengths = []int{2, 4, 8, 16, 32, 64}
-var MaxMatchLength = MatchLengths[len(MatchLengths) - 1]
 
-// Matches detections in a given frame forwards through frames to the MaxMatchLength.
+// Matches detections in a given frame forwards through frames to the maxLength.
 // Returns a map detectionIdx (in startFrame) -> set of (frame, detectionIdx in frame)
-func matchFrom(detections [][]skyhook.Detection, startFrame int) map[int]map[[2]int]bool {
+func matchFrom(detections [][]skyhook.Detection, startFrame int, maxLength int) map[int]map[[2]int]bool {
 	toRect := func(d skyhook.Detection) common.Rectangle {
 		return common.Rectangle{
 			common.Point{float64(d.Left), float64(d.Top)},
@@ -32,7 +30,7 @@ func matchFrom(detections [][]skyhook.Detection, startFrame int) map[int]map[[2]
 		finalMatches[idx][[2]int{startFrame, idx}] = true
 	}
 
-	for frameIdx := startFrame+1; frameIdx <= startFrame+MaxMatchLength && frameIdx < len(detections); frameIdx++ {
+	for frameIdx := startFrame+1; frameIdx <= startFrame+maxLength && frameIdx < len(detections); frameIdx++ {
 		// find the detections we need to match
 		checkSet := make(map[[2]int]bool)
 		for _, matches := range curMatches {
@@ -74,12 +72,13 @@ func matchFrom(detections [][]skyhook.Detection, startFrame int) map[int]map[[2]
 
 // Computes plausible matchings between every detection and other detections forwards/backwards in time.
 // Returns map from (frame idx, detection idx, match length) -> list of plausible detection idx in (frame idx + match length)
-func PreprocessMatches(detections [][]skyhook.Detection) map[[3]int][]int {
+func PreprocessMatches(detections [][]skyhook.Detection, matchLengths []int) map[[3]int][]int {
 	matches := make(map[[3]int][]int)
 	matchLengthSet := make(map[int]bool)
-	for _, matchLength := range MatchLengths {
+	for _, matchLength := range matchLengths {
 		matchLengthSet[matchLength] = true
 	}
+	maxLength := matchLengths[len(matchLengths)-1]
 
 	// multi-threaded pre-processing
 	// we process each start frame independently
@@ -90,7 +89,7 @@ func PreprocessMatches(detections [][]skyhook.Detection) map[[3]int][]int {
 		go func() {
 			threadMatches := make(map[[3]int][]int)
 			for startFrame := range ch {
-				frameMatches := matchFrom(detections, startFrame)
+				frameMatches := matchFrom(detections, startFrame, maxLength)
 				for curIdx := range frameMatches {
 					for right := range frameMatches[curIdx] {
 						matchLength := right[0] - startFrame

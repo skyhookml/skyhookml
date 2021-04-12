@@ -113,13 +113,13 @@ export default {
 				<div class="modal-body">
 					<ul class="nav nav-tabs mb-2">
 						<li class="nav-item">
-							<a class="nav-link active" data-toggle="tab" href="#import-local-tab" role="tab">Local</a>
+							<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#import-local-tab" role="tab">Local</button>
 						</li>
 						<li class="nav-item">
-							<a class="nav-link" data-toggle="tab" href="#import-upload-tab" role="tab">Upload</a>
+							<button class="nav-link" data-bs-toggle="tab" data-bs-target="#import-upload-tab" role="tab">Upload</button>
 						</li>
 						<li class="nav-item">
-							<a class="nav-link" data-toggle="tab" href="#import-url-tab" role="tab">URL</a>
+							<button class="nav-link" data-bs-toggle="tab" data-bs-target="#import-url-tab" role="tab">URL</button>
 						</li>
 					</ul>
 					<div class="tab-content">

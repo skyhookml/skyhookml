@@ -20,7 +20,7 @@ import ExecPytorchYolov5Train from './exec-edit-pytorch_yolov5_train.js';
 import ExecPytorchYolov5Infer from './exec-edit-pytorch_yolov5_infer.js';
 import ExecYolov3Train from './exec-edit-yolov3_train.js';
 import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
-import ExecUnsupervisedReid from './exec-edit-pytorch_train.js';
+import ExecUnsupervisedReid from './exec-edit-unsupervised_reid.js';
 import ExecVideoSample from './exec-edit-video_sample.js';
 
 let components = {

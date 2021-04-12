@@ -22,10 +22,10 @@ const Models = {
 <div>
 	<ul class="nav nav-tabs mb-3" id="m-nav" role="tablist">
 		<li class="nav-item">
-			<a class="nav-link active" id="m-components-tab" data-toggle="tab" href="#m-components-panel" role="tab">Components</a>
+			<button class="nav-link active" id="m-components-tab" data-bs-toggle="tab" data-bs-target="#m-components-panel" role="tab">Components</button>
 		</li>
 		<li class="nav-item">
-			<a class="nav-link" id="m-architectures-tab" data-toggle="tab" href="#m-architectures-panel" role="tab">Architectures</a>
+			<button class="nav-link" id="m-architectures-tab" data-bs-toggle="tab" data-bs-target="#m-architectures-panel" role="tab">Architectures</button>
 		</li>
 	</ul>
 	<div class="tab-content">

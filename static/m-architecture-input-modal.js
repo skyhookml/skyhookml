@@ -34,10 +34,10 @@ export default {
 			<div class="modal-body">
 				<ul class="nav nav-tabs">
 					<li class="nav-item">
-						<a class="nav-link active" data-toggle="tab" href="#m-aim-dataset-tab" role="tab">Dataset</a>
+						<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#m-aim-dataset-tab" role="tab">Dataset</button>
 					</li>
 					<li class="nav-item">
-						<a class="nav-link" data-toggle="tab" href="#m-aim-layer-tab" role="tab">Layer</a>
+						<button class="nav-link" data-bs-toggle="tab" data-bs-target="#m-aim-layer-tab" role="tab">Layer</button>
 					</li>
 				</ul>
 				<div class="tab-content">

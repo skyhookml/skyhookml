@@ -84,14 +84,14 @@ export default {
 						<div class="col-sm-10">
 							<ul class="nav nav-tabs">
 								<li v-for="category in categories" class="nav-item">
-									<a
+									<button
 										class="nav-link"
-										data-toggle="tab"
-										:href="'#add-node-cat-' + category.ID"
+										data-bs-toggle="tab"
+										:data-bs-target="'#add-node-cat-' + category.ID"
 										role="tab"
 										>
 										{{ category.Name }}
-									</a>
+									</button>
 								</li>
 							</ul>
 							<div class="tab-content">
