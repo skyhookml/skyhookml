@@ -11,6 +11,7 @@ export default {
 		return {
 			job: null,
 			plan: [],
+			planIndex: 0,
 		};
 	},
 	props: ['jobID'],
@@ -29,12 +30,44 @@ export default {
 				}
 				this.job = state.CurJob;
 				this.plan = state.Plan;
+				this.planIndex = state.PlanIndex;
 			});
 		},
 	},
 	template: `
-<div class="el-high">
-	<component v-if="job" v-bind:is="'job-'+job.Op" v-bind:jobID="job.ID"></component>
+<div class="flex-container">
+	<div v-if="plan && plan.length > 0">
+		<h5>Execution Plan</h5>
+		<table class="table table-sm w-auto">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Op</th>
+					<th>Status</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr v-for="(vnode, idx) in plan">
+					<td>{{ vnode.Name }}</td>
+					<td>{{ vnode.Op }}</td>
+					<td>
+						<template v-if="idx < planIndex">
+							Done
+						</template>
+						<template v-else-if="idx == planIndex">
+							Running
+						</template>
+						<template v-else>
+							Pending
+						</template>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+	<div class="flex-content">
+		<component v-if="job" v-bind:is="'job-'+job.Op" v-bind:jobID="job.ID"></component>
+	</div>
 </div>
 	`,
 };

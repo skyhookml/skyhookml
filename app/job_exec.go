@@ -17,11 +17,15 @@ type MultiExecJobOp struct {
 	// current execution plan
 	// the field can change but the slice itself must not
 	Plan []*skyhook.VirtualNode
+
+	// which index in the plan are we executing next (or right now)?
+	PlanIndex int
 }
 
 type MultiExecJobState struct {
 	CurJob *skyhook.Job
 	Plan []*skyhook.VirtualNode
+	PlanIndex int
 }
 
 func (op *MultiExecJobOp) Encode() string {
@@ -30,6 +34,7 @@ func (op *MultiExecJobOp) Encode() string {
 	return string(skyhook.JsonMarshal(MultiExecJobState{
 		CurJob: op.CurJob,
 		Plan: op.Plan,
+		PlanIndex: op.PlanIndex,
 	}))
 }
 
@@ -42,9 +47,10 @@ func (op *MultiExecJobOp) Stop() error {
 
 // Set the plan.
 // The plan must be immutable.
-func (op *MultiExecJobOp) ChangePlan(plan []*skyhook.VirtualNode) {
+func (op *MultiExecJobOp) ChangePlan(plan []*skyhook.VirtualNode, planIndex int) {
 	op.mu.Lock()
 	op.Plan = plan
+	op.PlanIndex = planIndex
 	op.mu.Unlock()
 }
 
@@ -52,4 +58,25 @@ func (op *MultiExecJobOp) ChangeJob(job skyhook.Job) {
 	op.mu.Lock()
 	op.CurJob = &job
 	op.mu.Unlock()
+}
+
+// Get a []*skyhook.VirtualNode plan based on current execution graph and related state.
+func (op *MultiExecJobOp) SetPlanFromGraph(graph skyhook.ExecutionGraph, ready map[skyhook.GraphID]map[string]*DBDataset, needed map[skyhook.GraphID]skyhook.Node) {
+	var plan []*skyhook.VirtualNode
+	for gid := range ready {
+		vnode, ok := graph[gid].(*skyhook.VirtualNode)
+		if !ok {
+			continue
+		}
+		plan = append(plan, vnode)
+	}
+	planIndex := len(plan)
+	for gid := range needed {
+		vnode, ok := graph[gid].(*skyhook.VirtualNode)
+		if !ok {
+			continue
+		}
+		plan = append(plan, vnode)
+	}
+	op.ChangePlan(plan, planIndex)
 }
