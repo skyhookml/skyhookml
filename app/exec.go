@@ -256,7 +256,10 @@ func (rd *RunData) Run() error {
 	// get container corresponding to rd.Node.Op
 	log.Printf("[exec-node %s] [run] acquiring container", name)
 	rd.JobOp.Update([]string{"Acquiring worker"})
-	AcquireWorker()
+	if err := AcquireWorker(rd.JobOp); err != nil {
+		rd.Error = err
+		return err
+	}
 	defer ReleaseWorker()
 	containerInfo, err := AcquireContainer(rd.Node, rd.JobOp)
 	if err != nil {
