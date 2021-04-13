@@ -18,7 +18,6 @@ import skyhook.pytorch.util as util
 
 MIN_PADDING = 4
 CROP_SIZE = 64
-MATCH_LENGTHS = [8, 16, 32, 64]
 
 out_dataset_id = int(sys.argv[1])
 url = sys.argv[2]
@@ -88,15 +87,17 @@ class MyDataset(torch.utils.data.Dataset):
 			with open(os.path.join(matches_path, key+'.json'), 'r') as f:
 				raw_matches = json.load(f)
 			matches = {}
+			match_lengths = set()
 			for frame_idx, detection_idx, match_length, next_idx in raw_matches:
 				k = (frame_idx, detection_idx, match_length)
+				match_lengths.add(match_length)
 				if k not in matches:
 					matches[k] = []
 				matches[k].append(next_idx)
 
 			self.data[key] = (detections, matches)
 			for frame_idx in range(len(detections)):
-				for match_length in MATCH_LENGTHS:
+				for match_length in match_lengths:
 					if frame_idx+match_length >= len(detections):
 						continue
 					if len(detections[frame_idx]) == 0 or len(detections[frame_idx+match_length]) == 0:
