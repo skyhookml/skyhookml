@@ -35,6 +35,10 @@ export default {
 				Name: "Convert",
 				Ops: ['from_yolo', 'to_yolo', 'from_coco', 'to_coco', 'from_catfolder', 'to_catfolder'],
 			}, {
+				ID: "geoimage",
+				Name: "Geo-Image",
+				Ops: ['make_geoimage', 'geoimage_to_image'],
+			}, {
 				ID: "debug",
 				Name: "Debug",
 				Ops: ['virtual_debug'],

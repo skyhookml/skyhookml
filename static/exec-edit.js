@@ -1,52 +1,54 @@
 import utils from './utils.js';
-import ExecCropResize from './exec-edit-cropresize.js';
-import ExecDetectionFilter from './exec-edit-detection_filter.js';
-import ExecResample from './exec-edit-resample.js';
-import ExecSegmentationMask from './exec-edit-segmentation_mask.js';
-import ExecSimpleTracker from './exec-edit-simple_tracker.js';
-import ExecReidTracker from './exec-edit-reid_tracker.js';
-import ExecPython from './exec-edit-python.js';
-import ExecPytorchTrain from './exec-edit-pytorch_train.js';
-import ExecPytorchInfer from './exec-edit-pytorch_infer.js';
-import ExecPytorchResnetTrain from './exec-edit-pytorch_resnet_train.js';
-import ExecPytorchResnetInfer from './exec-edit-pytorch_resnet_infer.js';
-import ExecPytorchSsdTrain from './exec-edit-pytorch_ssd_train.js';
-import ExecPytorchSsdInfer from './exec-edit-pytorch_ssd_infer.js';
-import ExecPytorchUnetTrain from './exec-edit-pytorch_unet_train.js';
-import ExecPytorchUnetInfer from './exec-edit-pytorch_unet_infer.js';
-import ExecPytorchYolov3Train from './exec-edit-pytorch_yolov3_train.js';
-import ExecPytorchYolov3Infer from './exec-edit-pytorch_yolov3_infer.js';
-import ExecPytorchYolov5Train from './exec-edit-pytorch_yolov5_train.js';
-import ExecPytorchYolov5Infer from './exec-edit-pytorch_yolov5_infer.js';
-import ExecYolov3Train from './exec-edit-yolov3_train.js';
-import ExecYolov3Infer from './exec-edit-yolov3_infer.js';
-import ExecUnsupervisedReid from './exec-edit-unsupervised_reid.js';
-import ExecVideoSample from './exec-edit-video_sample.js';
+import CropResize from './exec-edit/cropresize.js';
+import DetectionFilter from './exec-edit/detection_filter.js';
+import MakeGeoImage from './exec-edit/make_geoimage.js';
+import Resample from './exec-edit/resample.js';
+import SegmentationMask from './exec-edit/segmentation_mask.js';
+import SimpleTracker from './exec-edit/simple_tracker.js';
+import ReidTracker from './exec-edit/reid_tracker.js';
+import Python from './exec-edit/python.js';
+import PytorchTrain from './exec-edit/pytorch_train.js';
+import PytorchInfer from './exec-edit/pytorch_infer.js';
+import PytorchResnetTrain from './exec-edit/pytorch_resnet_train.js';
+import PytorchResnetInfer from './exec-edit/pytorch_resnet_infer.js';
+import PytorchSsdTrain from './exec-edit/pytorch_ssd_train.js';
+import PytorchSsdInfer from './exec-edit/pytorch_ssd_infer.js';
+import PytorchUnetTrain from './exec-edit/pytorch_unet_train.js';
+import PytorchUnetInfer from './exec-edit/pytorch_unet_infer.js';
+import PytorchYolov3Train from './exec-edit/pytorch_yolov3_train.js';
+import PytorchYolov3Infer from './exec-edit/pytorch_yolov3_infer.js';
+import PytorchYolov5Train from './exec-edit/pytorch_yolov5_train.js';
+import PytorchYolov5Infer from './exec-edit/pytorch_yolov5_infer.js';
+import Yolov3Train from './exec-edit/yolov3_train.js';
+import Yolov3Infer from './exec-edit/yolov3_infer.js';
+import UnsupervisedReid from './exec-edit/unsupervised_reid.js';
+import VideoSample from './exec-edit/video_sample.js';
 
 let components = {
-	'cropresize': ExecCropResize,
-	'detection_filter': ExecDetectionFilter,
-	'resample': ExecResample,
-	'segmentation_mask': ExecSegmentationMask,
-	'simple_tracker': ExecSimpleTracker,
-	'reid_tracker': ExecReidTracker,
-	'python': ExecPython,
-	'pytorch_train': ExecPytorchTrain,
-	'pytorch_infer': ExecPytorchInfer,
-	'pytorch_resnet_train': ExecPytorchResnetTrain,
-	'pytorch_resnet_infer': ExecPytorchResnetInfer,
-	'pytorch_ssd_train': ExecPytorchSsdTrain,
-	'pytorch_ssd_infer': ExecPytorchSsdInfer,
-	'pytorch_unet_train': ExecPytorchUnetTrain,
-	'pytorch_unet_infer': ExecPytorchUnetInfer,
-	'pytorch_yolov3_train': ExecPytorchYolov3Train,
-	'pytorch_yolov3_infer': ExecPytorchYolov3Infer,
-	'pytorch_yolov5_train': ExecPytorchYolov5Train,
-	'pytorch_yolov5_infer': ExecPytorchYolov5Infer,
-	'yolov3_train': ExecYolov3Train,
-	'yolov3_infer': ExecYolov3Infer,
-	'unsupervised_reid': ExecUnsupervisedReid,
-	'video_sample': ExecVideoSample,
+	'cropresize': CropResize,
+	'detection_filter': DetectionFilter,
+	'make_geoimage': MakeGeoImage,
+	'resample': Resample,
+	'segmentation_mask': SegmentationMask,
+	'simple_tracker': SimpleTracker,
+	'reid_tracker': ReidTracker,
+	'python': Python,
+	'pytorch_train': PytorchTrain,
+	'pytorch_infer': PytorchInfer,
+	'pytorch_resnet_train': PytorchResnetTrain,
+	'pytorch_resnet_infer': PytorchResnetInfer,
+	'pytorch_ssd_train': PytorchSsdTrain,
+	'pytorch_ssd_infer': PytorchSsdInfer,
+	'pytorch_unet_train': PytorchUnetTrain,
+	'pytorch_unet_infer': PytorchUnetInfer,
+	'pytorch_yolov3_train': PytorchYolov3Train,
+	'pytorch_yolov3_infer': PytorchYolov3Infer,
+	'pytorch_yolov5_train': PytorchYolov5Train,
+	'pytorch_yolov5_infer': PytorchYolov5Infer,
+	'yolov3_train': Yolov3Train,
+	'yolov3_infer': Yolov3Infer,
+	'unsupervised_reid': UnsupervisedReid,
+	'video_sample': VideoSample,
 };
 
 export default {
