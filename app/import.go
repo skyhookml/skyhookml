@@ -35,15 +35,20 @@ func (opts ImportOptions) SetTasks(total int) {
 
 // increment the ProgressJobOp, write a line to AppJobOp, and check IsStopping
 func (opts ImportOptions) CompletedTask(line string, increment int) bool {
-	if line != "" && opts.AppJobOp != nil {
-		opts.AppJobOp.Update([]string{line})
-		if opts.AppJobOp.IsStopping() {
-			return true
-		}
-	}
 	if increment > 0 && opts.ProgressJobOp != nil {
 		for i := 0; i < increment; i++ {
 			opts.ProgressJobOp.Increment()
+		}
+	}
+	if opts.AppJobOp != nil {
+		if line != "" {
+			opts.AppJobOp.Update([]string{line})
+		} else if increment > 0 {
+			// Empty update to make sure progress increment gets reflected.
+			opts.AppJobOp.Update(nil)
+		}
+		if opts.AppJobOp.IsStopping() {
+			return true
 		}
 	}
 	return false
@@ -314,7 +319,10 @@ func ImportURL(url string, opts ImportOptions, f func(path string) error) error 
 		}
 		read += n
 		if resp.ContentLength > 0 {
-			opts.ProgressJobOp.SetProgressPercent(read * 100 / int(resp.ContentLength))
+			updated := opts.ProgressJobOp.SetProgressPercent(read * 100 / int(resp.ContentLength))
+			if updated {
+				opts.AppJobOp.Update(nil)
+			}
 		}
 		if err == nil {
 			continue

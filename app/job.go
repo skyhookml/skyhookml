@@ -223,11 +223,17 @@ func (op *ProgressJobOp) SetTotal(total int) {
 	op.mu.Unlock()
 }
 
-func (op *ProgressJobOp) SetProgressPercent(percent int) {
+// Set the progress to the specified percentage.
+// Returns true if the percent was updated.
+func (op *ProgressJobOp) SetProgressPercent(percent int) bool {
 	op.mu.Lock()
+	defer op.mu.Unlock()
+	if op.Total == 100 && op.Completed == percent {
+		return false
+	}
 	op.Total = 100
 	op.Completed = percent
-	op.mu.Unlock()
+	return true
 }
 
 func (op *ProgressJobOp) Increment() {
