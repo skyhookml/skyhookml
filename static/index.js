@@ -117,6 +117,7 @@ Promise.all([
 				utils.request(this, 'POST', '/workspaces', {name: name}, () => {
 					this.resetForm();
 					this.fetch();
+					this.selectedWorkspace = name;
 					this.$router.push('/ws/'+name);
 				});
 			},
