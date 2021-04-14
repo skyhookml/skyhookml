@@ -1,11 +1,13 @@
 import utils from './utils.js';
 import JobConsoleProgress from './job-consoleprogress.js';
+import JobExport from './job-export.js';
 import JobPytorchTrain from './job-pytorch_train.js';
 import JobMultiExec from './job-multi_exec.js';
 
 export default {
 	components: {
 		'job-consoleprogress': JobConsoleProgress,
+		'job-export': JobExport,
 		'job-pytorch_train': JobPytorchTrain,
 		'job-multiexec': JobMultiExec,
 	},

@@ -3,7 +3,9 @@ package app
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -129,6 +131,13 @@ func (op *AppJobOp) Update(lines []string) {
 	for name, wrapped := range op.WrappedJobOps {
 		wrapped.Update(lines)
 		op.LastWrappedDatas[name] = wrapped.Encode()
+	}
+}
+
+func (op *AppJobOp) ReadFrom(r io.Reader) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		op.Update([]string{scanner.Text()})
 	}
 }
 

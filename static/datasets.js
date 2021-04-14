@@ -48,8 +48,8 @@ const Datasets = {
 			} else {
 				endpoint = '/export';
 			}
-			utils.request(this, 'POST', '/datasets/'+dataset.ID+endpoint, null, (fname) => {
-				window.location.href = '/exports/'+fname;
+			utils.request(this, 'POST', '/datasets/'+dataset.ID+endpoint, null, (job) => {
+				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 			});
 		},
 	},
