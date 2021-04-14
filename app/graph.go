@@ -274,7 +274,7 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 			rd.SetJob(fmt.Sprintf("Exec Node %s", vnode.Name), fmt.Sprintf("%d", vnode.OrigNode.ID))
 			// if MultiExecJobOp is provided, we need to update it with the current job
 			if opts.JobOp != nil {
-				opts.JobOp.SetPlanFromGraph(graph, ready, needed)
+				opts.JobOp.SetPlanFromGraph(graph, ready, needed, vnode)
 				opts.JobOp.ChangeJob(rd.JobOp.Job.Job)
 			}
 			err = rd.Run()
@@ -290,7 +290,7 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 
 	// update plan for last time if needed
 	if opts.JobOp != nil {
-		opts.JobOp.SetPlanFromGraph(graph, ready, needed)
+		opts.JobOp.SetPlanFromGraph(graph, ready, needed, nil)
 	}
 
 	return nil

@@ -61,22 +61,27 @@ func (op *MultiExecJobOp) ChangeJob(job skyhook.Job) {
 }
 
 // Get a []*skyhook.VirtualNode plan based on current execution graph and related state.
-func (op *MultiExecJobOp) SetPlanFromGraph(graph skyhook.ExecutionGraph, ready map[skyhook.GraphID]map[string]*DBDataset, needed map[skyhook.GraphID]skyhook.Node) {
+func (op *MultiExecJobOp) SetPlanFromGraph(graph skyhook.ExecutionGraph, ready map[skyhook.GraphID]map[string]*DBDataset, needed map[skyhook.GraphID]skyhook.Node, cur *skyhook.VirtualNode) {
 	var plan []*skyhook.VirtualNode
-	for gid := range ready {
+	addGraphID := func(gid skyhook.GraphID) {
 		vnode, ok := graph[gid].(*skyhook.VirtualNode)
 		if !ok {
-			continue
+			return
+		}
+		if vnode == cur {
+			return
 		}
 		plan = append(plan, vnode)
 	}
+	for gid := range ready {
+		addGraphID(gid)
+	}
 	planIndex := len(plan)
+	if cur != nil {
+		plan = append(plan, cur)
+	}
 	for gid := range needed {
-		vnode, ok := graph[gid].(*skyhook.VirtualNode)
-		if !ok {
-			continue
-		}
-		plan = append(plan, vnode)
+		addGraphID(gid)
 	}
 	op.ChangePlan(plan, planIndex)
 }
