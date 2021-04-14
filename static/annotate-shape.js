@@ -7,11 +7,18 @@ export default AnnotateGenericUI({
 			params: null,
 			shapes: null,
 
+			// current category to use for labeling shapes
+			category: '',
+
 			// index of currently selected shape, if any
 			selectedIdx: null,
 
 			keyupHandler: null,
 			resizeObserver: null,
+
+			// handler functions set by render()
+			cancelDrawHandler: null,
+			deleteSelectionHandler: null,
 		};
 	},
 	on_created_ready: function() {
@@ -32,6 +39,19 @@ export default AnnotateGenericUI({
 			params.CategoriesStr = params.Categories.join(',');
 		}
 		this.params = params;
+
+		// call handlers on certain key presses
+		this.setKeyupHandler((e) => {
+			if(document.activeElement.tagName == 'INPUT') {
+				return;
+			}
+
+			if(e.key === 'Escape' && this.cancelDrawHandler) {
+				this.cancelDrawHandler();
+			} else if(e.key === 'Delete' && this.deleteSelectionHandler) {
+				this.deleteSelectionHandler();
+			}
+		});
 	},
 	destroyed: function() {
 		this.setKeyupHandler(null);
@@ -412,7 +432,7 @@ export default AnnotateGenericUI({
 								[parseInt(curShape.x()), parseInt(curShape.y())],
 								[parseInt(curShape.x()+curShape.width()), parseInt(curShape.y()+curShape.height())],
 							],
-							Category: '',
+							Category: this.category,
 							TrackID: '',
 						};
 						this.shapes[this.frameIdx].push(shape);
@@ -432,7 +452,7 @@ export default AnnotateGenericUI({
 					layer.batchDraw();
 				});
 
-				cancelDrawHandler = () => {
+				this.cancelDrawHandler = () => {
 					if(curShape === null) {
 						return;
 					}
@@ -472,7 +492,7 @@ export default AnnotateGenericUI({
 								[parseInt(pts[0]), parseInt(pts[1])],
 								[parseInt(pts[2]), parseInt(pts[3])],
 							],
-							Category: '',
+							Category: this.category,
 							TrackID: '',
 						};
 						this.shapes[this.frameIdx].push(shape);
@@ -492,7 +512,7 @@ export default AnnotateGenericUI({
 					layer.batchDraw();
 				});
 
-				cancelDrawHandler = () => {
+				this.cancelDrawHandler = () => {
 					if(curShape === null) {
 						return;
 					}
@@ -502,30 +522,22 @@ export default AnnotateGenericUI({
 				}
 			}
 
-			// initialize a key handler to handle cancel drawing and deleting selected shapes
-			this.setKeyupHandler((e) => {
-				if(document.activeElement.tagName == 'INPUT') {
+			// initialize a handler for deleting selected shapes
+			this.deleteSelectionHandler = () => {
+				if(this.selectedIdx === null) {
 					return;
 				}
-
-				if(e.key === 'Escape' && cancelDrawHandler) {
-					cancelDrawHandler();
-				} else if(e.key === 'Delete') {
-					if(this.selectedIdx === null) {
-						return;
-					}
-					this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
-					let kshp = konvaShapes[this.selectedIdx];
-					konvaShapes.splice(this.selectedIdx, 1);
-					konvaShapes.forEach((kshp, idx) => {
-						kshp.myindex = idx;
-					});
-					kshp.destroy();
-					destroyResizeLayer();
-					this.selectedIdx = null;
-					layer.draw();
-				}
-			});
+				this.shapes[this.frameIdx].splice(this.selectedIdx, 1);
+				let kshp = konvaShapes[this.selectedIdx];
+				konvaShapes.splice(this.selectedIdx, 1);
+				konvaShapes.forEach((kshp, idx) => {
+					kshp.myindex = idx;
+				});
+				kshp.destroy();
+				destroyResizeLayer();
+				this.selectedIdx = null;
+				layer.draw();
+			};
 		},
 	},
 	template: {
@@ -543,6 +555,11 @@ export default AnnotateGenericUI({
 		</select>
 	</div>
 	<div class="col-auto">
+		<template v-if="params.Mode == 'box'">
+			<i class="bi bi-question-circle" data-toggle="tooltip" title="Box mode: click twice to draw a box. Escape to cancel current drawing, click to select box, Delete to delete selection."></i>
+		</template>
+	</div>
+	<div class="col-auto">
 		<label>Categories (comma-separated)</label>
 	</div>
 	<div class="col-auto">
@@ -554,10 +571,18 @@ export default AnnotateGenericUI({
 </form>
 		`,
 		im_above: `
-<div>
-	<p v-if="params.Mode == 'box'">
-		Box mode: click twice to draw a box. Escape to cancel current drawing, click to select box, Delete to delete selection.
-	</p>
+<div class="row g-1 align-items-center">
+	<div class="col-auto">
+		<label>Category:</label>
+	</div>
+	<div class="col-auto">
+		<select class="form-select form-select-sm" v-model="category">
+			<option value="">None</option>
+			<template v-for="category in params.Categories">
+				<option :key="category" :value="category">{{ category }}</option>
+			</template>
+		</select>
+	</div>
 </div>
 		`,
 		im_after: `
@@ -570,13 +595,16 @@ export default AnnotateGenericUI({
 		`,
 		im_below: `
 <div v-if="selectedIdx != null && selectedIdx >= 0 && selectedIdx < shapes[frameIdx].length" class="mb-2">
-	<p><strong>Selection: {{ shapes[frameIdx][selectedIdx].Type }} ({{ shapes[frameIdx][selectedIdx].Points }})</strong></p>
+	<p>
+		<strong>Selection: {{ shapes[frameIdx][selectedIdx].Type }} ({{ shapes[frameIdx][selectedIdx].Points }})</strong>
+		<button v-if="deleteSelectionHandler" type="button" class="btn btn-sm btn-danger" v-on:click="deleteSelectionHandler">Delete</button>
+	</p>
 	<div class="small-container">
 		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Category</label>
 			<div class="col-sm-10">
 				<select class="form-select" v-model="shapes[frameIdx][selectedIdx].Category">
-					<option :key="''" value="">None</option>
+					<option value="">None</option>
 					<template v-for="category in params.Categories">
 						<option :key="category" :value="category">{{ category }}</option>
 					</template>
