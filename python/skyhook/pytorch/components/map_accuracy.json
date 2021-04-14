@@ -1,0 +1,8 @@
+{
+	"Module": {"BuiltInModule": "map_accuracy"},
+	"NumInputs": 1,
+	"NumTargets": 1,
+	"Losses": [
+		"score"
+	]
+}

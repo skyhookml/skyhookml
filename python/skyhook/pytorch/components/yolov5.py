@@ -25,7 +25,11 @@ def M(info):
 				# e.g. 's', 'm', 'l', 'x'
 				self.mode = info['params'].get('mode', 'x')
 
-				self.confidence_threshold = info['params'].get('confidence_threshold', 0.1)
+				if self.infer:
+					default_confidence_threshold = 0.1
+				else:
+					default_confidence_threshold = 0.01
+				self.confidence_threshold = info['params'].get('confidence_threshold', default_confidence_threshold)
 				self.iou_threshold = info['params'].get('iou_threshold', 0.5)
 
 				lib.eprint('yolov5: set nc={}, mode={}, conf={}, iou={}'.format(self.nc, self.mode, self.confidence_threshold, self.iou_threshold))
@@ -51,12 +55,11 @@ def M(info):
 
 				if self.training:
 					d['pred'] = self.model(x.float()/255.0)
+					d['detections'] = None
 				else:
 					inf_out, d['pred'] = self.model(x.float()/255.0)
-
-					if self.infer:
-						detections = utils.general.non_max_suppression(inf_out, conf_thres=self.confidence_threshold, iou_thres=self.iou_threshold)
-						d['detections'] = yolov5_common.process_outputs((x.shape[3], x.shape[2]), detections, self.categories)
+					detections = utils.general.non_max_suppression(inf_out, conf_thres=self.confidence_threshold, iou_thres=self.iou_threshold)
+					d['detections'] = yolov5_common.process_outputs((x.shape[3], x.shape[2]), detections, self.categories)
 
 				if targets is not None:
 					loss, _ = self.compute_loss(d['pred'], targets)
