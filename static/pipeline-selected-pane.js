@@ -86,7 +86,7 @@ export default {
 		<strong class="mx-1">{{ node.Name }} ({{ node.Op }})</strong>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="editNode">Edit</button>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="runNode">Run</button>
-		<button type="button" class="btn btn-sm btn-primary" v-on:click="viewInteractive">Interactive</button>
+		<!--<button type="button" class="btn btn-sm btn-primary" v-on:click="viewInteractive">Interactive</button>-->
 		<button type="button" class="btn btn-sm btn-danger" v-on:click="deleteNode">Delete</button>
 	</div>
 	<div class="flex-x-container">
@@ -135,7 +135,7 @@ export default {
 		</div>
 	</div>
 
-	<div>
+	<!--<div>
 		<form v-on:submit.prevent="compareTo" class="d-flex align-items-center">
 			<label class="mx-2">Compare to:</label>
 			<select v-model="compareForm.workspace" @change="selectCompareWorkspace" class="form-select mx-2">
@@ -146,7 +146,7 @@ export default {
 			</select>
 			<button type="submit" class="btn btn-primary mx-2">Go</button>
 		</form>
-	</div>
+	</div>-->
 </div>
 	`,
 };
