@@ -134,4 +134,36 @@ export default {
 			},
 		},
 	},
+	"track": {
+		Name: "Object Tracking",
+		Help: "Train a model to track objects in video, i.e., find the path of each unique object over time.",
+		Inputs: [{
+			ID: "videos",
+			Name: "Videos",
+			DataType: "video",
+			Help: "A video dataset containing example inputs.",
+		}, {
+			ID: "tracks",
+			Name: "Track Labels",
+			DataType: "detection",
+			Help: "A detection dataset containing bounding box labels and track IDs for each input video.",
+		}],
+		Models: {
+			'unsupervised_reid': {
+				ID: 'unsupervised_reid',
+				Name: 'Unsupervised Re-identification',
+				Inputs: [{
+					ID: "videos",
+					Name: "Videos",
+					DataType: "video",
+					Help: "A video dataset containing example inputs.",
+				}, {
+					ID: "detections",
+					Name: "Object Detections",
+					DataType: "detection",
+					Help: "A dataset containing bounding boxes of objects in each video. Track IDs are not needed. The bounding boxes may be labeled manually, or computed automatically using an object detector.",
+				}],
+			},
+		},
+	},
 };

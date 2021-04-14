@@ -130,10 +130,21 @@ export default {
 					nodeParams['Mode'] = this.form.mode;
 				}
 
+				let op = this.form.model.ID+'_infer';
+
+				// custom stuff
+				if(this.form.model.ID == 'unsupervised_reid') {
+					op = 'reid_tracker';
+					parents = {
+						'model': [modelParent],
+						'video': [this.options[this.form.inputParentIdx]],
+					};
+				}
+
 				// create the node
 				let params = {
 					Name: this.form.name,
-					Op: this.form.model.ID+'_infer',
+					Op: op,
 					Params: JSON.stringify(nodeParams),
 					Parents: parents,
 					Workspace: this.$route.params.ws,

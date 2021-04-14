@@ -146,10 +146,18 @@ export default {
 					}
 				}
 
+				let op = this.form.model.ID+'_train';
+
+				// some custom settings
+				if(this.form.model.ID == 'unsupervised_reid') {
+					nodeParams['ArchID'] = 'reid';
+					op = 'unsupervised_reid';
+				}
+
 				// create the node
 				let params = {
 					Name: this.form.name,
-					Op: this.form.model.ID+'_train',
+					Op: op,
 					Params: JSON.stringify(nodeParams),
 					Parents: parents,
 					Workspace: this.$route.params.ws,
@@ -165,6 +173,17 @@ export default {
 				this.$router.push('/ws/'+this.$route.params.ws+'/exec/'+node.ID);
 			};
 			handle();
+		},
+	},
+	computed: {
+		curInputs: function() {
+			if(this.form.model && this.form.model.Inputs) {
+				return this.form.model.Inputs;
+			} else if(this.form.task) {
+				return this.form.task.Inputs;
+			} else {
+				return [];
+			}
 		},
 	},
 	template: `
@@ -222,7 +241,7 @@ export default {
 							<small class="form-text text-muted">Fine-tune a pre-trained model instead of training from scratch.</small>
 						</div>
 					</div>
-					<template v-for="(input, i) in form.task.Inputs">
+					<template v-for="(input, i) in curInputs">
 						<div class="row mb-2">
 							<label class="col-sm-4 col-form-label">{{ input.Name }}</label>
 							<div class="col-sm-8">
