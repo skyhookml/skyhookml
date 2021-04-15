@@ -27,7 +27,7 @@
 			<button type="button" class="btn btn-sm btn-danger mx-2" v-on:click="deleteWorkspace">Remove</button>
 		</form>
 		<form v-on:submit.prevent="createWorkspace" class="d-flex align-items-center ms-4">
-			<input v-model="addForms.workspace.name" type="form-control form-control-sm" placeholder="Name" class="mx-2" />
+			<input v-model="addForms.workspace.name" type="form-control form-control-sm" placeholder="New Workspace Name" class="mx-2" />
 			<button type="submit" class="btn btn-sm btn-primary mx-2">New Workspace</button>
 			<button type="button" class="btn btn-sm btn-primary mx-2" v-on:click="cloneWorkspace">Clone</button>
 		</form>
