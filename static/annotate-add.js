@@ -169,7 +169,7 @@ export default {
 					<div class="col-sm-8">
 						<template v-if="!addForm.toolObj.DataType">
 							<div class="form-check" v-for="(label, dt) in addForm.toolObj.DataTypes">
-								<input class="form-check-input" type="radio" v-model="addForm.datasetType" :value="dt">
+								<input class="form-check-input" type="radio" v-model="addForm.datasetType" :value="dt" required>
 								<label class="form-check-label">{{ label }}</label>
 							</div>
 						</template>
@@ -183,7 +183,7 @@ export default {
 				<div class="row mb-2" v-if="addForm.toolObj">
 					<label class="col-sm-4 col-form-label">Existing Dataset</label>
 					<div class="col-sm-8">
-						<select v-model="addForm.datasetID" class="form-select">
+						<select v-model="addForm.datasetID" class="form-select" required>
 							<template v-for="ds in datasets">
 								<option
 									v-if="ds.Type == 'data' && (!addForm.toolObj.DataTypes || addForm.toolObj.DataTypes[ds.DataType]) && (!addForm.toolObj.DataType || addForm.toolObj.DataType == ds.DataType)"
@@ -201,7 +201,7 @@ export default {
 				<div class="row mb-2">
 					<label class="col-sm-4 col-form-label">Input {{ input.Name }}</label>
 					<div class="col-sm-8">
-						<select v-model="addForm.inputIDs[i]" class="form-select">
+						<select v-model="addForm.inputIDs[i]" class="form-select" required>
 							<template v-for="ds in datasets">
 								<!-- Only show datasets that match the type of this input. -->
 								<option

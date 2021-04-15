@@ -149,3 +149,15 @@ html, body {
 .el-50h {
 	height: 50%;
 }
+
+/*
+In Firefox with Vue.js, required radio button appear red even before the form
+was submitted the first time. This fixes the issue by disabling the red box
+shadow in Firefox.
+See: https://github.com/vuejs/vue/issues/11321
+*/
+@-moz-document url-prefix() {
+	input[type=radio]:required {
+		box-shadow: none;
+	}
+}

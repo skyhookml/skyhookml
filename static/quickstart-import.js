@@ -294,7 +294,7 @@ export default {
 			<div class="row mb-2">
 				<label class="col-sm-4 col-form-label">File</label>
 				<div class="col-sm-8">
-					<input class="form-control" type="file" @change="onFileChange" />
+					<input class="form-control" type="file" @change="onFileChange" required />
 					<small class="form-text text-muted">
 						<template v-if="importType == 'unlabeled-video'">
 							Upload a zip archive containing video files (e.g. mp4).

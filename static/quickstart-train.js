@@ -215,7 +215,7 @@ export default {
 						<label class="col-sm-4 col-form-label">Model</label>
 						<div class="col-sm-8">
 							<div class="form-check" v-for="model in form.task.Models">
-								<input class="form-check-input" type="radio" v-model="form.modelID" :value="model.ID" @change="changedModel">
+								<input class="form-check-input" type="radio" name="modelID" v-model="form.modelID" :value="model.ID" @change="changedModel" required>
 								<label class="form-check-label">{{ model.Name }}</label>
 							</div>
 						</div>
@@ -224,7 +224,7 @@ export default {
 						<label class="col-sm-4 col-form-label">Mode</label>
 						<div class="col-sm-8">
 							<div class="form-check" v-for="mode in form.model.Modes">
-								<input class="form-check-input" type="radio" v-model="form.mode" :value="mode.ID">
+								<input class="form-check-input" type="radio" name="mode" v-model="form.mode" :value="mode.ID" required>
 								<label class="form-check-label">{{ mode.Name }}</label>
 							</div>
 						</div>
@@ -245,7 +245,7 @@ export default {
 						<div class="row mb-2">
 							<label class="col-sm-4 col-form-label">{{ input.Name }}</label>
 							<div class="col-sm-8">
-								<select v-model="form.inputParentIdxs[i]" class="form-select">
+								<select v-model="form.inputParentIdxs[i]" class="form-select" required>
 									<template v-for="(opt, idx) in options">
 										<option
 											v-if="input.DataType == opt.DataType"

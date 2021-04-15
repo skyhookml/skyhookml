@@ -191,7 +191,7 @@ export default {
 						<label class="col-sm-4 col-form-label">Model</label>
 						<div class="col-sm-8">
 							<div class="form-check" v-for="model in form.task.Models">
-								<input class="form-check-input" type="radio" v-model="form.modelID" :value="model.ID" @change="changedModel">
+								<input class="form-check-input" type="radio" name="modelID" v-model="form.modelID" :value="model.ID" @change="changedModel" required>
 								<label class="form-check-label">{{ model.Name }}</label>
 							</div>
 						</div>
@@ -200,7 +200,7 @@ export default {
 						<label class="col-sm-4 col-form-label">Mode</label>
 						<div class="col-sm-8">
 							<div class="form-check" v-for="mode in form.model.Modes">
-								<input class="form-check-input" type="radio" v-model="form.mode" :value="mode.ID">
+								<input class="form-check-input" type="radio" name="mode" v-model="form.mode" :value="mode.ID">
 								<label class="form-check-label">{{ mode.Name }}</label>
 							</div>
 						</div>
@@ -208,7 +208,7 @@ export default {
 					<div v-if="form.model && form.model.Pretrain" class="row mb-2">
 						<label class="col-sm-4 col-form-label">Model Type</label>
 						<div class="col-sm-8">
-							<select v-model="form.modelType" class="form-select">
+							<select v-model="form.modelType" class="form-select" required>
 								<option value="pretrain">Pre-trained Model</option>
 								<option value="custom">Custom Model</option>
 							</select>
@@ -217,7 +217,7 @@ export default {
 					<div v-if="form.modelType == 'pretrain'" class="row mb-2">
 						<label class="col-sm-4 col-form-label">Pre-training</label>
 						<div class="col-sm-8">
-							<select v-model="form.pretrain" class="form-select">
+							<select v-model="form.pretrain" class="form-select" required>
 								<template v-for="opt in form.model.Pretrain">
 									<option :key="opt.ID" :value="opt.ID">{{ opt.Name }}</option>
 								</template>
@@ -228,7 +228,7 @@ export default {
 					<div v-if="form.modelType == 'custom'" class="row mb-2">
 						<label class="col-sm-4 col-form-label">Custom Model</label>
 						<div class="col-sm-8">
-							<select v-model="form.customParentIdx" class="form-select">
+							<select v-model="form.customParentIdx" class="form-select" required>
 								<template v-for="(opt, idx) in options">
 									<option v-if="opt.DataType == 'file'" :value="idx">{{ opt.Label }}</option>
 								</template>
@@ -238,7 +238,7 @@ export default {
 					<div class="row mb-2">
 						<label class="col-sm-4 col-form-label">Input Dataset</label>
 						<div class="col-sm-8">
-							<select v-model="form.inputParentIdx" class="form-select">
+							<select v-model="form.inputParentIdx" class="form-select" required>
 								<template v-for="(opt, idx) in options">
 									<option v-if="opt.DataType == 'video' || opt.DataType == 'image'" :value="idx">{{ opt.Label }}</option>
 								</template>
