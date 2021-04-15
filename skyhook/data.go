@@ -24,6 +24,7 @@ const (
 	FileType = "file"
 	TableType = "table"
 	GeoImageType = "geoimage"
+	GeoJsonType = "geojson"
 )
 
 var DataTypes = map[DataType]string{
@@ -40,6 +41,7 @@ var DataTypes = map[DataType]string{
 	FileType: "File",
 	TableType: "Table",
 	GeoImageType: "Geo-Image",
+	GeoJsonType: "GeoJSON",
 }
 
 func EncodeTypes(types []DataType) string {

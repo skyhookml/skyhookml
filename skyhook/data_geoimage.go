@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
+
+	gomapinfer "github.com/mitroadmaps/gomapinfer/common"
+	geocoords "github.com/mitroadmaps/gomapinfer/googlemaps"
 )
 
 type GeoImageItemSource struct {
@@ -16,6 +20,31 @@ type GeoImageItemSource struct {
 	// Coordinates can be negative. For example, (-50, -50) means that (50, 50) in
 	// the source item is placed at (0, 0) in our image.
 	Offset [2]int
+}
+
+type GeoBbox [4]float64
+
+// Convert from relative fractional position in image to longitude-latitude.
+func (bbox GeoBbox) ToGeo(p [2]float64) [2]float64 {
+	return [2]float64{
+		bbox[0]+p[0]*(bbox[2]-bbox[0]),
+		bbox[1]+(1-p[1])*(bbox[3]-bbox[1]),
+	}
+}
+
+// Convert from longitude-latitude to fractional position in image.
+func (bbox GeoBbox) FromGeo(p [2]float64) [2]float64 {
+	return [2]float64{
+		(p[0]-bbox[0])/(bbox[2]-bbox[0]),
+		1-(p[1]-bbox[1])/(bbox[3]-bbox[1]),
+	}
+}
+
+func (bbox GeoBbox) Rect() gomapinfer.Rectangle {
+	return gomapinfer.Rectangle{
+		Min: gomapinfer.Point{bbox[0], bbox[1]},
+		Max: gomapinfer.Point{bbox[2], bbox[3]},
+	}
 }
 
 type GeoImageMetadata struct {
@@ -56,6 +85,7 @@ type GeoImageMetadata struct {
 	Items []GeoImageItemSource
 }
 
+// Assuming SourceType=="url", download a tile in this image from the URL.
 func (m GeoImageMetadata) DownloadTile(i, j int) (Image, error) {
 	url := m.URL
 	url = strings.ReplaceAll(url, "[ZOOM]", strconv.Itoa(m.Zoom))
@@ -82,6 +112,27 @@ func (m GeoImageMetadata) DownloadTile(i, j int) (Image, error) {
 		return ImageFromPNGReader(resp.Body)
 	}
 	return Image{}, fmt.Errorf("unknown Content-Type %s", contentType)
+}
+
+// Get the bounding box of this image.
+func (m GeoImageMetadata) GetBbox() GeoBbox {
+	if m.ReferenceType == "custom" {
+		return GeoBbox(m.Bbox)
+	}
+
+	// for webmercator, we use geocoords to convert to longitude-latitude
+	originTile := [2]int{m.X, m.Y}
+	offset := gomapinfer.Point{float64(m.Offset[0]), float64(m.Offset[1])}
+	lengths := gomapinfer.Point{float64(m.Width), float64(m.Height)}
+	p1 := geocoords.MapboxToLonLat(offset, m.Zoom, originTile)
+	p2 := geocoords.MapboxToLonLat(offset.Add(lengths), m.Zoom, originTile)
+
+	return GeoBbox{
+		math.Min(p1.X, p2.X),
+		math.Min(p1.Y, p2.Y),
+		math.Max(p1.X, p2.X),
+		math.Max(p1.Y, p2.Y),
+	}
 }
 
 type GeoImageData struct {

@@ -10,8 +10,18 @@ type ShapeMetadata struct {
 	Categories []string `json:",omitempty"`
 }
 
+// Shape types.
+type TypeOfShape string
+const (
+	PointShape TypeOfShape = "point"
+	LineShape = "line"
+	PolyLineShape = "polyline"
+	BoxShape = "box"
+	PolygonShape = "polygon"
+)
+
 type Shape struct {
-	Type string
+	Type TypeOfShape
 	Points [][2]int
 
 	// Optional metadata

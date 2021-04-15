@@ -6,6 +6,7 @@ import (
 	_ "github.com/skyhookml/skyhookml/exec_ops/detection_filter"
 	_ "github.com/skyhookml/skyhookml/exec_ops/filter"
 	_ "github.com/skyhookml/skyhookml/exec_ops/geoimage_to_image"
+	_ "github.com/skyhookml/skyhookml/exec_ops/geojson_to_shape"
 	_ "github.com/skyhookml/skyhookml/exec_ops/make_geoimage"
 	_ "github.com/skyhookml/skyhookml/exec_ops/materialize"
 	_ "github.com/skyhookml/skyhookml/exec_ops/python"
