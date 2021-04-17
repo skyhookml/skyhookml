@@ -13,6 +13,10 @@ export default {
 			DataType: "detection",
 			Help: "A detection dataset containing bounding box labels corresponding to each input image.",
 		}],
+		Defaults: {
+			Model: 'pytorch_yolov5',
+			Mode: 'l',
+		},
 		Models: {
 			'pytorch_yolov3': {
 				ID: 'pytorch_yolov3',
@@ -80,6 +84,10 @@ export default {
 			DataType: "int",
 			Help: "An integer dataset containing category labels corresponding to each input image.",
 		}],
+		Defaults: {
+			Model: 'pytorch_resnet',
+			Mode: 'resnet34',
+		},
 		Models: {
 			'pytorch_resnet': {
 				ID: 'pytorch_resnet',

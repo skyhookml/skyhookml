@@ -58,6 +58,13 @@ export default {
 			for(let i = 0; i < task.Inputs.length; i++) {
 				this.form.inputParentIdxs.push(null);
 			}
+			if(task.Defaults) {
+				this.form.modelID = task.Defaults.Model;
+				this.changedModel();
+				if(task.Defaults.Mode) {
+					this.form.mode = task.Defaults.Mode;
+				}
+			}
 		},
 		changedModel: function() {
 			this.form.model = null;
@@ -66,6 +73,11 @@ export default {
 			}
 			this.form.mode = '';
 			this.form.pretrain = '';
+
+			// default to pre-training if available
+			if(this.form.model.Pretrain && this.form.model.Pretrain.length > 0) {
+				this.form.pretrain = this.form.model.Pretrain[0].ID;
+			}
 		},
 		addNode: function() {
 			let handle = async () => {

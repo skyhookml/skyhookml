@@ -23,7 +23,7 @@ Quickstart
 ----------
 
 The fastest way to get started is with the all-in-one Docker container.
-First, install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker); on Ubuntu (tested on 20.04):
+First, install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker); on Ubuntu:
 
 	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 	sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
