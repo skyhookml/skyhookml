@@ -1,8 +1,7 @@
 SkyhookML
 =========
 
-SkyhookML is a data science platform for image and video data.
-It provides an easy-to-use interface that makes computer vision and machine learning more accessible.
+SkyhookML is a platform for computer vision, providing an easy-to-use interface that makes machine learning methods for image and video data more accessible.
 
 Website: https://www.skyhookml.org
 
@@ -39,10 +38,11 @@ Then:
 	git clone https://github.com/skyhookml/skyhookml.git
 	cd skyhookml
 	mkdir -p data/items data/models
-	docker/allinone/build.sh
 	docker/allinone/run.sh
 
 Access your deployment at http://localhost:8080.
+
+Note: If you get an error like `nvidia-container-cli: initialization error`, make sure NVIDIA driver is installed (e.g., `sudo apt install nvidia-driver-460`; driver version must be >= 450).
 
 
 Overview
