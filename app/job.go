@@ -290,14 +290,18 @@ func init() {
 			return
 		}
 
+		type StateResponse struct {
+			Job *DBJob
+			State string
+		}
+
 		if !job.Done {
 			jobMu.Lock()
 			jobOp := runningJobs[jobID]
 			jobMu.Unlock()
 			if jobOp != nil {
 				state := jobOp.Encode()
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(state))
+				skyhook.JsonResponse(w, StateResponse{job, state})
 				return
 			}
 		}
@@ -306,8 +310,7 @@ func init() {
 		if state == "" {
 			state = "null"
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(state))
+		skyhook.JsonResponse(w, StateResponse{job, state})
 	}).Methods("POST")
 
 	Router.HandleFunc("/jobs/{job_id}/stop", func(w http.ResponseWriter, r *http.Request) {

@@ -1,12 +1,15 @@
 import utils from './utils.js';
 import JobConsole from './job-console.js';
+import JobFooter from './job-footer.js';
 
 export default {
 	components: {
 		'job-console': JobConsole,
+		'job-footer': JobFooter,
 	},
 	data: function() {
 		return {
+			job: null,
 			progress: 0,
 			lines: [],
 		};
@@ -21,7 +24,12 @@ export default {
 	},
 	methods: {
 		fetch: function() {
-			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (state) => {
+			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (response) => {
+				this.job = response.Job;
+				let state;
+				try {
+					state = JSON.parse(response.State);
+				} catch(e) {}
 				if(!state) {
 					return;
 				}
@@ -47,8 +55,9 @@ export default {
 			</div>
 		</div>
 	</div>
-	<div class="flex-content">
-		<job-console :jobID="jobID" :lines="lines"></job-console>
+	<div class="flex-content flex-container">
+		<job-console :lines="lines"></job-console>
+		<job-footer :job="job"></job-footer>
 	</div>
 </div>
 	`,

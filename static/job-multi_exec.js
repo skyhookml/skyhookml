@@ -9,7 +9,8 @@ export default {
 	},
 	data: function() {
 		return {
-			job: null,
+			multiJob: null,
+			curJob: null,
 			plan: [],
 			planIndex: 0,
 		};
@@ -24,11 +25,16 @@ export default {
 	},
 	methods: {
 		fetch: function() {
-			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (state) => {
+			utils.request(this, 'POST', '/jobs/'+this.jobID+'/state', null, (response) => {
+				this.multiJob = response.Job;
+				let state;
+				try {
+					state = JSON.parse(response.State);
+				} catch(e) {}
 				if(!state) {
 					return;
 				}
-				this.job = state.CurJob;
+				this.curJob = state.CurJob;
 				this.plan = state.Plan;
 				this.planIndex = state.PlanIndex;
 			});
@@ -54,6 +60,14 @@ export default {
 						<template v-if="idx < planIndex">
 							Done
 						</template>
+						<template v-else-if="multiJob && multiJob.Done">
+							<template v-if="multiJob.Error">
+								Error
+							</template>
+							<template v-else>
+								Done
+							</template>
+						</template>
 						<template v-else-if="idx == planIndex">
 							Running
 						</template>
@@ -66,7 +80,7 @@ export default {
 		</table>
 	</div>
 	<div class="flex-content">
-		<component v-if="job" v-bind:is="'job-'+job.Op" v-bind:jobID="job.ID"></component>
+		<component v-if="curJob" v-bind:is="'job-'+curJob.Op" v-bind:jobID="curJob.ID"></component>
 	</div>
 </div>
 	`,
