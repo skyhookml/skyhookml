@@ -126,6 +126,31 @@ type PRestore struct {
 	SkipPrefixes string
 }
 
+// Pytorch default training loop parameters.
+type PTDParams struct {
+	LearningRate float64
+	Optimizer string
+	BatchSize int
+	AutoBatchSize bool
+	StopCondition struct {
+		MaxEpochs int
+		ScoreEpsilon float64
+		ScoreMaxEpochs int
+	}
+	ModelSaver struct {
+		Mode string
+	}
+	RateDecay struct {
+		Op string
+		StepSize int
+		StepGamma float64
+		PlateauFactor float64
+		PlateauPatience int
+		PlateauThreshold float64
+		PlateauMin float64
+	}
+}
+
 type PytorchOpParams struct {
 	Op string
 	Params string

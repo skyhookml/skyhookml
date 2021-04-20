@@ -24,6 +24,7 @@ arch_arg = sys.argv[4]
 comps_arg = sys.argv[5]
 datasets_arg = sys.argv[6]
 parent_models_arg = sys.argv[7]
+batch_size = int(sys.argv[8])
 
 params = json.loads(params_arg)
 arch = json.loads(arch_arg)
@@ -78,7 +79,6 @@ val_set.set_augments(ds_augments)
 # so we apply augmentation on CPU, whereas during training we will apply on GPU
 
 train_params = json.loads(params['Train']['Params'])
-batch_size = train_params.get('BatchSize', 1)
 
 print('preparing validation set')
 val_loader = torch.utils.data.DataLoader(

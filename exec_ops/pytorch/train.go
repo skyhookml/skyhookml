@@ -4,9 +4,14 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -37,25 +42,88 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	datasets := e.node.InputDatasets
 	e.dataset.Mkdir()
 
-	// run the python op
+	// prepare command-line arguments
 	paramsArg := e.node.Params
 	archArg := string(skyhook.JsonMarshal(arch))
 	compsArg := string(skyhook.JsonMarshal(components))
 	datasetsArg := string(skyhook.JsonMarshal(datasets["inputs"]))
 	modelsArg := string(skyhook.JsonMarshal(datasets["models"]))
 	fmt.Println(e.dataset.ID, paramsArg, archArg, compsArg, datasetsArg, modelsArg)
-	cmd := exec.Command(
-		"python3", "exec_ops/pytorch/train.py",
-		fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, modelsArg,
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
+
+	// Determine if automatic batch size reduction is enabled.
+	// Also extract the desired batch size.
+	autoBatchSize := false
+	batchSize := 1
+	if params.Train.Op == "default" {
+		var trainParams skyhook.PTDParams
+		if err := json.Unmarshal([]byte(params.Train.Params), &trainParams); err != nil {
+			return err
+		}
+		autoBatchSize = trainParams.AutoBatchSize
+		batchSize = trainParams.BatchSize
 	}
-	err = cmd.Wait()
-	if err != nil {
-		return err
+
+	// Helper function to run train.py.
+	// We use a function here since we may run train.py multiple times if we run
+	// out of memory and AutoBatchSize is enabled.
+	runTrain := func(batchSize int) error {
+		cmd := exec.Command(
+			"python3", "exec_ops/pytorch/train.py",
+			fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, modelsArg, strconv.Itoa(batchSize),
+		)
+		cmd.Stdout = os.Stdout
+
+		// Need to capture stderr output to determine if it includes "out of memory".
+		// We use a TeeReader so that we can capture output while still redirecting it to os.Stderr.
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
+		stderrTee := io.TeeReader(stderr, os.Stderr)
+
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+
+		// Launch goroutine to read from stderrTee and return the captured lines via channel.
+		stderrCh := make(chan []string)
+		go func() {
+			var lines []string
+			scanner := bufio.NewScanner(stderrTee)
+			for scanner.Scan() {
+				lines = append(lines, scanner.Text())
+			}
+			stderrCh <- lines
+		}()
+
+		err = cmd.Wait()
+		stderrLines := <- stderrCh
+		if err != nil {
+			// Training failed.
+			// But report this error as "out of memory" if that string appeared in the standard error output.
+			for _, line := range stderrLines {
+				if strings.Contains(line, "out of memory") {
+					return fmt.Errorf("out of memory")
+				}
+			}
+			return err
+		}
+		return nil
+	}
+
+	for {
+		err := runTrain(batchSize)
+		if err != nil {
+			if autoBatchSize && strings.Contains(err.Error(), "out of memory") && batchSize > 1 {
+				log.Printf("Training failed due to out of memory error, but automatic batch size reduction is enabled")
+				log.Printf("Reducing batch size from %d to %d and trying again", batchSize, batchSize/2)
+				batchSize /= 2
+				continue
+			} else {
+				return err
+			}
+		}
+		break
 	}
 
 	// add to the file dataset
