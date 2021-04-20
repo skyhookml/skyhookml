@@ -703,6 +703,32 @@ func init() {
 		skyhook.JsonResponse(w, job)
 	}).Methods("POST")
 
+	// Endpoint to mark the outputs of a node as done.
+	// It returns an error if the output datasets aren't even created yet.
+	// This is provided so that, in some cases, a job can be manually terminated
+	// and the user can opt to use the incomplete outputs for the next job.
+	// Specifically, it is used in pytorch_train to stop the job and keep the
+	// current saved model for downstream operations.
+	Router.HandleFunc("/exec-nodes/{node_id}/set-done", func(w http.ResponseWriter, r *http.Request) {
+		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
+		node := GetExecNode(nodeID)
+		if node == nil {
+			http.Error(w, "no such exec node", 404)
+			return
+		}
+		datasets, ok := node.GetDatasets(false)
+		if !ok {
+			http.Error(w, "can't mark outputs done since some outputs do not exist", 400)
+			return
+		}
+		for _, ds := range datasets {
+			if !ds.Done {
+				log.Printf("[set-done] manually marking dataset %d [%s] as done", ds.ID, ds.Name)
+				ds.SetDone(true)
+			}
+		}
+	}).Methods("POST")
+
 	Router.HandleFunc("/exec-nodes/{node_id}/incremental", func(w http.ResponseWriter, r *http.Request) {
 		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
 		r.ParseForm()

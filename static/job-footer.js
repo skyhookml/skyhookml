@@ -13,7 +13,7 @@ export default {
 <div>
 	<template v-if="job">
 		<template v-if="!job.Done">
-			<button class="btn btn-danger" v-on:click="stopJob">Stop</button>
+			<button class="btn btn-danger" v-on:click="stopJob">Terminate Job</button>
 		</template>
 		<template v-else-if="job.Error">
 			<div class="alert alert-danger" role="alert">

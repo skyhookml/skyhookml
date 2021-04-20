@@ -161,3 +161,8 @@ See: https://github.com/vuejs/vue/issues/11321
 		box-shadow: none;
 	}
 }
+
+/* Bootstrap tooltips are by default center-aligned which looks ugly in our app. */
+.tooltip-inner {
+    text-align: left;
+}

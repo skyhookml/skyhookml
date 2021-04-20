@@ -556,7 +556,7 @@ export default AnnotateGenericUI({
 	</div>
 	<div class="col-auto">
 		<template v-if="params.Mode == 'box'">
-			<i class="bi bi-question-circle" data-toggle="tooltip" title="Box mode: click twice to draw a box. Escape to cancel current drawing, click to select box, Delete to delete selection."></i>
+			<i class="bi bi-question-circle" data-bs-toggle="tooltip" title="Box mode: click twice to draw a box. Escape to cancel current drawing, click to select box, Delete to delete selection."></i>
 		</template>
 	</div>
 	<div class="col-auto">

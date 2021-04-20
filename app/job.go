@@ -171,16 +171,24 @@ func (op *AppJobOp) SetDone(err string) {
 	if op.cond != nil {
 		op.cond.Broadcast()
 	}
+	wasTerminated := op.Stopping
 	op.mu.Unlock()
 
-	// make sure job state reflects the latest updates
-	if err == "" {
-		op.Update([]string{"Job completed successfully."})
+	// Update the job state.
+	// err generally determines whether the job is successful or not.
+	// One exception: if the job was terminated by the user (op.Stopping), then we
+	// should update the job with a different error.
+	if wasTerminated {
+		op.Job.SetDone("terminated by user")
 	} else {
-		op.Update([]string{"Job exiting with error: " + err})
+		if err == "" {
+			op.Update([]string{"Job completed successfully."})
+		} else {
+			op.Update([]string{"Job exiting with error: " + err})
+		}
+		op.Job.SetDone(err)
 	}
 	op.Job.UpdateState(op.Encode())
-	op.Job.SetDone(err)
 }
 
 func (op *AppJobOp) IsStopping() bool {
