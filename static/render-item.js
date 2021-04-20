@@ -24,6 +24,11 @@ export default {
 					this.metadata = {};
 				}
 			} catch(e) {}
+
+			this.$store.commit('setRouteData', {
+				dataset: this.item.Dataset,
+				item: this.item,
+			});
 		});
 	},
 	methods: {

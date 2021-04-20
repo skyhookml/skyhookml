@@ -28,6 +28,22 @@ import Interactive from './interactive.js';
 import Jobs from './jobs.js';
 import Job from './job.js';
 
+// We use a simple store to keep track of data about the current route.
+// For example, if we are viewing an item in a dataset, the object will have
+// a reference to the dataset, and a reference to the item.
+// This way, we can use that information both in the router view component, and
+// in the sidebar.
+const store = new Vuex.Store({
+	state: {
+		routeData: {},
+	},
+	mutations: {
+		setRouteData(state, newData) {
+			state.routeData = newData;
+		},
+	},
+});
+
 const router = new VueRouter({
 	routes: [
 		{path: '/', redirect: '/ws/default'},
@@ -74,6 +90,7 @@ Promise.all([
 ]).then(() => {
 	const app = new Vue({
 		el: '#app',
+		store: store,
 		data: {
 			error: '',
 			selectedWorkspace: '',
@@ -153,6 +170,11 @@ Promise.all([
 				} else {
 					return '/';
 				}
+			},
+		},
+		watch: {
+			$route: function(to, from) {
+				this.$store.commit('setRouteData', {});
 			},
 		},
 		router: router,

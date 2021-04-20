@@ -19,6 +19,10 @@ export default {
 	created: function() {
 		utils.request(this, 'GET', '/jobs/'+this.$route.params.jobid, null, (job) => {
 			this.job = job;
+
+			this.$store.commit('setRouteData', {
+				job: this.job,
+			});
 		});
 	},
 	template: `

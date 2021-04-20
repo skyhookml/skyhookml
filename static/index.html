@@ -47,30 +47,115 @@
 						Dashboard
 					</router-link>
 				</li>
+				<!-- Show current quickstart page in sidebar. -->
+				<template v-if="$route.path.includes('/quickstart/import')">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/quickstart/import'" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Quickstart: Import
+						</router-link>
+					</li>
+				</template>
+				<template v-if="$route.path.includes('/quickstart/train')">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/quickstart/train'" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Quickstart: Train
+						</router-link>
+					</li>
+				</template>
+				<template v-if="$route.path.includes('/quickstart/apply')">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/quickstart/apply'" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Quickstart: Apply
+						</router-link>
+					</li>
+				</template>
+
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/datasets'" active-class="active" exact>
 						<i class="bi bi-files"></i>&nbsp;
 						Datasets
 					</router-link>
 				</li>
+				<!-- If viewing a dataset, show it in sidebar. -->
+				<template v-if="$route.params.dsid && $store.state.routeData.dataset">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/datasets/'+$route.params.dsid" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Dataset: {{ $store.state.routeData.dataset.Name }}
+						</router-link>
+					</li>
+				</template>
+				<!-- If viewing an item, show it in sidebar. -->
+				<template v-if="$route.params.itemkey">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/datasets/'+$route.params.dsid+'/items/'+$route.params.itemkey" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Item: {{ $route.params.itemkey }}
+						</router-link>
+					</li>
+				</template>
+
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/annotate'" active-class="active" exact>
 						<i class="bi bi-pencil-square"></i>&nbsp;
 						Annotate
 					</router-link>
 				</li>
+				<!-- If viewing an annoset, show it in sidebar. -->
+				<template v-if="$route.params.setid && $store.state.routeData.annoset">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/annotate/'+$store.state.routeData.annoset.Tool+'/'+$route.params.setid" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Annotating: {{ $store.state.routeData.annoset.Dataset.Name }}
+						</router-link>
+					</li>
+				</template>
+				<!-- Show add annotation set in sidebar. -->
+				<template v-if="$route.path.includes('/annotate-add')">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/annotate-add'" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Add Annotation Dataset
+						</router-link>
+					</li>
+				</template>
+
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/pipeline'" active-class="active" exact>
 						<i class="bi bi-diagram-3"></i>&nbsp;
 						Pipeline
 					</router-link>
 				</li>
+				<!-- If editing a node, show it in sidebar. -->
+				<template v-if="$route.params.nodeid && $route.path.includes('/exec/') && $store.state.routeData.node">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/exec/'+$route.params.nodeid" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Editing: {{ $store.state.routeData.node.Name }}
+						</router-link>
+					</li>
+				</template>
+
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/jobs'" active-class="active" exact>
 						<i class="bi bi-list-task"></i>&nbsp;
 						Jobs
 					</router-link>
 				</li>
+				<!-- If viewing a job, show it in sidebar. -->
+				<template v-if="$route.params.jobid && $store.state.routeData.job">
+					<li class="nav-item">
+						<router-link class="nav-link" :to="wsPrefix+'/jobs/'+$route.params.jobid" active-class="active" exact>
+							<i class="bi bi-arrow-right"></i>&nbsp;
+							Job: {{ $store.state.routeData.job.Name }}
+						</router-link>
+					</li>
+				</template>
+
 				<hr />
 				<li class="nav-item">
 					<router-link class="nav-link" :to="wsPrefix + '/models'" active-class="active" exact>
@@ -103,6 +188,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js" integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/vue/dist/vue.js"></script>
 <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+<script src="https://unpkg.com/vuex@3.6.2/dist/vuex.js"></script>
 <script src="https://unpkg.com/konva@6.0.0/konva.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.8/socket.io.min.js" integrity="sha256-iItBu0k/grx4e1B97uNd+Kncoy2fWeXkQ0M0uwSqHhc=" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js" integrity="sha512-d9xgZrVZpmmQlfonhQUvTR7lMPtO7NkZMkA0ABN3PHCbKA5nqylQ/yWlFAyY6hYgdF1Qh6nYiuADWwKB4C2WSw==" crossorigin="anonymous"></script>

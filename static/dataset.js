@@ -18,6 +18,10 @@ export default {
 		this.datasetID = this.$route.params.dsid;
 		utils.request(this, 'GET', '/datasets/'+this.datasetID, null, (dataset) => {
 			this.dataset = dataset;
+
+			this.$store.commit('setRouteData', {
+				dataset: this.dataset,
+			});
 		});
 		this.fetchItems();
 	},

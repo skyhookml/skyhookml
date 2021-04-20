@@ -58,6 +58,10 @@ export default function(impl) {
 					impl.on_created_ready.call(this);
 				}
 				this.update();
+
+				this.$store.commit('setRouteData', {
+					annoset: this.annoset,
+				});
 			});
 		},
 		mounted: function() {
