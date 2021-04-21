@@ -35,8 +35,8 @@ export default function(impl) {
 				// error message to display e.g. if we ran out of images to label
 				message: null,
 
-				// videobar state 
-				videobarpos: 0., 
+				// placeholder for index where we build a position to jump to
+				jumpIdx: null,
 			};
 			if(impl.data) {
 				let impl_data = impl.data.call(this);
@@ -235,40 +235,18 @@ export default function(impl) {
 					}
 				});
 			},
-			getrelpos: function(e){
+			getRelpos: function(e){
 				const tbar = this.$refs.totalBar;
 				var rect = tbar.getBoundingClientRect();
-				
 				var x = e.clientX - rect.left; //x position within the element.
 				var width = rect.right - rect.left;
 				var relpos = x/width;
-				// console.log(rect)
-				// console.log(rect.width)
-				// console.log(relpos);
 				return relpos;
 			},
-			tbarclick: function(e){
-
-				var relpos = this.videobarpos; //getrelpos(e);
-				var pos = (relpos*100) + '%';
-				// console.log(pos)
-				const pbar = this.$refs.positionBar;
-				pbar.style.width = pos
-				const jumpTo = Math.floor(this.numFrames*relpos)
-				this.getFrame(jumpTo);
-				// console.log(pbar.style.width)
-			  },
-			updatetooltip: function(e){
-				var relpos= this.getrelpos(e);
-				this.videobarpos = relpos;
-
-				var ptip = this.$refs.tooltipText;
-				var pos = (relpos*100) + '%';
-				const jumpTo = Math.floor(this.numFrames*relpos)
-				ptip.textContent = jumpTo;
-				ptip.style.left = pos;
-			  }
-
+			updateJumpIdx: function(e){
+				var relpos= this.getRelpos(e);
+				this.jumpIdx = Math.round(relpos*this.numFrames)
+			}
 		},
 	};
 	let template = `
@@ -353,15 +331,20 @@ export default function(impl) {
 			[IM_BELOW]
 
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
-				<div class="videobar">
+				<div class="video-bar">
 					<div class="tooltip">
-						<div class="totalbar" ref="totalBar"
-							v-on:mouseover="updatetooltip"
-							v-on:click="tbarclick"
-							v-on:mousemove="updatetooltip">
-							<div class="positionbar" ref="positionBar"></div>
+						<div class="total-bar" ref="totalBar"
+							v-on:mouseenter="updateJumpIdx"
+							v-on:mousemove="updateJumpIdx"
+							v-on:mouseleave="jumpIdx=null"
+							v-on:click="frameIdx=jumpIdx">
+							<div class="position-bar" ref="positionBar"
+								:style="{
+									width: frameIdx*100/numFrames+'%'
+								}"
+							></div>
 						</div>
-						<span class="tooltiptext" ref="tooltipText"></span>
+						<!-- <span class="tooltip-text" ref="tooltipText">{{jumpIdx}}</span> -->
 					</div>
 				</div>
 			</div>
@@ -372,7 +355,9 @@ export default function(impl) {
 				</div>
 				<div class="col-auto">
 					<template v-if="response != null">
-						<input v-model="frameIdx" placeholder="enter frame...">
+						<input v-model="jumpIdx" 
+							v-on:keyup.enter="(frameIdx=Math.min(jumpIdx,numFrames),jumpIdx=null)"
+							placeholder="jump to ...">
 						Frame {{ frameIdx }} / {{ numFrames }}
 					</template>
 				</div>

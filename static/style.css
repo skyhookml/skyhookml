@@ -167,14 +167,14 @@ See: https://github.com/vuejs/vue/issues/11321
     text-align: left;
 }
 
-.videobar .totalbar {
+.video-bar .total-bar {
 	width: 100%;
 	height: 20px;
 	/* max-width: 500px; */
 	  background: #ddd;
   }
   
-  .videobar .positionbar {
+  .video-bar .position-bar {
 	width: 0%;
 	height: 20px;
 	  line-height: 20px;
@@ -182,7 +182,7 @@ See: https://github.com/vuejs/vue/issues/11321
 	color: #fff;
   }
   
-  .videobar .tooltip {
+  .video-bar .tooltip {
 	width: 100%;
 	/* max-width: 400px; TODO would like bar to be as wide as the video frame above allows */
 	height: 20px;
@@ -194,7 +194,7 @@ See: https://github.com/vuejs/vue/issues/11321
   }
   
   
-  .videobar .tooltip .tooltiptext {
+  .video-bar .tooltip .tooltip-text {
 	visibility: hidden;
 	width: 120px;
 	background-color: #555;
@@ -211,7 +211,7 @@ See: https://github.com/vuejs/vue/issues/11321
 	transition: opacity 0.3s;
   }
   
-  .videobar .tooltip .tooltiptext::after {
+  .video-bar .tooltip .tooltip-text::after {
 	content: "";
 	position: absolute;
 	bottom: 100%;  /* At the top of the tooltip */
@@ -223,7 +223,7 @@ See: https://github.com/vuejs/vue/issues/11321
 	border-color: transparent transparent #555 transparent;
   }
   
-  .videobar .tooltip:hover .tooltiptext {
+  .video-bar .tooltip:hover .tooltip-text {
 	visibility: visible;
 	opacity: 1;
   }
