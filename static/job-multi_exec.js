@@ -1,11 +1,13 @@
 import utils from './utils.js';
 import JobConsoleProgress from './job-consoleprogress.js';
 import JobPytorchTrain from './job-pytorch_train.js';
+import JobFooter from './job-footer.js';
 
 export default {
 	components: {
 		'job-consoleprogress': JobConsoleProgress,
 		'job-pytorch_train': JobPytorchTrain,
+		'job-footer': JobFooter,
 	},
 	data: function() {
 		return {
@@ -79,9 +81,10 @@ export default {
 			</tbody>
 		</table>
 	</div>
-	<div class="flex-content">
-		<component v-if="curJob" v-bind:is="'job-'+curJob.Op" v-bind:jobID="curJob.ID"></component>
+	<div v-if="curJob" class="flex-content">
+		<component v-bind:is="'job-'+curJob.Op" v-bind:jobID="curJob.ID"></component>
 	</div>
+	<job-footer v-if="multiJob && multiJob.Done && !curJob" :job="multiJob"></job-footer>
 </div>
 	`,
 };

@@ -185,6 +185,59 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 		return fmt.Errorf("NoRunTree is set but more than one node needed")
 	}
 
+	// Make sure that we are not going to run multiple conflicting MultiExec jobs.
+	// To do so, we:
+	// (1) Store the node IDs that we intend to execute in the job metadata.
+	// (2) Loop through all other pending MultiExec jobs, and verify that there
+	//     are no conflicts.
+	// This should always prevent conflicts since we do (1) before (2). In some
+	// cases, we may stop all conflicting jobs instead of running one of them; we
+	// could avoid that by implementing transactions later, but it's not a big
+	// issue.
+	conflictErr := func() error {
+		// Collect the node IDs we intend to run.
+		var ourIDs []int
+		ourIDSet := make(map[int]string) // map from node ID to name
+		for _, cur := range needed {
+			vnode := cur.(*skyhook.VirtualNode)
+			origID := vnode.OrigNode.ID
+			if ourIDSet[origID] != "" {
+				continue
+			}
+			ourIDs = append(ourIDs, origID)
+			ourIDSet[origID] = vnode.OrigNode.Name
+		}
+
+		// Commit our node IDs to the database (via job metadata).
+		jobID := -1
+		if opts.JobOp != nil {
+			bytes := skyhook.JsonMarshal(ourIDs)
+			opts.JobOp.Job.UpdateMetadata(string(bytes))
+			jobID = opts.JobOp.Job.ID
+		}
+
+		// Check for conflicts.
+		rows := db.Query("SELECT metadata FROM jobs WHERE done = 0 AND type = 'multiexec' AND id != ?", jobID)
+		for rows.Next() {
+			var metadataRaw string
+			rows.Scan(&metadataRaw)
+			var ids []int
+			skyhook.JsonUnmarshal([]byte(metadataRaw), &ids)
+			for _, id := range ids {
+				if ourIDSet[id] == "" {
+					continue
+				}
+				rows.Close()
+				return fmt.Errorf("another job has a conflict on node %s, wait for that job to finish and try again", ourIDSet[id])
+			}
+		}
+
+		return nil
+	}()
+	if conflictErr != nil {
+		return conflictErr
+	}
+
 	// repeatedly run needed nodes where parents are all available
 	// until all nodes are done
 	for len(needed) > 0 {

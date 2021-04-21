@@ -683,7 +683,7 @@ func init() {
 			"multiexec",
 			fmt.Sprintf("%d", node.ID),
 		)
-		jobOp := &MultiExecJobOp{}
+		jobOp := &MultiExecJobOp{Job: job}
 		job.AttachOp(jobOp)
 
 		go func() {

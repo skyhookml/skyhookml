@@ -10,6 +10,7 @@ import (
 // A JobOp for running multiple ExecNodes.
 type MultiExecJobOp struct {
 	mu sync.Mutex
+	Job *DBJob
 
 	// current wrapped job (current ExecJob)
 	CurJob *skyhook.Job
