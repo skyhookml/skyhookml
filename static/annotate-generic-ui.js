@@ -236,7 +236,7 @@ export default function(impl) {
 				});
 			},
 			getrelpos: function(e){
-				const tbar = document.getElementById('totalbar');
+				const tbar = this.$refs.totalBar;
 				var rect = tbar.getBoundingClientRect();
 				
 				var x = e.clientX - rect.left; //x position within the element.
@@ -252,7 +252,7 @@ export default function(impl) {
 				var relpos = this.videobarpos; //getrelpos(e);
 				var pos = (relpos*100) + '%';
 				// console.log(pos)
-				const pbar = this.$refs.position_bar;
+				const pbar = this.$refs.positionBar;
 				pbar.style.width = pos
 				const jumpTo = Math.floor(this.numFrames*relpos)
 				this.getFrame(jumpTo);
@@ -262,7 +262,7 @@ export default function(impl) {
 				var relpos= this.getrelpos(e);
 				this.videobarpos = relpos;
 
-				var ptip = this.$refs.position_tooltip;
+				var ptip = this.$refs.tooltipText;
 				var pos = (relpos*100) + '%';
 				const jumpTo = Math.floor(this.numFrames*relpos)
 				ptip.textContent = jumpTo;
@@ -355,13 +355,13 @@ export default function(impl) {
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
 			<div class="videobar">
 			<div class="tooltip">
-				<div id="totalbar" 
+				<div class="totalbar" ref="totalBar"
 				v-on:mouseover="updatetooltip" 
 				v-on:click="tbarclick" 
 				v-on:mousemove="updatetooltip">
-					<div ref="position_bar"></div>
+					<div class="positionbar" ref="positionBar"></div>
 				</div>
-				<span class="tooltiptext" ref="position_tooltip"></span>
+				<span class="tooltiptext" ref="tooltipText"></span>
 			</div>
 			</div>
 			</div>
