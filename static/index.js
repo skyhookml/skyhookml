@@ -14,6 +14,7 @@ import Annotate from './annotate.js';
 import AnnotateAdd from './annotate-add.js';
 import AnnotateInt from './annotate-int.js';
 import AnnotateShape from './annotate-shape.js';
+import AnnotateGeoJSON from './annotate-geojson.js';
 import AnnotateDetectionToTrack from './annotate-detection-to-track.js';
 
 import Models from './models.js';
@@ -63,6 +64,7 @@ const router = new VueRouter({
 		{path: '/ws/:ws/annotate/int/:setid', component: AnnotateInt},
 		{path: '/ws/:ws/annotate/shape/:setid', component: AnnotateShape},
 		{path: '/ws/:ws/annotate/detection-to-track/:setid', component: AnnotateDetectionToTrack},
+		{path: '/ws/:ws/annotate/geojson/:setid', component: AnnotateGeoJSON},
 
 		{path: '/ws/:ws/models', component: Models},
 		{path: '/ws/:ws/models/arch/:archid', component: MArch},

@@ -67,6 +67,13 @@ export default {
 					}],
 					DataType: "detection",
 				},
+				"geojson": {
+					ID: "geojson",
+					Name: "GeoJSON",
+					Help: "Annotate GeoJSON objects in aerial or satellite imagery, including points, polylines, and polygons.",
+					Inputs: [],
+					DataType: "geojson",
+				},
 			},
 		};
 	},

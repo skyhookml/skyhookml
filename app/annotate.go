@@ -53,6 +53,10 @@ func init() {
 
 		var inputs []skyhook.Dataset
 		for _, inputStr := range strings.Split(inputsStr, ",") {
+			inputStr = strings.TrimSpace(inputStr)
+			if inputStr == "" {
+				continue
+			}
 			inputs = append(inputs, GetDataset(skyhook.ParseInt(inputStr)).Dataset)
 		}
 

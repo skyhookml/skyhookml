@@ -68,6 +68,10 @@ func annotateDatasetListHelper(rows *Rows) []*DBAnnotateDataset {
 		var inputsRaw string
 		rows.Scan(&s.ID, &s.Dataset.ID, &s.Dataset.Name, &s.Dataset.Type, &s.Dataset.DataType, &inputsRaw, &s.Tool, &s.Params)
 		for _, part := range strings.Split(inputsRaw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
 			s.Inputs = append(s.Inputs, skyhook.Dataset{
 				ID: skyhook.ParseInt(part),
 			})
