@@ -34,6 +34,9 @@ export default function(impl) {
 
 				// error message to display e.g. if we ran out of images to label
 				message: null,
+
+				// videobar state 
+				videobarpos: 0., 
 			};
 			if(impl.data) {
 				let impl_data = impl.data.call(this);
@@ -232,6 +235,40 @@ export default function(impl) {
 					}
 				});
 			},
+			getrelpos: function(e){
+				const tbar = document.getElementById('totalbar');
+				var rect = tbar.getBoundingClientRect();
+				
+				var x = e.clientX - rect.left; //x position within the element.
+				var width = rect.right - rect.left;
+				var relpos = x/width;
+				// console.log(rect)
+				// console.log(rect.width)
+				// console.log(relpos);
+				return relpos;
+			},
+			tbarclick: function(e){
+
+				var relpos = this.videobarpos; //getrelpos(e);
+				var pos = (relpos*100) + '%';
+				// console.log(pos)
+				const pbar = this.$refs.position_bar;
+				pbar.style.width = pos
+				const jumpTo = Math.floor(this.numFrames*relpos)
+				this.getFrame(jumpTo);
+				// console.log(pbar.style.width)
+			  },
+			updatetooltip: function(e){
+				var relpos= this.getrelpos(e);
+				this.videobarpos = relpos;
+
+				var ptip = this.$refs.position_tooltip;
+				var pos = (relpos*100) + '%';
+				const jumpTo = Math.floor(this.numFrames*relpos)
+				ptip.textContent = jumpTo;
+				ptip.style.left = pos;
+			  }
+
 		},
 	};
 	let template = `
@@ -316,11 +353,28 @@ export default function(impl) {
 			[IM_BELOW]
 
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
+			<div class="videobar">
+			<div class="tooltip">
+				<div id="totalbar" 
+				v-on:mouseover="updatetooltip" 
+				v-on:click="tbarclick" 
+				v-on:mousemove="updatetooltip">
+					<div ref="position_bar"></div>
+				</div>
+				<span class="tooltiptext" ref="position_tooltip"></span>
+			</div>
+			</div>
+			</div>
+			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
 				<div class="col-auto">
 					<button v-on:click="getFrame(frameIdx-1)" type="button" class="btn btn-primary">Prev Frame</button>
 				</div>
 				<div class="col-auto">
+
+			  </div>
+				<div class="col-auto">
 					<template v-if="response != null">
+						<input v-model="frameIdx" placeholder="enter frame...">
 						Frame {{ frameIdx }} / {{ numFrames }}
 					</template>
 				</div>
@@ -328,6 +382,7 @@ export default function(impl) {
 					<button v-on:click="getFrame(frameIdx+1)" type="button" class="btn btn-primary">Next Frame</button>
 				</div>
 			</div>
+			
 		</template>
 	</div>`;
 	for(var key in impl.methods) {
