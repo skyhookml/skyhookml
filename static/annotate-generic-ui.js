@@ -353,25 +353,23 @@ export default function(impl) {
 			[IM_BELOW]
 
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
-			<div class="videobar">
-			<div class="tooltip">
-				<div class="totalbar" ref="totalBar"
-				v-on:mouseover="updatetooltip" 
-				v-on:click="tbarclick" 
-				v-on:mousemove="updatetooltip">
-					<div class="positionbar" ref="positionBar"></div>
+				<div class="videobar">
+					<div class="tooltip">
+						<div class="totalbar" ref="totalBar"
+							v-on:mouseover="updatetooltip"
+							v-on:click="tbarclick"
+							v-on:mousemove="updatetooltip">
+							<div class="positionbar" ref="positionBar"></div>
+						</div>
+						<span class="tooltiptext" ref="tooltipText"></span>
+					</div>
 				</div>
-				<span class="tooltiptext" ref="tooltipText"></span>
 			</div>
-			</div>
-			</div>
+
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
 				<div class="col-auto">
 					<button v-on:click="getFrame(frameIdx-1)" type="button" class="btn btn-primary">Prev Frame</button>
 				</div>
-				<div class="col-auto">
-
-			  </div>
 				<div class="col-auto">
 					<template v-if="response != null">
 						<input v-model="frameIdx" placeholder="enter frame...">
