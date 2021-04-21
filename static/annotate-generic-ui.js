@@ -34,6 +34,9 @@ export default function(impl) {
 
 				// error message to display e.g. if we ran out of images to label
 				message: null,
+
+				// placeholder for index where we build a position to jump to
+				jumpIdx: null,
 			};
 			if(impl.data) {
 				let impl_data = impl.data.call(this);
@@ -232,6 +235,18 @@ export default function(impl) {
 					}
 				});
 			},
+			getRelpos: function(e){
+				const tbar = this.$refs.totalBar;
+				var rect = tbar.getBoundingClientRect();
+				var x = e.clientX - rect.left; //x position within the element.
+				var width = rect.right - rect.left;
+				var relpos = x/width;
+				return relpos;
+			},
+			updateJumpIdx: function(e){
+				var relpos= this.getRelpos(e);
+				this.jumpIdx = Math.round(relpos*this.numFrames)
+			}
 		},
 	};
 	let template = `
@@ -316,11 +331,33 @@ export default function(impl) {
 			[IM_BELOW]
 
 			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
+				<div class="video-bar">
+					<div class="tooltip">
+						<div class="total-bar" ref="totalBar"
+							v-on:mouseenter="updateJumpIdx"
+							v-on:mousemove="updateJumpIdx"
+							v-on:mouseleave="jumpIdx=null"
+							v-on:click="frameIdx=jumpIdx">
+							<div class="position-bar" ref="positionBar"
+								:style="{
+									width: frameIdx*100/numFrames+'%'
+								}"
+							></div>
+						</div>
+						<!-- <span class="tooltip-text" ref="tooltipText">{{jumpIdx}}</span> -->
+					</div>
+				</div>
+			</div>
+
+			<div v-if="sourceType == 'video'" class="row align-items-center g-1">
 				<div class="col-auto">
 					<button v-on:click="getFrame(frameIdx-1)" type="button" class="btn btn-primary">Prev Frame</button>
 				</div>
 				<div class="col-auto">
 					<template v-if="response != null">
+						<input v-model="jumpIdx" 
+							v-on:keyup.enter="(frameIdx=Math.min(jumpIdx,numFrames),jumpIdx=null)"
+							placeholder="jump to ...">
 						Frame {{ frameIdx }} / {{ numFrames }}
 					</template>
 				</div>
@@ -328,6 +365,7 @@ export default function(impl) {
 					<button v-on:click="getFrame(frameIdx+1)" type="button" class="btn btn-primary">Next Frame</button>
 				</div>
 			</div>
+			
 		</template>
 	</div>`;
 	for(var key in impl.methods) {
