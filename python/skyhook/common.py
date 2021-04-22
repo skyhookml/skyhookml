@@ -224,6 +224,18 @@ def input_datas():
 			datas.append(input_array(channels=3, dt=numpy.dtype('uint8')))
 		elif t == 'array':
 			datas.append(input_array())
+		elif t == 'geoimage':
+			header = input_json()
+			metadata = header['Metadata']
+			if header['Width'] > 0:
+				buf = stdin.read(header['Width']*header['Height']*3)
+				im = numpy.frombuffer(buf, dtype='uint8').reshape((header['Height'], header['Width'], 3))
+			else:
+				im = None
+			datas.append({
+				'Metadata': metadata,
+				'Image': im,
+			})
 		else:
 			datas.append(input_json())
 	return datas
@@ -254,6 +266,20 @@ def output_datas(in_key, key, datas):
 	for i, t in enumerate(meta['OutputTypes']):
 		if t == 'image' or t == 'video' or t == 'array':
 			output_array(datas[i])
+		elif t == 'geoimage':
+			metadata = datas[i]['Metadata']
+			im = datas[i]['Image']
+			if im is None:
+				width, height = 0, 0
+			else:
+				width, height = im.shape[1], im.shape[0]
+			output_json({
+				'Metadata': metadata,
+				'Width': width,
+				'Height': height,
+			})
+			if im:
+				stdout.write(im.tobytes())
 		else:
 			output_json(datas[i])
 	stdout.flush()
