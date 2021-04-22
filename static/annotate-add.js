@@ -176,7 +176,7 @@ export default {
 					<div class="col-sm-8">
 						<template v-if="!addForm.toolObj.DataType">
 							<div class="form-check" v-for="(label, dt) in addForm.toolObj.DataTypes">
-								<input class="form-check-input" type="radio" v-model="addForm.datasetType" :value="dt" required>
+								<input class="form-check-input" type="radio" v-model="addForm.datasetType" name="datasetType" :value="dt" required>
 								<label class="form-check-label">{{ label }}</label>
 							</div>
 						</template>
