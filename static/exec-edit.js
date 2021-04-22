@@ -1,6 +1,7 @@
 import utils from './utils.js';
 import CropResize from './exec-edit/cropresize.js';
 import DetectionFilter from './exec-edit/detection_filter.js';
+import GeoImageToImage from './exec-edit/geoimage_to_image.js';
 import MakeGeoImage from './exec-edit/make_geoimage.js';
 import Resample from './exec-edit/resample.js';
 import SegmentationMask from './exec-edit/segmentation_mask.js';
@@ -27,6 +28,7 @@ import VideoSample from './exec-edit/video_sample.js';
 let components = {
 	'cropresize': CropResize,
 	'detection_filter': DetectionFilter,
+	'geoimage_to_image': GeoImageToImage,
 	'make_geoimage': MakeGeoImage,
 	'resample': Resample,
 	'segmentation_mask': SegmentationMask,
