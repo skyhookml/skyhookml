@@ -359,6 +359,31 @@ export default AnnotateGenericUI({
 					});
 
 					kshp.on('dragend', updateShape);
+				} else if(shape.Type == 'point') {
+					kshp = new Konva.Circle({
+						x: shape.Points[0][0],
+						y: shape.Points[0][1],
+						radius: 5,
+						stroke: 'red',
+						strokeWidth: 2,
+						draggable: true,
+					});
+
+					let updateShape = () => {
+						shape.Points = [[parseInt(kshp.x()), parseInt(kshp.y())]];
+					};
+
+					kshp.on('click', (e) => {
+						if(curShape) {
+							return;
+						}
+
+						e.cancelBubble = true;
+						this.selectedIdx = kshp.myindex;
+						resetColors();
+					});
+
+					kshp.on('dragend', updateShape);
 				}
 
 				kshp.on('mouseover', () => {
@@ -510,6 +535,35 @@ export default AnnotateGenericUI({
 					var pos = getPointerPosition();
 					updateLine(pos.x, pos.y);
 					layer.batchDraw();
+				});
+
+				this.cancelDrawHandler = () => {
+					if(curShape === null) {
+						return;
+					}
+					curShape.destroy();
+					curShape = null;
+					layer.draw();
+				}
+			} else if(this.params.Mode == 'point') {
+				stage.on('click', () => {
+					if(resizeLayer) {
+						destroyResizeLayer()
+						this.selectedIdx = null;
+						layer.draw();
+						return;
+					}
+
+					var pos = getPointerPosition();
+					let shape = {
+						Type: 'point',
+						Points: [[parseInt(pos.x), parseInt(pos.y)]],
+						Category: this.category,
+						TrackID: '',
+					};
+					this.shapes[this.frameIdx].push(shape);
+					drawShape(shape, this.shapes[this.frameIdx].length-1);
+					layer.draw();
 				});
 
 				this.cancelDrawHandler = () => {
