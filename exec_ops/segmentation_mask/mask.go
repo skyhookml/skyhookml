@@ -108,7 +108,10 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 				}
 				var polygon gomapinfer.Polygon
 				for _, point := range shape.Points {
-					polygon = append(polygon, gomapinfer.Point{float64(point[0]), float64(point[1])})
+					polygon = append(polygon, gomapinfer.Point{
+						float64(point[0]*dims[0]/shapeDims[0]),
+						float64(point[1]*dims[1]/shapeDims[1]),
+					})
 				}
 				bounds := shape.Bounds()
 
