@@ -127,6 +127,33 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 						canvas[y*dims[0] + x] = byte(catID)
 					}
 				}
+			} else if shape.Type == skyhook.PointShape {
+				catID := getCategoryID(shape.Category)
+				if catID == -1 {
+					return nil, fmt.Errorf("unknown category %s", shape.Category)
+				}
+				p := [2]int{
+					shape.Points[0][0]*dims[0]/shapeDims[0],
+					shape.Points[0][1]*dims[1]/shapeDims[1],
+				}
+
+				// Draw circle of radius padding centered at p.
+				for ox := -padding; ox < padding; ox++ {
+					for oy := -padding; oy < padding; oy++ {
+						// Check radius.
+						d := ox*ox+oy*oy
+						if d > padding*padding {
+							continue
+						}
+						// Set pixel.
+						x := p[0]+ox
+						y := p[1]+oy
+						if x < 0 || x >= dims[0] || y < 0 || y >= dims[1] {
+							continue
+						}
+						canvas[y*dims[0] + x] = byte(catID)
+					}
+				}
 			} else {
 				panic(fmt.Errorf("mask for shape type %s not implemented", shape.Type))
 			}
