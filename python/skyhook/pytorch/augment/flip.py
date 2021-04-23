@@ -17,7 +17,7 @@ class Flip(object):
 			vertical_flip = random.random() < 0.5
 
 		for i, inputs in enumerate(batch):
-			if self.data_types[i] == 'image':
+			if self.data_types[i] in ('image', 'video', 'array'):
 				flip_dims = []
 				if horizontal_flip:
 					flip_dims.append(3)
