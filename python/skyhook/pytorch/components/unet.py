@@ -44,7 +44,8 @@ class UNet(torch.nn.Module):
 			if 2**i < scale:
 				continue
 
-			if i == 0:
+			if len(up_layers) == 0:
+				# don't concatenate input for the last upsample layer
 				layer_in_channels = channels_list[i+1]
 			else:
 				layer_in_channels = channels_list[i+1] + channels_list[i]
