@@ -96,10 +96,11 @@ export default {
 				}
 				let feature = layer.toGeoJSON();
 				if(feature.type == 'FeatureCollection') {
-					Array.prototype.push.apply(features, feature.features);
-				} else {
-					features.push(feature);
+					// leaflet-geoman should automatically create individual features from the FeatureCollection.
+					// So we can ignore it here.
+					return;
 				}
+				features.push(feature);
 			});
 			let data = {
 				type: "FeatureCollection",
