@@ -15,8 +15,8 @@ func init() {
 
 	Router.HandleFunc("/pytorch/components", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		name := r.PostForm.Get("name")
-		comp := NewPytorchComponent(name)
+		id := r.PostForm.Get("id")
+		comp := NewPytorchComponent(id)
 		skyhook.JsonResponse(w, comp)
 	}).Methods("POST")
 
@@ -43,6 +43,15 @@ func init() {
 
 		comp.Update(request)
 	}).Methods("POST")
+
+	Router.HandleFunc("/pytorch/components/{comp}", func(w http.ResponseWriter, r *http.Request) {
+		comp := GetPytorchComponent(mux.Vars(r)["comp"])
+		if comp == nil {
+			http.Error(w, "no such PytorchComponent", 404)
+			return
+		}
+		comp.Delete()
+	}).Methods("DELETE")
 
 	Router.HandleFunc("/pytorch/archs", func(w http.ResponseWriter, r *http.Request) {
 		skyhook.JsonResponse(w, ListPytorchArchs())
@@ -78,4 +87,13 @@ func init() {
 
 		arch.Update(request)
 	}).Methods("POST")
+
+	Router.HandleFunc("/pytorch/archs/{arch}", func(w http.ResponseWriter, r *http.Request) {
+		arch := GetPytorchArchByName(mux.Vars(r)["arch"])
+		if arch == nil {
+			http.Error(w, "no such PytorchArch", 404)
+			return
+		}
+		arch.Delete()
+	}).Methods("DELETE")
 }

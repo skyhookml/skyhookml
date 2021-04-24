@@ -51,6 +51,10 @@ func (c *DBPytorchComponent) Update(req PytorchComponentUpdate) {
 	}
 }
 
+func (c *DBPytorchComponent) Delete() {
+	db.Exec("DELETE FROM pytorch_components WHERE id = ?", c.ID)
+}
+
 const PytorchArchQuery = "SELECT id, params FROM pytorch_archs"
 
 func pytorchArchListHelper(rows *Rows) []*DBPytorchArch {
@@ -103,4 +107,8 @@ func (arch *DBPytorchArch) Update(req PytorchArchUpdate) {
 	if req.Params != nil {
 		db.Exec("UPDATE pytorch_archs SET params = ? WHERE id = ?", string(skyhook.JsonMarshal(*req.Params)), arch.ID)
 	}
+}
+
+func (arch *DBPytorchArch) Delete() {
+	db.Exec("DELETE FROM pytorch_archs WHERE id = ?", arch.ID)
 }
