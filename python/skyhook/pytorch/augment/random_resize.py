@@ -15,7 +15,7 @@ class RandomResize(object):
 
 	def forward(self, batch):
 		for i, x in enumerate(batch):
-			if self.data_types[i] != 'image':
+			if self.data_types[i] not in ('image', 'video', 'array'):
 				# we only need to resize images
 				# other data types like object detections are represented in a way that doesn't depend on scale
 				continue

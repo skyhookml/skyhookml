@@ -41,7 +41,7 @@ class Crop(object):
 			return x, y
 
 		for i, inputs in enumerate(batch):
-			if self.data_types[i] == 'image':
+			if self.data_types[i] in ('image', 'video', 'array'):
 				width, height = inputs[0].shape[2], inputs[0].shape[1]
 				target_width = int(width * self.Width[0]) // self.Width[1]
 				target_height = int(height * self.Height[0]) // self.Height[1]
