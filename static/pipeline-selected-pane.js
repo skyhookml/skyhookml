@@ -16,6 +16,9 @@ export default {
 
 			// map from output name to the dataset (if it's created)
 			outputDatasets: {},
+
+			// Whether user is currently editing the name of the selected node.
+			editingName: false,
 		};
 	},
 	props: ['node', 'nodes', 'datasets', 'workspaces'],
@@ -68,6 +71,22 @@ export default {
 			this.updateParents();
 		},
 
+		startEditingName: function() {
+			this.editingName = true;
+			Vue.nextTick(() => {
+				this.$refs.editNameInput.focus();
+			});
+		},
+		updateName: function() {
+			let params = JSON.stringify({
+				Name: this.node.Name,
+			});
+			utils.request(this, 'POST', '/exec-nodes/' + this.node.ID, params, () => {
+				this.editingName = false;
+				this.$emit('update');
+			});
+		},
+
 		selectCompareWorkspace: function() {
 			this.compareForm.nodeID = null;
 			this.wsNodes = null;
@@ -83,7 +102,24 @@ export default {
 <div>
 	<hr />
 	<div>
-		<strong class="mx-1">{{ node.Name }} ({{ node.Op }})</strong>
+		<template v-if="!editingName">
+			<strong class="mx-1">
+				{{ node.Name }} ({{ node.Op }})
+				<i v-on:click="startEditingName" class="bi bi-pencil-square"></i>
+			</strong>
+		</template>
+		<template v-else>
+			<form v-on:submit.prevent="updateName" class="d-inline-block">
+				<input
+					ref="editNameInput"
+					type="text"
+					class="form-control form-control-sm w-auto"
+					v-model="node.Name"
+					placeholder="Enter a name for this node"
+					v-on:blur="updateName"
+					/>
+			</form>
+		</template>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="editNode">Edit</button>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="runNode">Run</button>
 		<!--<button type="button" class="btn btn-sm btn-primary" v-on:click="viewInteractive">Interactive</button>-->
