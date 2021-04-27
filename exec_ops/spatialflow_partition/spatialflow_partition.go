@@ -238,7 +238,12 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 					break
 				}
 			}
+
 			
+			if !isOverlapped {
+				continue 
+			}
+
 			// If the current tile overlaps with the ROI, store it in a dataset
 			if isOverlapped {
 				log.Printf("[spatialflow_partition] create tile %s", fmt.Sprintf("%d_%d_%d", zoom, i, j))
