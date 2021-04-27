@@ -239,7 +239,7 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 				}
 			}
 
-			
+			// If the current tile doesn't overlap with the ROI, skip it. 
 			if !isOverlapped {
 				continue 
 			}
