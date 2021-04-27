@@ -5,6 +5,7 @@ import (
 	"github.com/skyhookml/skyhookml/exec_ops"
 	"log"
 	"fmt"
+	"math"
 	"github.com/paulmach/go.geojson"
 	gomapinfer "github.com/mitroadmaps/gomapinfer/common"
 	geocoords "github.com/mitroadmaps/gomapinfer/googlemaps"
@@ -12,15 +13,22 @@ import (
 
 // We just use grid partition now. Later on we will add support for rectangle partition.
 // Parameters for grid partition:
-// - Shape Buffer, e.g., 128 meters?
-// - Padding Size (overlaps between neighboring images), e.g., 32px 
-// - Image Size (Square), e.g., 256px
-// - Zoom Level, e.g., 18 
-func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhook.ExecTask) error {
-	// Parameters (should be assigned from UI)
-	var zoom int = 18
-	var shapeBuffer int = 100 //  pixels?
+// - URL, similar to the URL in 'make_geoimage'
+// - Zoom Level, e.g.,similar to 'make_geoimage'
+// - ROI Buffer, e.g., 128 pixels
+type Params struct {
+	URL string
+	Zoom int
+	Buffer int
+}
 
+// TODO: Should split this into multiple tasks so that they can run in parallel. 
+func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhook.ExecTask, params Params) error {
+	// Parameters (should be assigned from UI)
+	var zoom int = params.Zoom
+	var shapeBuffer int = params.Buffer
+	mapurl := params.URL
+	
 	// Load all GeoJSON geometries.
 	var geometries []*geojson.Geometry
 	addFeatures := func(collection *geojson.FeatureCollection) {
@@ -96,8 +104,6 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 		}
 	}
 
-
-
 	// Grid partition
 	startTile := geocoords.LonLatToMapboxTile(geometriesBBox.Min, zoom)
 	endTile := geocoords.LonLatToMapboxTile(geometriesBBox.Max, zoom)
@@ -109,14 +115,21 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 	}
 	log.Printf("[spatialflow_partition] checking candidate tiles from %v to %v", startTile, endTile)
 	buffer := float64(shapeBuffer) / 256.0 
+	bufferTiles := int(math.Ceil(buffer))
 	corner1 := gomapinfer.Point{0.0 - buffer, 0.0 - buffer}
 	corner2 := gomapinfer.Point{1.0 + buffer, 0.0 - buffer}
 	corner3 := gomapinfer.Point{1.0 + buffer, 1.0 + buffer}
 	corner4 := gomapinfer.Point{0.0 - buffer, 1.0 + buffer}
 	corners := [4]gomapinfer.Point{corner1, corner2, corner3, corner4}
 
-	for i := startTile[0]; i <= endTile[0]; i++ {
-		for j := startTile[1]; j <= endTile[1]; j++ {
+	var total_tiles int = 0
+	var kept_tiles int = 0
+
+	// TODO: This is a O(n^2) implementation. Should improve it by using spatial index.
+	for i := startTile[0] - bufferTiles; i <= endTile[0] + bufferTiles; i++ {
+		for j := startTile[1] - bufferTiles; j <= endTile[1] + bufferTiles; j++ {
+			total_tiles += 1
+
 			p1 := geocoords.MapboxToLonLat(gomapinfer.Point{0,0}, zoom, [2]int{i,j})
 			p2 := geocoords.MapboxToLonLat(gomapinfer.Point{0,0}, zoom, [2]int{i+1,j+1})
 			
@@ -156,19 +169,19 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 					p2 := toRelativePixelCoordinate(coordinates[ind+1])
 					
 					segment := gomapinfer.Segment{p1,p2}
-					if segment.Intersection(gomapinfer.Segment{corner1, corner2}) == nil {
+					if segment.Intersection(gomapinfer.Segment{corner1, corner2}) != nil {
 						isOverlapped = true
 						return 
 					}
-					if segment.Intersection(gomapinfer.Segment{corner2, corner3}) == nil {
+					if segment.Intersection(gomapinfer.Segment{corner2, corner3}) != nil {
 						isOverlapped = true
 						return 
 					}
-					if segment.Intersection(gomapinfer.Segment{corner3, corner4}) == nil {
+					if segment.Intersection(gomapinfer.Segment{corner3, corner4}) != nil {
 						isOverlapped = true
 						return 
 					}
-					if segment.Intersection(gomapinfer.Segment{corner4, corner1}) == nil {
+					if segment.Intersection(gomapinfer.Segment{corner4, corner1}) != nil {
 						isOverlapped = true
 						return 
 					}
@@ -226,8 +239,9 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 				}
 			}
 			
-			// The current tile overlaps with the ROI, store it in a dataset
+			// If the current tile overlaps with the ROI, store it in a dataset
 			if isOverlapped {
+				log.Printf("[spatialflow_partition] create tile %s", fmt.Sprintf("%d_%d_%d", zoom, i, j))
 				outputData := skyhook.GeoImageData{
 					Metadata: skyhook.GeoImageMetadata{
 						ReferenceType: "webmercator",
@@ -238,16 +252,20 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 						Width: 256,
 						Height: 256,
 						SourceType: "url",
-						URL: url,
+						URL: mapurl,
 					},
 				}
 				err := exec_ops.WriteItem(url, outputDataset, fmt.Sprintf("%d_%d_%d", zoom, i, j), outputData)
 				if err != nil {
 					return err
 				}
+				kept_tiles += 1
 			}
 		}
 	}
+
+	log.Printf("[spatialflow_partition] found %d tiles overlapping with the ROI from %d tiles", kept_tiles, total_tiles)
+				
 
 	return nil
 }
@@ -269,8 +287,13 @@ func init() {
 		},
 		GetTasks: exec_ops.SimpleTasks,
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
+			var params Params
+			if err := exec_ops.DecodeParams(node, &params, false); err != nil {
+				return nil, err
+			}
+
 			applyFunc := func(task skyhook.ExecTask) error {
-				return SpatialFlowPartition(url, node.OutputDatasets["geoimages"], task) 
+				return SpatialFlowPartition(url, node.OutputDatasets["geoimages"], task, params) 
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},
