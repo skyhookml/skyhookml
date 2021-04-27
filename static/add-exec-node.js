@@ -37,7 +37,7 @@ export default {
 			}, {
 				ID: "geoimage",
 				Name: "Geo-Image",
-				Ops: ['make_geoimage', 'geoimage_to_image', 'geojson_to_shape', 'shape_to_geojson'],
+				Ops: ['make_geoimage', 'geoimage_to_image', 'geojson_to_shape', 'shape_to_geojson', 'spatialflow_partition'],
 			}, {
 				ID: "debug",
 				Name: "Debug",

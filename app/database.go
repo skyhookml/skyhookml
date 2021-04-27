@@ -11,7 +11,7 @@ import (
 	sync "github.com/sasha-s/go-deadlock"
 )
 
-const DbDebug bool = false
+const DbDebug bool = true
 
 var db *Database
 
