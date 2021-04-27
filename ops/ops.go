@@ -16,6 +16,7 @@ import (
 	_ "github.com/skyhookml/skyhookml/exec_ops/reid_tracker"
 	_ "github.com/skyhookml/skyhookml/exec_ops/render"
 	_ "github.com/skyhookml/skyhookml/exec_ops/resample"
+	_ "github.com/skyhookml/skyhookml/exec_ops/sample"
 	_ "github.com/skyhookml/skyhookml/exec_ops/segmentation_mask"
 	_ "github.com/skyhookml/skyhookml/exec_ops/simple_tracker"
 	_ "github.com/skyhookml/skyhookml/exec_ops/spatialflow_partition"

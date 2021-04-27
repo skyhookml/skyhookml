@@ -20,6 +20,7 @@ import PytorchYolov3Train from './exec-edit/pytorch_yolov3_train.js';
 import PytorchYolov3Infer from './exec-edit/pytorch_yolov3_infer.js';
 import PytorchYolov5Train from './exec-edit/pytorch_yolov5_train.js';
 import PytorchYolov5Infer from './exec-edit/pytorch_yolov5_infer.js';
+import Sample from './exec-edit/sample.js';
 import SpatialFlowPartition from './exec-edit/spatialflow_partition.js';
 import Yolov3Train from './exec-edit/yolov3_train.js';
 import Yolov3Infer from './exec-edit/yolov3_infer.js';
@@ -52,6 +53,7 @@ let components = {
 	'yolov3_train': Yolov3Train,
 	'yolov3_infer': Yolov3Infer,
 	'spatialflow_partition': SpatialFlowPartition,
+	'sample': Sample,
 	'unsupervised_reid': UnsupervisedReid,
 	'video_sample': VideoSample,
 };

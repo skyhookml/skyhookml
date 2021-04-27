@@ -8,7 +8,7 @@ export default {
 			categories: [{
 				ID: "basic",
 				Name: "Basic",
-				Ops: ['filter', 'detection_filter', 'simple_tracker', 'reid_tracker', 'resample', 'segmentation_mask', 'union'],
+				Ops: ['filter', 'detection_filter', 'simple_tracker', 'reid_tracker', 'resample', 'segmentation_mask', 'union', 'sample'],
 			}, {
 				ID: "model",
 				Name: "Model",
