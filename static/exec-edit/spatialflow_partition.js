@@ -14,7 +14,7 @@ export default {
 		} catch(e) {}
 		if(!('URL' in params)) params.URL = '';
 		if(!('Zoom' in params)) params.Zoom = 17;
-        if(!('Buffer' in params)) params.Buffer = 128;
+		if(!('Buffer' in params)) params.Buffer = 128;
 		this.params = params;
 	},
 	methods: {
@@ -43,7 +43,7 @@ export default {
 				<small class="form-text text-muted">Desired zoom level. For example, at zoom 18, resolution is roughly 60 cm/pixel.</small>
 			</div>
 		</div>
-        <div class="form-group row">
+		<div class="form-group row">
 			<label class="col-sm-2 col-form-label">Buffer</label>
 			<div class="col-sm-10">
 				<input v-model.number="params.Buffer" type="text" class="form-control">
