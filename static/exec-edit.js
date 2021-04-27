@@ -35,6 +35,7 @@ let components = {
 	'simple_tracker': SimpleTracker,
 	'reid_tracker': ReidTracker,
 	'python': Python,
+	'pythonv2': Python,
 	'pytorch_train': PytorchTrain,
 	'pytorch_infer': PytorchInfer,
 	'pytorch_resnet_train': PytorchResnetTrain,

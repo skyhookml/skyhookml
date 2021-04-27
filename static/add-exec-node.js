@@ -29,7 +29,7 @@ export default {
 			}, {
 				ID: "code",
 				Name: "Code",
-				Ops: ['python'],
+				Ops: ['pythonv2'],
 			}, {
 				ID: "convert",
 				Name: "Convert",

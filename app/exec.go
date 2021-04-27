@@ -107,7 +107,7 @@ func (rd *RunData) SetJob(name string, metadata string) {
 		metadata,
 	)
 
-	rd.ProgressJobOp = &ProgressJobOp{Total: len(rd.Tasks)}
+	rd.ProgressJobOp = &ProgressJobOp{}
 	rd.JobOp = &AppJobOp{
 		Job: job,
 		TailOp: &skyhook.TailJobOp{},
@@ -127,9 +127,9 @@ func (rd *RunData) SetJob(name string, metadata string) {
 // marked as completed.
 func (rd *RunData) SetDone() {
 	if rd.Error == nil {
-		rd.JobOp.SetDone("")
+		rd.JobOp.SetDone(nil)
 	} else {
-		rd.JobOp.SetDone(rd.Error.Error())
+		rd.JobOp.SetDone(rd.Error)
 	}
 }
 
@@ -286,6 +286,7 @@ func (rd *RunData) Run() error {
 
 	nthreads := containerInfo.Parallelism
 	log.Printf("[exec-node %s] [run] running %d tasks in %d threads", name, len(rd.Tasks), nthreads)
+	rd.ProgressJobOp.SetTotal(len(rd.Tasks))
 
 	counter := 0
 	var applyErr error

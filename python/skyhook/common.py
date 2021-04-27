@@ -9,6 +9,7 @@ import struct
 import sys
 
 import skyhook.ffmpeg as ffmpeg
+import skyhook.io
 
 def eprint(s):
 	sys.stderr.write(str(s) + "\n")
@@ -197,65 +198,16 @@ stdout = None
 meta = None
 
 def input_json():
-	buf = stdin.read(4)
-	if not buf:
+	try:
+		return skyhook.io.read_json(stdin)
+	except EOFError:
 		return None
-	(hlen,) = struct.unpack('>I', buf[0:4])
-	json_data = stdin.read(hlen)
-	return json.loads(json_data.decode('utf-8'))
-
-def input_array(channels=None, dt=None):
-	header = input_json()
-
-	if channels is None:
-		channels = header['Channels']
-	if dt is None:
-		dt = numpy.dtype(header['Type'])
-		dt = dt.newbyteorder('>')
-
-	size = header['Length']*header['Width']*header['Height']*channels*dt.itemsize
-	buf = stdin.read(size)
-	return numpy.frombuffer(buf, dtype=dt).reshape((header['Length'], header['Height'], header['Width'], channels))
 
 def input_datas():
-	datas = []
-	for t in meta['InputTypes']:
-		if t == 'image' or t == 'video':
-			datas.append(input_array(channels=3, dt=numpy.dtype('uint8')))
-		elif t == 'array':
-			datas.append(input_array())
-		elif t == 'geoimage':
-			header = input_json()
-			metadata = header['Metadata']
-			if header['Width'] > 0:
-				buf = stdin.read(header['Width']*header['Height']*3)
-				im = numpy.frombuffer(buf, dtype='uint8').reshape((header['Height'], header['Width'], 3))
-			else:
-				im = None
-			datas.append({
-				'Metadata': metadata,
-				'Image': im,
-			})
-		else:
-			datas.append(input_json())
-	return datas
+	return skyhook.io.read_datas(stdin, meta['InputTypes'])
 
 def output_json(x):
-	s = json.dumps(x).encode()
-	stdout.write(struct.pack('>I', len(s)))
-	stdout.write(s)
-
-def output_array(x):
-	output_json({
-		'Length': x.shape[0],
-		'Width': x.shape[2],
-		'Height': x.shape[1],
-		'Channels': x.shape[3],
-		'Type': x.dtype.name,
-	})
-	dt = numpy.dtype(x.dtype.name)
-	dt = dt.newbyteorder('>')
-	stdout.write(x.astype(dt, copy=False).tobytes())
+	skyhook.io.write_json(stdout, x)
 
 def output_datas(in_key, key, datas):
 	output_json({
@@ -263,25 +215,7 @@ def output_datas(in_key, key, datas):
 		'Key': in_key,
 		'OutputKey': key,
 	})
-	for i, t in enumerate(meta['OutputTypes']):
-		if t == 'image' or t == 'video' or t == 'array':
-			output_array(datas[i])
-		elif t == 'geoimage':
-			metadata = datas[i]['Metadata']
-			im = datas[i]['Image']
-			if im is None:
-				width, height = 0, 0
-			else:
-				width, height = im.shape[1], im.shape[0]
-			output_json({
-				'Metadata': metadata,
-				'Width': width,
-				'Height': height,
-			})
-			if im:
-				stdout.write(im.tobytes())
-		else:
-			output_json(datas[i])
+	skyhook.io.write_datas(stdout, meta['OutputTypes'], datas)
 	stdout.flush()
 
 def output_data_finish(in_key, key):

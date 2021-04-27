@@ -312,16 +312,10 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 			// load runnable
 			runnable := vnode.GetRunnable(ToSkyhookInputDatasets(parentDatasets), ToSkyhookOutputDatasets(outputDatasets))
 
-			// get tasks
-			tasks, err := runnable.GetOp().GetTasks(runnable, parentItems)
-			if err != nil {
-				return err
-			}
-
+			// Initialize job.
 			rd := &RunData{
 				Name: vnode.Name,
 				Node: runnable,
-				Tasks: tasks,
 				WillBeDone: true,
 			}
 			rd.SetJob(fmt.Sprintf("Exec Node %s", vnode.Name), fmt.Sprintf("%d", vnode.OrigNode.ID))
@@ -330,6 +324,17 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 				opts.JobOp.SetPlanFromGraph(graph, ready, needed, vnode)
 				opts.JobOp.ChangeJob(rd.JobOp.Job.Job)
 			}
+
+			// Get tasks.
+			// We do this after initializing RunData so that we can log any error to the AppJobOp.
+			var err error
+			rd.Tasks, err = runnable.GetOp().GetTasks(runnable, parentItems)
+			if err != nil {
+				rd.JobOp.SetDone(err)
+				return err
+			}
+
+			// Run the node.
 			err = rd.Run()
 			rd.SetDone()
 			if err != nil {

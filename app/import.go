@@ -444,11 +444,10 @@ func init() {
 			}()
 			if err == nil {
 				log.Printf("[import-dataset] ... import from %s succeeded", path)
-				opts.AppJobOp.SetDone("")
 			} else {
 				log.Printf("[import-dataset] ... import from %s failed: %v", path, err)
-				opts.AppJobOp.SetDone(err.Error())
 			}
+			opts.AppJobOp.SetDone(err)
 		}
 
 		if mode == "local" {
@@ -480,7 +479,7 @@ func init() {
 					// This means we didn't quite make it to importFunc.
 					// So we need to set the error here.
 					log.Printf("[import-dataset] failed to download %s: %v", url)
-					opts.AppJobOp.SetDone(err.Error())
+					opts.AppJobOp.SetDone(err)
 				}
 			}()
 			skyhook.JsonResponse(w, opts.AppJobOp.Job)
@@ -520,11 +519,10 @@ func init() {
 
 			if err == nil {
 				log.Printf("[import] ... import from %s succeeded", path)
-				opts.AppJobOp.SetDone("")
 			} else {
 				log.Printf("[import] ... import from %s failed: %v", path, err)
-				opts.AppJobOp.SetDone(err.Error())
 			}
+			opts.AppJobOp.SetDone(err)
 		}
 
 		jobName := fmt.Sprintf("Import Into %s", dataset.Name)

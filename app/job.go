@@ -163,7 +163,7 @@ func (op *AppJobOp) Cleanup() {
 }
 
 // Handles ending the job so that the caller doesn't need to call Job.SetDone directly.
-func (op *AppJobOp) SetDone(err string) {
+func (op *AppJobOp) SetDone(err error) {
 	op.mu.Lock()
 	op.cleanup()
 
@@ -181,12 +181,18 @@ func (op *AppJobOp) SetDone(err string) {
 	if wasTerminated {
 		op.Job.SetDone("terminated by user")
 	} else {
-		if err == "" {
+		if err == nil {
 			op.Update([]string{"Job completed successfully."})
+			op.Job.SetDone("")
 		} else {
-			op.Update([]string{"Job exiting with error: " + err})
+			// If err is CmdError, then add any log lines that the error may include to job output.
+			if cmdErr, ok := err.(skyhook.CmdError); ok {
+				op.Update(cmdErr.Lines)
+			}
+
+			op.Update([]string{"Job exiting with error: " + err.Error()})
+			op.Job.SetDone(err.Error())
 		}
-		op.Job.SetDone(err)
 	}
 	op.Job.UpdateState(op.Encode())
 }

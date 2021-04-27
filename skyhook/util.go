@@ -173,8 +173,8 @@ type Cmd struct {
 	stdin io.WriteCloser
 	stdout io.ReadCloser
 	stderr io.ReadCloser
-	// if not nil, means PrintStderr will send last line it got before exiting
-	stderrCh chan string
+	// if not nil, means PrintStderr will send last line(s) it got before exiting
+	stderrCh chan []string
 	closed bool
 }
 
@@ -190,6 +190,19 @@ func (cmd *Cmd) Stderr() io.ReadCloser {
 	return cmd.stderr
 }
 
+type CmdError struct {
+	ExitError error
+	Lines []string
+}
+
+func (e CmdError) Error() string {
+	var linesPart string
+	if len(e.Lines) > 0 {
+		linesPart = fmt.Sprintf(" (%s)", e.Lines[len(e.Lines)-1])
+	}
+	return fmt.Sprintf("exit error: %v", e.ExitError) + linesPart
+}
+
 func (cmd *Cmd) Wait() error {
 	if cmd.closed {
 		panic(fmt.Errorf("closed twice"))
@@ -201,22 +214,25 @@ func (cmd *Cmd) Wait() error {
 	if cmd.stdout != nil {
 		cmd.stdout.Close()
 	}
-	var lastLine string
+	var lastLines []string
 	if cmd.stderrCh != nil {
-		lastLine = <- cmd.stderrCh
+		lastLines = <- cmd.stderrCh
 	}
 	err := cmd.cmd.Wait()
 	if err != nil {
-		myerr := fmt.Errorf("exit error: %v (%s)", err, lastLine)
-		log.Printf("[%s] %v", cmd.prefix, myerr)
+		myerr := CmdError{
+			ExitError: err,
+			Lines: lastLines,
+		}
+		log.Printf("[%s] %v", cmd.prefix, myerr.Error())
 		return myerr
 	}
 	return nil
 }
 
-func (cmd *Cmd) printStderr(onlyDebug bool) {
+func (cmd *Cmd) printStderr(opts CommandOptions) {
 	rd := bufio.NewReader(cmd.stderr)
-	var lastLine string
+	var lastLines []string
 	for {
 		line, err := rd.ReadString('\n')
 		if err == io.EOF {
@@ -224,13 +240,17 @@ func (cmd *Cmd) printStderr(onlyDebug bool) {
 		} else if err != nil {
 			panic(err)
 		}
-		line = strings.TrimSpace(line)
-		lastLine = line
-		if !onlyDebug || Debug {
+		line = strings.TrimRight(line, "\n")
+		if opts.AllStderrLines {
+			lastLines = append(lastLines, line)
+		} else {
+			lastLines = []string{line}
+		}
+		if !opts.OnlyDebug || Debug {
 			log.Printf("[%s] %s", cmd.prefix, line)
 		}
 	}
-	cmd.stderrCh <- lastLine
+	cmd.stderrCh <- lastLines
 }
 
 type CommandOptions struct {
@@ -238,8 +258,13 @@ type CommandOptions struct {
 	NoStdout bool
 	NoStderr bool
 	NoPrintStderr bool
+	// Function to arbitrary modify the exec.Cmd, e.g., set working directory.
+	// This is called just before starting the process.
 	F func(*exec.Cmd)
+	// Whether to only print stderr if debug mode is on.
 	OnlyDebug bool
+	// Whether to keep not just the last stderr line, but all lines, in case of error.
+	AllStderrLines bool
 }
 
 func Command(prefix string, opts CommandOptions, command string, args ...string) *Cmd {
@@ -283,8 +308,8 @@ func Command(prefix string, opts CommandOptions, command string, args ...string)
 		stderr: stderr,
 	}
 	if stderr != nil && !opts.NoPrintStderr {
-		mycmd.stderrCh = make(chan string)
-		go mycmd.printStderr(opts.OnlyDebug)
+		mycmd.stderrCh = make(chan []string)
+		go mycmd.printStderr(opts)
 	}
 	return mycmd
 }

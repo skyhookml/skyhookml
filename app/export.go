@@ -152,11 +152,10 @@ func init() {
 				}
 				if err == nil {
 					log.Printf("[export] export of %s succeeded", dataset.Name)
-					opts.AppJobOp.SetDone("")
 				} else {
 					log.Printf("[export] export of %s failed: %v", dataset.Name, err)
-					opts.AppJobOp.SetDone(err.Error())
 				}
+				opts.AppJobOp.SetDone(err)
 			}()
 			skyhook.JsonResponse(w, job)
 		}

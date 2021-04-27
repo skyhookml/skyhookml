@@ -10,6 +10,7 @@ import (
 	_ "github.com/skyhookml/skyhookml/exec_ops/make_geoimage"
 	_ "github.com/skyhookml/skyhookml/exec_ops/materialize"
 	_ "github.com/skyhookml/skyhookml/exec_ops/python"
+	_ "github.com/skyhookml/skyhookml/exec_ops/pythonv2"
 	_ "github.com/skyhookml/skyhookml/exec_ops/pytorch"
 	_ "github.com/skyhookml/skyhookml/exec_ops/pytorch/archs"
 	_ "github.com/skyhookml/skyhookml/exec_ops/reid_tracker"
