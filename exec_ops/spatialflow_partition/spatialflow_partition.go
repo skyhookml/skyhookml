@@ -214,10 +214,6 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 			}
 			
 			for _, g := range geometries {
-				if isOverlapped {
-					break
-				}
-
 				if g.Type == geojson.GeometryPoint {
 					handlePoint(g.Point)
 				} else if g.Type == geojson.GeometryMultiPoint {
@@ -237,33 +233,34 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 						handlePolygon(coordinates)
 					}
 				}
-			}
-			
-			if !isOverlapped {
-				continue
-			}
 
-			// If the current tile overlaps with the ROI, store it in a dataset
-			log.Printf("[spatialflow_partition] create tile %s", fmt.Sprintf("%d_%d_%d", zoom, i, j))
-			outputData := skyhook.GeoImageData{
-				Metadata: skyhook.GeoImageMetadata{
-					ReferenceType: "webmercator",
-					Zoom: zoom,
-					X: i,
-					Y: j,
-					Scale: 256,
-					Width: 256,
-					Height: 256,
-					SourceType: "url",
-					URL: mapurl,
-				},
+				if isOverlapped {
+					break
+				}
 			}
-			err := exec_ops.WriteItem(url, outputDataset, fmt.Sprintf("%d_%d_%d", zoom, i, j), outputData)
-			if err != nil {
-				return err
-			}
-			kept_tiles += 1
 			
+			// If the current tile overlaps with the ROI, store it in a dataset
+			if isOverlapped {
+				log.Printf("[spatialflow_partition] create tile %s", fmt.Sprintf("%d_%d_%d", zoom, i, j))
+				outputData := skyhook.GeoImageData{
+					Metadata: skyhook.GeoImageMetadata{
+						ReferenceType: "webmercator",
+						Zoom: zoom,
+						X: i,
+						Y: j,
+						Scale: 256,
+						Width: 256,
+						Height: 256,
+						SourceType: "url",
+						URL: mapurl,
+					},
+				}
+				err := exec_ops.WriteItem(url, outputDataset, fmt.Sprintf("%d_%d_%d", zoom, i, j), outputData)
+				if err != nil {
+					return err
+				}
+				kept_tiles += 1
+			}
 		}
 	}
 
