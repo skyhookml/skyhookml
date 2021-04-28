@@ -2,3 +2,6 @@ skyhook.sqlite3
 __pycache__
 exports
 data
+web/node_modules
+web/package-lock.json
+web/dist/main.js
