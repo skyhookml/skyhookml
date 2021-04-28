@@ -342,21 +342,18 @@ func (rd *RunData) Run() error {
 	return nil
 }
 
-func (node *DBExecNode) Run(opts ExecRunOptions) error {
-	rd, err := node.PrepareRun(opts)
-	if err != nil {
-		return err
-	}
-	if rd == nil {
-		return nil
-	}
-	err = rd.Run()
-	rd.SetDone()
-	return err
-}
-
 // Get some number of incremental outputs from this node.
-func (node *DBExecNode) Incremental(n int) error {
+type IncrementalOptions struct {
+	// Number of random outputs to compute at this node.
+	// Only one of Count or Keys should be specified.
+	Count int
+	// Compute outputs matching these keys.
+	Keys []string
+	// MultiExecJob to update during incremental execution.
+	// For non-incremental ancestors, we pass this JobOp to RunNode.
+	JobOp *MultiExecJobOp
+}
+func (node *DBExecNode) Incremental(opts IncrementalOptions) error {
 	isIncremental := func(node *DBExecNode) bool {
 		return node.GetOp().IsIncremental()
 	}
@@ -367,7 +364,7 @@ func (node *DBExecNode) Incremental(n int) error {
 		return nil
 	}
 
-	log.Printf("[exec-node %s] [incremental] begin execution of %d outputs", node.Name, n)
+	log.Printf("[exec-node %s] [incremental] begin execution", node.Name)
 	// identify all non-incremental ancestors of this node
 	// but stop the search at ExecNodes whose outputs have already been computed
 	// we will need to run these ancestors in their entirety
@@ -409,7 +406,9 @@ func (node *DBExecNode) Incremental(n int) error {
 	if len(nonIncremental) > 0 {
 		log.Printf("[exec-node %s] [incremental] running %d non-incremental ancestors: %v", node.Name, len(nonIncremental), nonIncremental)
 		for _, cur := range nonIncremental {
-			RunNode(cur, RunNodeOptions{})
+			RunNode(cur, RunNodeOptions{
+				JobOp: opts.JobOp,
+			})
 		}
 	}
 
@@ -483,11 +482,25 @@ func (node *DBExecNode) Incremental(n int) error {
 
 	// what output keys do we want to produce at the last node?
 	wantedKeys := make(map[string]bool)
-	if len(missingKeys) < n {
-		n = len(missingKeys)
-	}
-	for _, idx := range rand.Perm(len(missingKeys))[0:n] {
-		wantedKeys[missingKeys[idx]] = true
+	if opts.Count > 0 {
+		n := opts.Count
+		if len(missingKeys) < n {
+			n = len(missingKeys)
+		}
+		for _, idx := range rand.Perm(len(missingKeys))[0:n] {
+			wantedKeys[missingKeys[idx]] = true
+		}
+	} else {
+		missingSet := make(map[string]bool)
+		for _, key := range missingKeys {
+			missingSet[key] = true
+		}
+		for _, key := range opts.Keys {
+			if !missingSet[key] {
+				continue
+			}
+			wantedKeys[key] = true
+		}
 	}
 	log.Printf("[exec-node %s] [incremental] determined %d keys to produce at this node", node.Name, len(wantedKeys))
 
@@ -560,13 +573,30 @@ func (node *DBExecNode) Incremental(n int) error {
 
 			curOutputKeys := neededOutputKeys[cur.ID]
 			log.Printf("[exec-node %s] [incremental] computing %d output keys at node %s", node.Name, len(curOutputKeys), cur.Name)
-			err := cur.Run(ExecRunOptions{
+
+			rd, err := node.PrepareRun(ExecRunOptions{
 				Incremental: true,
 				LimitOutputKeys: curOutputKeys,
 			})
 			if err != nil {
 				return err
 			}
+			if rd == nil {
+				// Already done.
+				continue
+			}
+
+			if opts.JobOp != nil {
+				opts.JobOp.SetPlanFromMap(incrementalNodes, nodesDone, cur.ID)
+				opts.JobOp.ChangeJob(rd.JobOp.Job.Job)
+			}
+
+			err = rd.Run()
+			rd.SetDone()
+			if err != nil {
+				return err
+			}
+
 			nodesDone[cur.ID] = true
 		}
 	}
@@ -731,21 +761,75 @@ func init() {
 	}).Methods("POST")
 
 	Router.HandleFunc("/exec-nodes/{node_id}/incremental", func(w http.ResponseWriter, r *http.Request) {
-		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
-		r.ParseForm()
-		count := skyhook.ParseInt(r.PostForm.Get("count"))
+		var params struct {
+			// One of random, dataset, or direct.
+			Mode string
+			// Random mode: number of outputs to compute.
+			Count int
+			// Dataset mode: ExecParent specifying a dataset whose keys we should compute.
+			ParentSpec skyhook.ExecParent
+			// Direct mode: list of keys to compute.
+			Keys []string
+		}
+		if err := skyhook.ParseJsonRequest(w, r, &params); err != nil {
+			return
+		}
 
+		nodeID := skyhook.ParseInt(mux.Vars(r)["node_id"])
 		node := GetExecNode(nodeID)
 		if node == nil {
 			http.Error(w, "no such exec node", 404)
 			return
 		}
+
+		var opts IncrementalOptions
+		if params.Mode == "random" {
+			opts.Count = params.Count
+		} else if params.Mode == "direct" {
+			opts.Keys = params.Keys
+		} else if params.Mode == "dataset" {
+			// If mode is dataset, we need to get the items in the dataset and determine
+			// the concrete list of keys that we should compute.
+			var dataset *DBDataset
+			if params.ParentSpec.Type == "d" {
+				dataset = GetDataset(params.ParentSpec.ID)
+			} else if params.ParentSpec.Type == "n" {
+				otherNode := GetExecNode(params.ParentSpec.ID)
+				outputDatasets, _ := otherNode.GetDatasets(false)
+				dataset = outputDatasets[params.ParentSpec.Name]
+			}
+			if dataset == nil {
+				http.Error(w, "could not find the specified dataset; make sure the dataset specifying keys to compute is already computed", 400)
+				return
+			}
+			for _, item := range dataset.ListItems() {
+				opts.Keys = append(opts.Keys, item.Key)
+			}
+		}
+
+		// initialize job for this run
+		job := NewJob(
+			fmt.Sprintf("Partial Execution %s", node.Name),
+			"multiexec",
+			"multiexec",
+			fmt.Sprintf("%d", node.ID),
+		)
+		jobOp := &MultiExecJobOp{Job: job}
+		job.AttachOp(jobOp)
+		opts.JobOp = jobOp
+
 		go func() {
-			err := node.Incremental(count)
+			err := node.Incremental(opts)
+			job.UpdateState(jobOp.Encode())
 			if err != nil {
 				log.Printf("[exec node %s] incremental run error: %v", node.Name, err)
+				job.SetDone(err.Error())
+			} else {
+				job.SetDone("")
 			}
 		}()
+
+		skyhook.JsonResponse(w, job)
 	}).Methods("POST")
 
 	// Execution of an anonymous Runnable with arbitrary configuration.

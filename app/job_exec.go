@@ -86,3 +86,30 @@ func (op *MultiExecJobOp) SetPlanFromGraph(graph skyhook.ExecutionGraph, ready m
 	}
 	op.ChangePlan(plan, planIndex)
 }
+
+// Used in DBExecNode.Incremental.
+func (op *MultiExecJobOp) SetPlanFromMap(nodes map[int]*DBExecNode, done map[int]bool, curID int) {
+	var plan []*skyhook.VirtualNode
+	addNode := func(node *DBExecNode) {
+		plan = append(plan, node.GetOp().Virtualize(node.ExecNode))
+	}
+	// Add done ones.
+	for id, node := range nodes {
+		if !done[id] {
+			continue
+		}
+		addNode(node)
+	}
+	planIndex := len(plan)
+	// Add pending ones.
+	if curID != -1 {
+		addNode(nodes[curID])
+	}
+	for id, node := range nodes {
+		if done[id] || id == curID {
+			continue
+		}
+		addNode(node)
+	}
+	op.ChangePlan(plan, planIndex)
+}

@@ -1,9 +1,11 @@
 import utils from './utils.js';
 import ExecNodeParents from './exec-node-parents.js';
+import PipelineRunPartialModal from './pipeline-run-partial-modal.js';
 
 export default {
 	components: {
 		'exec-node-parents': ExecNodeParents,
+		'pipeline-run-partial-modal': PipelineRunPartialModal,
 	},
 	data: function() {
 		return {
@@ -19,6 +21,9 @@ export default {
 
 			// Whether user is currently editing the name of the selected node.
 			editingName: false,
+
+			// Whether we're currently showing the partial execution modal.
+			showingPartialRunModal: false,
 		};
 	},
 	props: ['node', 'nodes', 'datasets', 'workspaces'],
@@ -36,9 +41,6 @@ export default {
 			utils.request(this, 'POST', '/exec-nodes/'+this.node.ID+'/run', null, (job) => {
 				this.$router.push('/ws/'+this.$route.params.ws+'/jobs/'+job.ID);
 			});
-		},
-		viewInteractive: function() {
-			this.$router.push('/ws/'+this.$route.params.ws+'/interactive/'+this.node.ID);
 		},
 		deleteNode: function() {
 			utils.request(this, 'DELETE', '/exec-nodes/'+this.node.ID, null, () => {
@@ -122,7 +124,7 @@ export default {
 		</template>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="editNode">Edit</button>
 		<button type="button" class="btn btn-sm btn-primary" v-on:click="runNode">Run</button>
-		<!--<button type="button" class="btn btn-sm btn-primary" v-on:click="viewInteractive">Interactive</button>-->
+		<button type="button" class="btn btn-sm btn-primary" v-on:click="showingPartialRunModal = true">Partial Run</button>
 		<button type="button" class="btn btn-sm btn-danger" v-on:click="deleteNode">Delete</button>
 	</div>
 	<div class="flex-x-container">
@@ -170,6 +172,7 @@ export default {
 			</div>
 		</div>
 	</div>
+	<pipeline-run-partial-modal v-if="showingPartialRunModal" v-on:closed="showingPartialRunModal = false" :node="node"></pipeline-run-partial-modal>
 
 	<!--<div>
 		<form v-on:submit.prevent="compareTo" class="d-flex align-items-center">

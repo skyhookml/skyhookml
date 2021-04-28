@@ -48,7 +48,6 @@ func init() {
 			}
 
 			var tasks []skyhook.ExecTask
-			fmt.Println(params.Mode, params.Keys)
 			if params.Mode == "count" || params.Mode == "percentage" {
 				var needed int
 				if params.Mode == "count" {
