@@ -13,7 +13,7 @@ var SetupFuncs []func(*socketio.Server)
 var Router = mux.NewRouter()
 
 func init() {
-	fileServer := http.FileServer(http.Dir("static/"))
+	fileServer := http.FileServer(http.Dir("web/dist/"))
 	Router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fileServer))
 	Router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
