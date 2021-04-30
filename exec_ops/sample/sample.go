@@ -1,4 +1,4 @@
-package python
+package sample
 
 import (
 	"github.com/skyhookml/skyhookml/skyhook"

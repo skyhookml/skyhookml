@@ -17,10 +17,6 @@ import CropResize from './exec-edit/cropresize.vue';
 import DetectionFilter from './exec-edit/detection_filter.vue';
 import GeoImageToImage from './exec-edit/geoimage_to_image.vue';
 import MakeGeoImage from './exec-edit/make_geoimage.vue';
-import Resample from './exec-edit/resample.vue';
-import SegmentationMask from './exec-edit/segmentation_mask.vue';
-import SimpleTracker from './exec-edit/simple_tracker.vue';
-import ReidTracker from './exec-edit/reid_tracker.vue';
 import Python from './exec-edit/python.vue';
 import PytorchTrain from './exec-edit/pytorch_train.js';
 import PytorchInfer from './exec-edit/pytorch_infer.vue';
@@ -35,7 +31,12 @@ import PytorchYolov3Infer from './exec-edit/pytorch_yolov3_infer.vue';
 import PytorchYolov5Train from './exec-edit/pytorch_yolov5_train.js';
 import PytorchYolov5Infer from './exec-edit/pytorch_yolov5_infer.vue';
 import Sample from './exec-edit/sample.vue';
+import SegmentationMask from './exec-edit/segmentation_mask.vue';
+import SimpleTracker from './exec-edit/simple_tracker.vue';
 import SpatialFlowPartition from './exec-edit/spatialflow_partition.vue';
+import Split from './exec-edit/split.vue';
+import ReidTracker from './exec-edit/reid_tracker.vue';
+import Resample from './exec-edit/resample.vue';
 import Yolov3Train from './exec-edit/yolov3_train.vue';
 import Yolov3Infer from './exec-edit/yolov3_infer.vue';
 import UnsupervisedReid from './exec-edit/unsupervised_reid.js';
@@ -46,10 +47,6 @@ let components = {
 	'detection_filter': DetectionFilter,
 	'geoimage_to_image': GeoImageToImage,
 	'make_geoimage': MakeGeoImage,
-	'resample': Resample,
-	'segmentation_mask': SegmentationMask,
-	'simple_tracker': SimpleTracker,
-	'reid_tracker': ReidTracker,
 	'python': Python,
 	'pythonv2': Python,
 	'pytorch_train': PytorchTrain,
@@ -64,10 +61,15 @@ let components = {
 	'pytorch_yolov3_infer': PytorchYolov3Infer,
 	'pytorch_yolov5_train': PytorchYolov5Train,
 	'pytorch_yolov5_infer': PytorchYolov5Infer,
+	'sample': Sample,
+	'segmentation_mask': SegmentationMask,
+	'simple_tracker': SimpleTracker,
+	'spatialflow_partition': SpatialFlowPartition,
+	'split': Split,
+	'reid_tracker': ReidTracker,
+	'resample': Resample,
 	'yolov3_train': Yolov3Train,
 	'yolov3_infer': Yolov3Infer,
-	'spatialflow_partition': SpatialFlowPartition,
-	'sample': Sample,
 	'unsupervised_reid': UnsupervisedReid,
 	'video_sample': VideoSample,
 };
