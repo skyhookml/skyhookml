@@ -79,7 +79,7 @@ class Dataset(torch.utils.data.Dataset):
 
 		return inputs
 
-def get_datasets(url, datasets, params):
+def get_datasets(url, datasets, params, train_keys, val_keys):
 	# add options to datasets
 	dataset_list = [ds.copy() for ds in datasets]
 	for idx, ds in enumerate(dataset_list):
@@ -102,11 +102,15 @@ def get_datasets(url, datasets, params):
 		if len(items[key]) != len(unique_ds_ids):
 			del items[key]
 
-	keys = list(items.keys())
-	random.shuffle(keys)
-	num_val = len(keys)*params['ValPercent']//100
-	val_keys = keys[0:num_val]
-	train_keys = keys[num_val:]
+	if not train_keys or not val_keys:
+		keys = list(items.keys())
+		random.shuffle(keys)
+		num_val = len(keys)*params['ValPercent']//100
+		val_keys = keys[0:num_val]
+		train_keys = keys[num_val:]
+		print('split items into {} for training and {} for validation'.format(len(train_keys), len(val_keys)))
+	else:
+		print('using given splits, with {} for training and {} for validation'.format(len(train_keys), len(val_keys)))
 
 	train_set = Dataset(dataset_list, train_keys, items)
 	val_set = Dataset(dataset_list, val_keys, items)

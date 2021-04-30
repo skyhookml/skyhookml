@@ -56,7 +56,7 @@ func NewPythonOp(cmd *skyhook.Cmd, url string, params Params, inputDatasets []sk
 	stdout := cmd.Stdout()
 
 	// Initialize local HTTP server.
-	httpServer, err := NewHttpServer(url)
+	httpServer, err := NewHttpServer(url, nil)
 	if err != nil {
 		return nil, err
 	}

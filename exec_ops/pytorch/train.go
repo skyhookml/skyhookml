@@ -3,12 +3,14 @@ package pytorch
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
+	"github.com/skyhookml/skyhookml/exec_ops/pythonv2"
 
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -18,7 +20,7 @@ import (
 type TrainOp struct {
 	url string
 	node skyhook.Runnable
-	dataset skyhook.Dataset
+	outputDataset skyhook.Dataset
 }
 
 func (e *TrainOp) Parallelism() int {
@@ -26,6 +28,7 @@ func (e *TrainOp) Parallelism() int {
 }
 
 func (e *TrainOp) Apply(task skyhook.ExecTask) error {
+	// Prepare parameters needed by Python script.
 	var params skyhook.PytorchTrainParams
 	if err := exec_ops.DecodeParams(e.node, &params, false); err != nil {
 		return err
@@ -35,20 +38,107 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
+	// Fetch any git repositories that aren't already available locally.
 	if err := EnsureRepositories(components); err != nil {
 		return err
 	}
 
-	datasets := e.node.InputDatasets
-	e.dataset.Mkdir()
+	inputDatasets := e.node.InputDatasets
+	e.outputDataset.Mkdir()
 
-	// prepare command-line arguments
-	paramsArg := e.node.Params
-	archArg := string(skyhook.JsonMarshal(arch))
-	compsArg := string(skyhook.JsonMarshal(components))
-	datasetsArg := string(skyhook.JsonMarshal(datasets["inputs"]))
-	modelsArg := string(skyhook.JsonMarshal(datasets["models"]))
-	fmt.Println(e.dataset.ID, paramsArg, archArg, compsArg, datasetsArg, modelsArg)
+	// Initialize HTTP server that will serve the training parameters.
+	muxFunc := func(mux *http.ServeMux) error {
+		var trainConfig struct {
+			Params skyhook.PytorchTrainParams
+			Arch *skyhook.PytorchArch
+			Components map[string]*skyhook.PytorchComponent
+			Inputs []skyhook.Dataset
+			ParentModels []skyhook.Dataset
+			Output skyhook.Dataset
+			TrainSplit []string
+			ValidSplit []string
+		}
+		trainConfig.Params = params
+		trainConfig.Arch = arch
+		trainConfig.Components = components
+		trainConfig.Inputs = inputDatasets["inputs"]
+		trainConfig.ParentModels = inputDatasets["models"]
+		trainConfig.Output = e.outputDataset
+		if len(inputDatasets["train_split"]) > 0 || len(inputDatasets["valid_split"]) > 0 {
+			// If either/both train/valid split are set, then we need to provide keys
+			// for train/valid.
+			// (1) Get all keys across the input datasets.
+			// (2) Get specified train and/or valid keys.
+			// (3) Compute missing split if needed. (If only one of train/valid is given.)
+			allItems, err := exec_ops.GetItems(e.url, inputDatasets["inputs"])
+			if err != nil {
+				return err
+			}
+
+			trainKeys := make(map[string]bool)
+			validKeys := make(map[string]bool)
+			if len(inputDatasets["train_split"]) > 0 {
+				items, err := exec_ops.GetDatasetItems(e.url, inputDatasets["train_split"][0])
+				if err != nil {
+					return err
+				}
+				for key := range items {
+					if allItems[key] == nil {
+						continue
+					}
+					trainKeys[key] = true
+				}
+			}
+			if len(inputDatasets["valid_split"]) > 0 {
+				items, err := exec_ops.GetDatasetItems(e.url, inputDatasets["valid_split"][0])
+				if err != nil {
+					return err
+				}
+				for key := range items {
+					if allItems[key] == nil {
+						continue
+					}
+					validKeys[key] = true
+				}
+			}
+
+			if len(trainKeys) == 0 && len(validKeys) == 0 {
+				return fmt.Errorf("train and/or valid split provided but dataset is empty")
+			}
+
+			if len(trainKeys) == 0 {
+				for key := range allItems {
+					if !validKeys[key] {
+						trainKeys[key] = true
+					}
+				}
+			} else if len(validKeys) == 0 {
+				for key := range allItems {
+					if !trainKeys[key] {
+						validKeys[key] = true
+					}
+				}
+			}
+
+			for key := range trainKeys {
+				trainConfig.TrainSplit = append(trainConfig.TrainSplit, key)
+			}
+			for key := range validKeys {
+				trainConfig.ValidSplit = append(trainConfig.ValidSplit, key)
+			}
+		}
+
+		mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+			skyhook.JsonResponse(w, trainConfig)
+		})
+
+		return nil
+	}
+	httpServer, err := python.NewHttpServer(e.url, muxFunc)
+	if err != nil {
+		return err
+	}
+	defer httpServer.Close()
 
 	// Determine if automatic batch size reduction is enabled.
 	// Also extract the desired batch size.
@@ -69,7 +159,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	runTrain := func(batchSize int) error {
 		cmd := exec.Command(
 			"python3", "exec_ops/pytorch/train.py",
-			fmt.Sprintf("%d", e.dataset.ID), e.url, paramsArg, archArg, compsArg, datasetsArg, modelsArg, strconv.Itoa(batchSize),
+			e.url, strconv.Itoa(httpServer.Port), strconv.Itoa(batchSize),
 		)
 		cmd.Stdout = os.Stdout
 
@@ -128,7 +218,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// add to the file dataset
 	fileMetadata := skyhook.FileMetadata{Filename: "model.pt"}
-	_, err = exec_ops.AddItem(e.url, e.dataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
+	_, err = exec_ops.AddItem(e.url, e.outputDataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
 	if err != nil {
 		return err
 	}
@@ -174,6 +264,8 @@ var TrainImpl = skyhook.ExecOpImpl{
 	Inputs: []skyhook.ExecInput{
 		{Name: "inputs", Variable: true},
 		{Name: "models", DataTypes: []skyhook.DataType{skyhook.FileType}, Variable: true},
+		{Name: "train_split"},
+		{Name: "valid_split"},
 	},
 	Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.FileType}},
 	Requirements: func(node skyhook.Runnable) map[string]int {
@@ -184,7 +276,7 @@ var TrainImpl = skyhook.ExecOpImpl{
 		op := &TrainOp{
 			url: url,
 			node: node,
-			dataset: node.OutputDatasets["model"],
+			outputDataset: node.OutputDatasets["model"],
 		}
 		return op, nil
 	},

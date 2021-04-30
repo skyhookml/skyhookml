@@ -22,7 +22,7 @@ func (s HttpServer) Close() {
 	s.Listener.Close()
 }
 
-func NewHttpServer(url string) (HttpServer, error) {
+func NewHttpServer(url string, f func(*http.ServeMux) error) (HttpServer, error) {
 	mux := http.NewServeMux()
 	var s HttpServer
 
@@ -162,6 +162,13 @@ func NewHttpServer(url string) (HttpServer, error) {
 			return
 		}
 	})
+
+	if f != nil {
+		err := f(mux)
+		if err != nil {
+			return HttpServer{}, err
+		}
+	}
 
 	ln, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1")})
 	if err != nil {

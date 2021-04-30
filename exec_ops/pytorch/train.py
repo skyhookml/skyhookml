@@ -5,6 +5,7 @@ import skyhook.common as lib
 import json
 import numpy
 import os, os.path
+import requests
 import skimage.io, skimage.transform
 
 import torch
@@ -17,20 +18,24 @@ import skyhook.pytorch.util as util
 import skyhook.pytorch.dataset as skyhook_dataset
 import skyhook.pytorch.augment as skyhook_augment
 
-out_dataset_id = int(sys.argv[1])
-url = sys.argv[2]
-params_arg = sys.argv[3]
-arch_arg = sys.argv[4]
-comps_arg = sys.argv[5]
-datasets_arg = sys.argv[6]
-parent_models_arg = sys.argv[7]
-batch_size = int(sys.argv[8])
+url = sys.argv[1]
+local_port = int(sys.argv[2])
+batch_size = int(sys.argv[3])
 
-params = json.loads(params_arg)
-arch = json.loads(arch_arg)
-comps = json.loads(comps_arg)
-datasets = json.loads(datasets_arg)
-parent_models = json.loads(parent_models_arg)
+local_url = 'http://127.0.0.1:{}'.format(local_port)
+
+# Get parameters.
+resp = requests.get(local_url + '/config')
+config = resp.json()
+
+params = config['Params']
+arch = config['Arch']
+comps = config['Components']
+datasets = config['Inputs']
+parent_models = config['ParentModels']
+out_dataset_id = config['Output']['ID']
+train_split = config['TrainSplit']
+valid_split = config['ValidSplit']
 
 arch = arch['Params']
 
@@ -53,7 +58,7 @@ device = torch.device('cuda:0')
 print('loading datasets')
 dataset_provider = skyhook_dataset.providers[params['Dataset']['Op']]
 dataset_params = json.loads(params['Dataset']['Params'])
-train_set, val_set = dataset_provider(url, datasets, dataset_params)
+train_set, val_set = dataset_provider(url, datasets, dataset_params, train_split, valid_split)
 datatypes = train_set.get_datatypes()
 
 # get data augmentation steps

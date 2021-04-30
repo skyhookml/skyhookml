@@ -24,19 +24,34 @@ func init() {
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: exec_ops.SimpleTasks,
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+			items := rawItems["inputs"]
+			var tasks []skyhook.ExecTask
+			for i, itemList := range items {
+				for _, item := range itemList {
+					taskItems := make([][]skyhook.Item, len(items))
+					taskItems[i] = []skyhook.Item{item}
+					tasks = append(tasks, skyhook.ExecTask{
+						Key: item.Key,
+						Items: map[string][][]skyhook.Item{"inputs": taskItems},
+					})
+				}
+			}
+			return tasks, nil
+		},
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			applyFunc := func(task skyhook.ExecTask) error {
 				for i, itemList := range task.Items["inputs"] {
-					inItem := itemList[0]
-					dataset := node.OutputDatasets[fmt.Sprintf("outputs%d", i)]
-					item, err := exec_ops.AddItem(url, dataset, task.Key, inItem.Ext, inItem.Format, inItem.Metadata)
-					if err != nil {
-						return err
-					}
-					err = inItem.CopyTo(item.Fname(), inItem.Format, false)
-					if err != nil {
-						return err
+					for _, inItem := range itemList {
+						dataset := node.OutputDatasets[fmt.Sprintf("outputs%d", i)]
+						item, err := exec_ops.AddItem(url, dataset, task.Key, inItem.Ext, inItem.Format, inItem.Metadata)
+						if err != nil {
+							return err
+						}
+						err = inItem.CopyTo(item.Fname(), inItem.Format, false)
+						if err != nil {
+							return err
+						}
 					}
 				}
 				return nil
