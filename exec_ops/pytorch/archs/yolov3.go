@@ -9,14 +9,12 @@ func init() {
 	type TrainParams struct {
 		skyhook.PytorchTrainParams
 		Mode string
-		Width int
-		Height int
+		Resize skyhook.PDDImageOptions
 		ValPercent int
 	}
 
 	type InferParams struct {
-		Width int
-		Height int
+		Resize skyhook.PDDImageOptions
 		ConfidenceThreshold float64
 	}
 
@@ -49,10 +47,7 @@ func init() {
 			p := params.PytorchTrainParams
 			p.Dataset.Op = "default"
 			p.Dataset.Params = string(skyhook.JsonMarshal(skyhook.PDDParams{
-				InputOptions: []interface{}{skyhook.PDDImageOptions{
-					Width: params.Width,
-					Height: params.Height,
-				}, struct{}{}},
+				InputOptions: []interface{}{params.Resize, struct{}{}},
 				ValPercent: params.ValPercent,
 			}))
 
@@ -78,13 +73,10 @@ func init() {
 					Layer: "detections",
 					DataType: skyhook.DetectionType,
 				}},
-			}
-			if params.Width > 0 || params.Height > 0 {
-				opt := skyhook.PDDImageOptions{params.Width, params.Height}
-				p.InputOptions = []skyhook.PIInputOption{{
+				InputOptions: []skyhook.PIInputOption{{
 					Idx: 0,
-					Value: string(skyhook.JsonMarshal(opt)),
-				}}
+					Value: string(skyhook.JsonMarshal(params.Resize)),
+				}},
 			}
 
 			modelParams := ModelParams{

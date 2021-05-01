@@ -127,5 +127,10 @@ export default function(opts) {
 	if(opts.basicTemplate) {
 		component.template = component.template.replace('BASIC_TEMPLATE', opts.basicTemplate);
 	}
+	if(opts.components) {
+		for(let [name, comp] of Object.entries(opts.components)) {
+			component.components[name] = comp;
+		}
+	}
 	return component;
 };

@@ -12,25 +12,8 @@
 	<h3>Input Options</h3>
 	<template v-for="(parent, idx) in parents">
 		<h4>{{ parent.Name }} ({{ parent.DataType }})</h4>
-		<template v-if="parent.DataType == 'image'">
-			<div class="form-group row">
-				<label class="col-sm-2 col-form-label">Width</label>
-				<div class="col-sm-10">
-					<input v-model.number="inputOptions[idx].Width" type="text" class="form-control" @change="update">
-					<small class="form-text text-muted">
-						Resize the image to this width. Leave as 0 to use the input image without resizing.
-					</small>
-				</div>
-			</div>
-			<div class="form-group row">
-				<label class="col-sm-2 col-form-label">Height</label>
-				<div class="col-sm-10">
-					<input v-model.number="inputOptions[idx].Height" type="text" class="form-control" @change="update">
-					<small class="form-text text-muted">
-						Resize the image to this height. Leave as 0 to use the input image without resizing.
-					</small>
-				</div>
-			</div>
+		<template v-if="['image', 'video', 'array'].includes(parent.DataType)">
+			<select-input-size v-model="inputOptions[idx]" @change="update"></select-input-size>
 		</template>
 	</template>
 </div>
@@ -38,8 +21,12 @@
 
 <script>
 import utils from '../utils.js';
+import SelectInputSize from './select-input-size.vue';
 
 export default {
+	components: {
+		'select-input-size': SelectInputSize,
+	},
 	data: function() {
 		return {
 			parents: [],
@@ -74,20 +61,6 @@ export default {
 			return index;
 		};
 
-		// after figuring out the data type at input idx, add missing options for that type to inputOptions
-		let addMissingOptions = (idx) => {
-			let dtype = this.parents[idx].DataType;
-			if(dtype == 'image') {
-				if('Width' in this.inputOptions[idx] && 'Height' in this.inputOptions[idx]) {
-					return;
-				}
-				this.$set(this.inputOptions, idx, {
-					Width: 0,
-					Height: 0,
-				});
-			}
-		};
-
 		let inputs = [];
 		if(this.node.Parents) {
 			inputs = this.node.Parents['inputs'];
@@ -106,13 +79,11 @@ export default {
 					this.parents[idx].Name = node.Name;
 					let index = getIndexByKeyValue(node.Outputs, 'Name', parent.Name);
 					this.parents[idx].DataType = node.Outputs[index].DataType;
-					addMissingOptions(idx);
 				});
 			} else if(parent.Type == 'd') {
 				utils.request(this, 'GET', '/datasets/'+parent.ID, null, (ds) => {
 					this.parents[idx].Name = ds.Name;
 					this.parents[idx].DataType = ds.DataType;
-					addMissingOptions(idx);
 				});
 			}
 		});

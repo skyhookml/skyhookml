@@ -27,8 +27,33 @@ def read_input(dataset, item):
 def prepare_input(t, data, opt):
 	if t == 'image' or t == 'video' or t == 'array':
 		im = data
-		if opt.get('Width', 0) and opt.get('Height', 0):
-			im = skimage.transform.resize(im, [opt['Height'], opt['Width']], preserve_range=True).astype(im.dtype)
+		if opt.get('Mode', 'keep') != 'keep':
+			# Mode may be:
+			# 'scale-down': resize down so that maximum dimension is opt['MaxDimension']
+			# 'fixed': resize to a fixed resolution
+			# 'keep': don't resize, keep input as is
+			def get_resize_dims():
+				height = im.shape[0]
+				width = im.shape[1]
+				if opt['Mode'] == 'scale-down':
+					larger_dim = max(height, width)
+					if larger_dim <= opt['MaxDimension']:
+						return height, width
+					height = height * opt['MaxDimension'] // larger_dim
+					width = width * opt['MaxDimension'] // larger_dim
+				elif opt['Mode'] == 'fixed':
+					height, width = opt['Height'], opt['Width']
+				return height, width
+			height, width = get_resize_dims()
+
+			# If opt['Multiple'] is set, we must ensure dimensions are a multiple of that number.
+			if opt.get('Multiple', 1) >= 2:
+				multiple = opt['Multiple']
+				height = height // multiple * multiple
+				width = width // multiple * multiple
+
+			im = skimage.transform.resize(im, [height, width], preserve_range=True).astype(im.dtype)
+
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
 		return numpy.array(data['Ints'], dtype='int64')

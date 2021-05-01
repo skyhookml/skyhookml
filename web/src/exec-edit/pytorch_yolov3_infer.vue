@@ -1,24 +1,7 @@
 <template>
 <div class="small-container m-2">
 	<template v-if="node != null">
-		<div class="row mb-2">
-			<label class="col-sm-2 col-form-label">Width</label>
-			<div class="col-sm-10">
-				<input v-model.number="params.Width" type="text" class="form-control">
-				<small class="form-text text-muted">
-					Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
-				</small>
-			</div>
-		</div>
-		<div class="row mb-2">
-			<label class="col-sm-2 col-form-label">Height</label>
-			<div class="col-sm-10">
-				<input v-model.number="params.Height" type="text" class="form-control">
-				<small class="form-text text-muted">
-					Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
-				</small>
-			</div>
-		</div>
+		<select-input-size v-model="params.Resize"></select-input-size>
 		<div class="row mb-2">
 			<label class="col-sm-2 col-form-label">Confidence Threshold</label>
 			<div class="col-sm-10">
@@ -35,8 +18,12 @@
 
 <script>
 import utils from '../utils.js';
+import SelectInputSize from './select-input-size.vue';
 
 export default {
+	components: {
+		'select-input-size': SelectInputSize,
+	},
 	data: function() {
 		return {
 			params: null,
@@ -49,8 +36,15 @@ export default {
 			let s = JSON.parse(this.node.Params);
 			params = s;
 		} catch(e) {}
-		if(!('Width' in params)) params.Width = 0;
-		if(!('Height' in params)) params.Height = 0;
+		if(!('Resize' in params)) {
+			params.Resize = {
+				Mode: 'scale-down',
+				MaxDimension: 640,
+				Width: 416,
+				Height: 416,
+				Multiple: 32,
+			};
+		}
 		if(!('ConfidenceThreshold' in params)) params.ConfidenceThreshold = 0.1;
 		this.params = params;
 	},

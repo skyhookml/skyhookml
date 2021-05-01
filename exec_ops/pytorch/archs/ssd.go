@@ -46,6 +46,7 @@ func init() {
 			p.Dataset.Op = "default"
 			p.Dataset.Params = string(skyhook.JsonMarshal(skyhook.PDDParams{
 				InputOptions: []interface{}{skyhook.PDDImageOptions{
+					Mode: "fixed",
 					Width: 300,
 					Height: 300,
 				}, struct{}{}},
@@ -75,7 +76,11 @@ func init() {
 					DataType: skyhook.DetectionType,
 				}},
 			}
-			opt := skyhook.PDDImageOptions{300, 300}
+			opt := skyhook.PDDImageOptions{
+				Mode: "fixed",
+				Width: 300,
+				Height: 300,
+			}
 			p.InputOptions = []skyhook.PIInputOption{{
 				Idx: 0,
 				Value: string(skyhook.JsonMarshal(opt)),

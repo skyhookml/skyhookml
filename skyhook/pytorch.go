@@ -111,8 +111,11 @@ type PytorchArch struct {
 // This configures skyhook.pytorch.dataset.default,
 // and goes JSON-encoded in PytorchTrainParams.Dataset.Params.
 type PDDImageOptions struct {
+	Mode string
+	MaxDimension int
 	Width int
 	Height int
+	Multiple int
 }
 type PDDParams struct {
 	InputOptions []interface{}

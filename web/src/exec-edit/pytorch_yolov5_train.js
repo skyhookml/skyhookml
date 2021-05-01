@@ -1,11 +1,23 @@
 import PytorchTrainGeneric from './pytorch_train-generic.js';
+import SelectInputSize from './select-input-size.vue';
+
 export default PytorchTrainGeneric({
+	components: {
+		'select-input-size': SelectInputSize,
+	},
 	disabled: ['model', 'dataset'],
 	created: function() {
 		if(!('Mode' in this.params)) this.$set(this.params, 'Mode', 'x');
-		if(!('Width' in this.params)) this.$set(this.params, 'Width', 0);
-		if(!('Height' in this.params)) this.$set(this.params, 'Height', 0);
 		if(!('ValPercent' in this.params)) this.$set(this.params, 'ValPercent', 20);
+		if(!('Resize' in this.params)) {
+			this.$set(this.params, 'Resize', {
+				Mode: 'scale-down',
+				MaxDimension: 640,
+				Width: 416,
+				Height: 416,
+				Multiple: 32,
+			});
+		}
 	},
 	basicTemplate: `
 <div class="small-container">
@@ -24,24 +36,6 @@ export default PytorchTrainGeneric({
 		</div>
 	</div>
 	<div class="row mb-2">
-		<label class="col-sm-4 col-form-label">Width</label>
-		<div class="col-sm-8">
-			<input v-model.number="params.Width" type="text" class="form-control">
-			<small class="form-text text-muted">
-				Resize the image to this width (must be a multiple of 32). Leave as 0 to use the input image without resizing.
-			</small>
-		</div>
-	</div>
-	<div class="row mb-2">
-		<label class="col-sm-4 col-form-label">Height</label>
-		<div class="col-sm-8">
-			<input v-model.number="params.Height" type="text" class="form-control">
-			<small class="form-text text-muted">
-				Resize the image to this height (must be a multiple of 32). Leave as 0 to use the input image without resizing.
-			</small>
-		</div>
-	</div>
-	<div class="row mb-2">
 		<label class="col-sm-4 col-form-label">Validation Percentage</label>
 		<div class="col-sm-8">
 			<input v-model.number="params.ValPercent" type="text" class="form-control">
@@ -50,6 +44,8 @@ export default PytorchTrainGeneric({
 			</small>
 		</div>
 	</div>
+	<hr />
+	<select-input-size v-model="params.Resize"></select-input-size>
 </div>
 	`,
 });
