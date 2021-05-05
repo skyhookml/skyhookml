@@ -2,26 +2,15 @@ import sys
 sys.path.append('./python')
 import skyhook.common as lib
 
-import io
-import json
-import math
-import numpy
-import os
-import os.path
-import skimage.io
-import struct
+import importlib
 
-user_func = None
+def f(meta):
+	module_name = 'custom'
+	module_spec = importlib.util.spec_from_loader(module_name, loader=None)
+	module = importlib.util.module_from_spec(module_spec)
+	exec(meta['Code'], module.__dict__)
+	sys.modules[module_name] = module
 
-# user_func will be defined by the exec call in meta_func
-def callback(*args):
-    return user_func(*args)
+	return module.f(meta)
 
-def meta_func(meta):
-    global user_func
-    # code should define a function "f"
-    locals = {}
-    exec(meta['Code'], None, locals)
-    user_func = locals['f']
-
-lib.run(callback, meta_func)
+lib.run(f)

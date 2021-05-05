@@ -22,13 +22,13 @@ type DBItem struct {
 	loaded bool
 }
 
-const DatasetQuery = "SELECT id, name, type, data_type, hash, done FROM datasets"
+const DatasetQuery = "SELECT id, name, type, data_type, metadata, hash, done FROM datasets"
 
 func datasetListHelper(rows *Rows) []*DBDataset {
 	datasets := []*DBDataset{}
 	for rows.Next() {
 		var ds DBDataset
-		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType, &ds.Hash, &ds.Done)
+		rows.Scan(&ds.ID, &ds.Name, &ds.Type, &ds.DataType, &ds.Metadata, &ds.Hash, &ds.Done)
 		datasets = append(datasets, &ds)
 	}
 	return datasets
@@ -193,12 +193,13 @@ func (ds *DBDataset) getDB() *Database {
 			-- 'data' or 'computed'
 			type TEXT,
 			data_type TEXT,
+			metadata TEXT,
 			-- only set if computed
 			hash TEXT
 		)`)
 		db.Exec(
-			"INSERT OR REPLACE INTO datasets (id, name, type, data_type, hash) VALUES (1, ?, ?, ?, ?)",
-			ds.Name, ds.Type, ds.DataType, ds.Hash,
+			"INSERT OR REPLACE INTO datasets (id, name, type, data_type, metadata, hash) VALUES (1, ?, ?, ?, ?, ?)",
+			ds.Name, ds.Type, ds.DataType, ds.Metadata, ds.Hash,
 		)
 	})
 }
@@ -246,19 +247,19 @@ func (ds *DBDataset) GetItem(key string) *DBItem {
 	}
 }
 
-func (ds *DBDataset) WriteItem(key string, data skyhook.Data) (*DBItem, error) {
+func (ds *DBDataset) WriteItem(key string, data interface{}, metadata skyhook.DataMetadata) (*DBItem, error) {
 	// TODO: might want to write the item before updating database
-	ext, format := data.GetDefaultExtAndFormat()
+	ext, format := ds.DataSpec().GetDefaultExtAndFormat(data, metadata)
 	item, err := ds.AddItem(skyhook.Item{
 		Key: key,
 		Ext: ext,
 		Format: format,
-		Metadata: string(skyhook.JsonMarshal(data.GetMetadata())),
+		Metadata: string(skyhook.JsonMarshal(metadata)),
 	})
 	if err != nil {
 		return nil, err
 	}
-	err = item.UpdateData(data)
+	err = item.UpdateData(data, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +320,12 @@ func (item *DBItem) SetMetadataFromFile() error {
 	if fname == "" {
 		return fmt.Errorf("could not set metadata from file in dataset not supporting filename")
 	}
-	format, metadata, err := skyhook.DataImpls[item.Dataset.DataType].GetDefaultMetadata(fname)
+	spec := item.DataSpec()
+	spec_, ok := spec.(skyhook.MetadataFromFileDataSpec)
+	if !ok {
+		return fmt.Errorf("MetadataFromFile not supported for type %s", item.Dataset.DataType)
+	}
+	format, metadata, err := spec_.GetMetadataFromFile(fname)
 	if err != nil {
 		return err
 	}
@@ -327,12 +333,12 @@ func (item *DBItem) SetMetadataFromFile() error {
 	return nil
 }
 
-func (item *DBItem) SetMetadata(format string, metadata string) {
+func (item *DBItem) SetMetadata(format string, metadata skyhook.DataMetadata) {
 	item.Load()
 	item.Format = format
-	item.Metadata = metadata
+	item.Metadata = string(skyhook.JsonMarshal(metadata))
 	db := (&DBDataset{Dataset: item.Dataset}).getDB()
-	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE k = ?", format, metadata, item.Key)
+	db.Exec("UPDATE items SET format = ?, metadata = ? WHERE k = ?", item.Format, item.Metadata, item.Key)
 }
 
 func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) *DBDataset {
@@ -341,4 +347,20 @@ func NewDataset(name string, t string, dataType skyhook.DataType, hash *string) 
 	id := res.LastInsertId()
 	log.Printf("[dataset %d-%s] created new dataset, data_type=%v", id, name, dataType)
 	return GetDataset(id)
+}
+
+type DatasetUpdate struct {
+	Name *string
+	Metadata *string
+}
+
+func (ds *DBDataset) Update(req DatasetUpdate) {
+	if req.Name != nil {
+		db.Exec("UPDATE datasets SET name = ? WHERE id = ?", *req.Name, ds.ID)
+		ds.Name = *req.Name
+	}
+	if req.Metadata != nil {
+		db.Exec("UPDATE datasets SET metadata = ? WHERE id = ?", *req.Metadata, ds.ID)
+		ds.Metadata = *req.Metadata
+	}
 }

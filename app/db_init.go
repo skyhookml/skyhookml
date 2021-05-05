@@ -20,6 +20,7 @@ func InitDB(init bool) {
 			-- 'data' or 'computed'
 			type TEXT,
 			data_type TEXT,
+			metadata TEXT DEFAULT '',
 			-- only set if computed
 			hash TEXT,
 			done INTEGER DEFAULT 1

@@ -30,14 +30,11 @@ arch['Components'][0]['Params'] = json.dumps(comp_params)
 
 # example inputs
 im_data = numpy.zeros((300, 300, 3), dtype='uint8')
-detection_data = {
-    'Metadata': {'CanvasDims': [300, 300]},
-    'Detections': [{'Left': 100, 'Right': 100, 'Top': 100, 'Bottom': 100}],
-}
+detection_data = [{'Left': 100, 'Right': 100, 'Top': 100, 'Bottom': 100}]
 # Need to repeat the inputs twice because SSD requires batch_size>1 for normalization.
 example_inputs = [
-    util.collate('image', 2*[util.prepare_input('image', im_data, {})]),
-    util.collate('detection', 2*[util.prepare_input('detection', detection_data, {})]),
+    util.collate('image', 2*[util.prepare_input('image', im_data, {}, {})]),
+    util.collate('detection', 2*[util.prepare_input('detection', detection_data, {'CanvasDims': [300, 300]}, {})]),
 ]
 util.inputs_to_device(example_inputs, device)
 

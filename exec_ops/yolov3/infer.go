@@ -77,11 +77,7 @@ func (e *Yolov3) Parallelism() int {
 }
 
 func (e *Yolov3) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items["images"][0][0].LoadData()
-	if err != nil {
-		return err
-	}
-	reader := data.(skyhook.ReadableData).Reader()
+	reader, _ := task.Items["images"][0][0].LoadReader()
 	defer reader.Close()
 	var detections [][]skyhook.Detection
 	zeroImage := skyhook.NewImage(e.dims[0], e.dims[1])
@@ -92,7 +88,7 @@ func (e *Yolov3) Apply(task skyhook.ExecTask) error {
 		} else if err != nil {
 			return err
 		}
-		images := imageData.(skyhook.ImageData).Images
+		images := imageData.([]skyhook.Image)
 
 		e.mu.Lock()
 		// write this batch of images
@@ -127,14 +123,14 @@ func (e *Yolov3) Apply(task skyhook.ExecTask) error {
 		detections = append(detections, batchDetections[0:len(images)]...)
 	}
 
-	output := skyhook.DetectionData{
-		Detections: detections,
-		Metadata: skyhook.DetectionMetadata{
+	return exec_ops.WriteItem(
+		e.URL, e.Dataset, task.Key,
+		detections,
+		skyhook.DetectionMetadata{
 			CanvasDims: e.dims,
 			Categories: e.categories,
 		},
-	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
+	)
 }
 
 func (e *Yolov3) Close() {

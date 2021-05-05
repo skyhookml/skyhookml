@@ -73,28 +73,22 @@ func (e *Tracker) Parallelism() int {
 }
 
 func (e *Tracker) Apply(task skyhook.ExecTask) error {
-	videoData, err := task.Items["video"][0][0].LoadData()
-	if err != nil {
-		return err
-	}
+	videoItem := task.Items["video"][0][0]
+	detectionItem := task.Items["detections"][0][0]
+	detectionDims := detectionItem.DecodeMetadata().(skyhook.DetectionMetadata).CanvasDims
 
-	data1, err := task.Items["detections"][0][0].LoadData()
-	if err != nil {
-		return err
-	}
-	detectionData := data1.(skyhook.DetectionData)
-
-	ndetections := make([][]skyhook.Detection, len(detectionData.Detections))
+	var ndetections [][]skyhook.Detection
 	activeTracks := make(map[int][]strack.TrackedDetection)
 	activeImages := make(map[int][]skyhook.Image) // images corresponding to activeTracks
 	nextTrackID := 1
 
-	datas := []skyhook.Data{videoData, detectionData}
-	err = skyhook.PerFrame(datas, func(frameIdx int, datas []skyhook.Data) error {
-		im := datas[0].(skyhook.ImageData).Images[0]
-		detectionData := datas[1].(skyhook.DetectionData)
-		detectionDims := detectionData.Metadata.CanvasDims
-		dlist := detectionData.Detections[0]
+	err := skyhook.PerFrame([]skyhook.Item{videoItem, detectionItem}, func(frameIdx int, datas []interface{}) error {
+		for len(ndetections) <= frameIdx {
+			ndetections = append(ndetections, []skyhook.Detection{})
+		}
+
+		im := datas[0].([]skyhook.Image)[0]
+		dlist := datas[1].([][]skyhook.Detection)[0]
 
 		// prepare query to python script:
 		// (1) batch of images from tracks
@@ -214,11 +208,7 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 		return err
 	}
 
-	outputData := skyhook.DetectionData{
-		Detections: ndetections,
-		Metadata: detectionData.Metadata,
-	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, outputData)
+	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, ndetections, detectionItem.DecodeMetadata())
 }
 
 func (e *Tracker) Close() {}

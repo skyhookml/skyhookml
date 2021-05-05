@@ -19,7 +19,7 @@ func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	data, err := item.LoadData()
+	data, metadata, err := item.LoadData()
 	if err != nil {
 		panic(err)
 	}
@@ -35,10 +35,10 @@ func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request
 	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		var filename string
-		if data.Type() == skyhook.FileType {
-			filename = data.(skyhook.FileData).Metadata.Filename
+		if item.Dataset.DataType == skyhook.FileType {
+			filename = metadata.(skyhook.FileMetadata).Filename
 		} else {
-			ext := skyhook.GetExtGivenFormat(item.Dataset.DataType, format)
+			ext := skyhook.GetExtFromFormat(item.Dataset.DataType, format)
 			if ext == "" {
 				ext = item.Ext
 			}
@@ -47,7 +47,7 @@ func (item *DBItem) Handle(format string, w http.ResponseWriter, r *http.Request
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=\"%s\"", filename))
 	}
 
-	if err := data.Encode(format, w); err != nil {
+	if err := item.DataSpec().Write(data, format, metadata, w); err != nil {
 		panic(err)
 	}
 }
@@ -74,6 +74,22 @@ func init() {
 		}
 		skyhook.JsonResponse(w, dataset)
 	}).Methods("GET")
+
+	Router.HandleFunc("/datasets/{ds_id}", func(w http.ResponseWriter, r *http.Request) {
+		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
+		dataset := GetDataset(dsID)
+		if dataset == nil {
+			http.Error(w, "no such dataset", 404)
+			return
+		}
+
+		var request DatasetUpdate
+		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			return
+		}
+
+		dataset.Update(request)
+	}).Methods("POST")
 
 	Router.HandleFunc("/datasets/{ds_id}", func(w http.ResponseWriter, r *http.Request) {
 		dsID := skyhook.ParseInt(mux.Vars(r)["ds_id"])
@@ -166,12 +182,8 @@ func init() {
 		format := r.Form.Get("format")
 
 		if format == "meta" {
-			w.Header().Set("Content-Type", "application/json")
-			metadata := item.Metadata
-			if metadata == "" {
-				metadata = "{}"
-			}
-			w.Write([]byte(metadata))
+			metadata := item.DecodeMetadata()
+			skyhook.JsonResponse(w, metadata)
 			return
 		}
 
@@ -188,18 +200,18 @@ func init() {
 		}
 
 		item.Load()
-		data, err := item.LoadData()
-		if err != nil {
-			panic(err)
-		}
-		reader := data.(skyhook.VideoData).ReadSlice(frameIdx, frameIdx+1)
+		videoSpec := skyhook.DataSpecs[skyhook.VideoType].(skyhook.VideoDataSpec)
+		imageSpec := skyhook.DataSpecs[skyhook.ImageType]
+		reader := videoSpec.ReadSlice("mp4", item.DecodeMetadata(), item.Fname(), frameIdx, frameIdx+1)
 		defer reader.Close()
-		imageData, err := reader.Read(1)
+		data, err := reader.Read(1)
 		if err != nil {
-			panic(err)
+			http.Error(w, fmt.Sprintf("error reading frame: %v", err), 400)
+			return
 		}
+		images := data.([]skyhook.Image)
 		w.Header().Set("Content-Type", "image/jpeg")
-		if err := imageData.Encode("jpeg", w); err != nil {
+		if err := imageSpec.Write(images[0], "jpeg", nil, w); err != nil {
 			panic(err)
 		}
 	}))

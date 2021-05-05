@@ -4,8 +4,6 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"bytes"
-	"io"
 	"runtime"
 )
 
@@ -44,66 +42,41 @@ func (e *CropResize) Parallelism() int {
 }
 
 func (e *CropResize) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items["input"][0][0].LoadData()
+	inputItem := task.Items["input"][0][0]
+	inputMetadata := inputItem.DecodeMetadata().(skyhook.VideoMetadata)
+
+	// Initialize writer.
+	outputMetadata := skyhook.VideoMetadata{
+		Dims: e.Params.OutputDims(),
+		Framerate: inputMetadata.Framerate,
+		Duration: inputMetadata.Duration,
+	}
+	outputItem, err := exec_ops.AddItem(e.URL, e.OutputDataset, task.Key, inputItem.Ext, inputItem.Format, outputMetadata)
 	if err != nil {
 		return err
 	}
-	vdata := data.(skyhook.VideoData)
+	writer := outputItem.LoadWriter()
 
-	// encode the video and write the data in a separate thread
-	ch := make(chan skyhook.Image)
-	donech := make(chan error, 1)
-	go func() {
-		r, cmd := skyhook.MakeVideo(&skyhook.ChanReader{ch}, e.Params.OutputDims(), vdata.Metadata.Framerate)
-		buf := new(bytes.Buffer)
-		_, err := io.Copy(buf, r)
-		if err != nil {
-			r.Close()
-			cmd.Wait()
-			donech <- err
-			return
-		}
-		r.Close()
-		cmd.Wait()
-		outMeta := skyhook.VideoMetadata{
-			Dims: e.Params.OutputDims(),
-			Framerate: vdata.Metadata.Framerate,
-			Duration: vdata.Metadata.Duration,
-		}
-		outData := skyhook.VideoData{
-			Metadata: outMeta,
-			Bytes: buf.Bytes(),
-		}
-
-		err = exec_ops.WriteItem(e.URL, e.OutputDataset, task.Key, outData)
-		donech <- err
-	}()
-
-	// now read the data and pass it over ch
+	// Use PerFrame to get input frames.
 	start := e.Params.Start
 	cropDims := e.Params.CropDims
 	resizeDims := e.Params.ResizeDims
-	err = vdata.Iterator().Iterate(32, func(im skyhook.Image) {
-		// crop and resize
+	err = skyhook.PerFrame([]skyhook.Item{inputItem}, func(pos int, datas []interface{}) error {
+		im := datas[0].([]skyhook.Image)[0]
+
+		// Crop and resize.
 		im = im.Crop(start[0], start[1], start[0]+cropDims[0], start[1]+cropDims[1])
 		if resizeDims[0] > 0 {
 			im = im.Resize(resizeDims[0], resizeDims[1])
 		}
 
-		ch <- im
+		return writer.Write([]skyhook.Image{im})
 	})
-	close(ch)
 	if err != nil {
 		return err
 	}
 
-	// wait for encoder thread
-	encodeErr := <- donech
-	if encodeErr != nil {
-		return encodeErr
-	}
-
-	return nil
+	return writer.Close()
 }
 
 func (e *CropResize) Close() {}

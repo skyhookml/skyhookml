@@ -3,6 +3,7 @@ import random
 import requests
 import torch
 
+import skyhook.common as lib
 import skyhook.pytorch.util as util
 
 class Dataset(torch.utils.data.Dataset):
@@ -21,6 +22,16 @@ class Dataset(torch.utils.data.Dataset):
 		# data augmentation steps
 		self.augments = []
 
+		# Extract metadata for each item.
+		self.metadatas = {}
+		for key in self.keys:
+			cur = []
+			for dataset in self.datasets:
+				item = items[dataset['ID']]
+				metadata = lib.decode_metadata(dataset, item)
+				cur.append(metadata)
+			self.metadatas[key] = cur
+
 	def __len__(self):
 		return len(self.keys)
 
@@ -30,12 +41,13 @@ class Dataset(torch.utils.data.Dataset):
 
 		key = self.keys[idx]
 		items = self.items[key]
+		metadatas = self.metadatas[key]
 
 		inputs = []
-		for dataset in self.datasets:
+		for i, dataset in enumerate(self.datasets):
 			item = items[dataset['ID']]
 			data = util.read_input(dataset, item)
-			data = util.prepare_input(dataset['DataType'], data, dataset['Options'])
+			data = util.prepare_input(dataset['DataType'], data, metadatas[i], dataset['Options'])
 			inputs.append(data)
 
 		return inputs
@@ -45,16 +57,7 @@ class Dataset(torch.utils.data.Dataset):
 		Returns the metadata for the items at the specified index.
 		'''
 		key = self.keys[idx]
-		items = self.items[key]
-
-		metadatas = []
-		for dataset in self.datasets:
-			item = items[dataset['ID']]
-			if not item['Metadata']:
-				metadatas.append(None)
-				continue
-			metadatas.append(json.loads(item['Metadata']))
-		return metadatas
+		return self.metadatas[key]
 
 	def get_datatypes(self):
 		'''

@@ -36,44 +36,41 @@ func init() {
 				// we support:
 				// - Table: combine all rows into one table.
 				// - Any sequence type: use ChunkBuilder to build the sequence.
+				// TODO: make Table a sequence type so we don't have to have this special case.
 				if dtype == skyhook.TableType {
-					outTable := skyhook.TableData{}
+					var outData [][]string
+					var outMetadata skyhook.DataMetadata
 					for _, item := range items {
-						data_, err := item.LoadData()
+						data, metadata, err := item.LoadData()
 						if err != nil {
 							return err
 						}
-						data := data_.(skyhook.TableData)
-						if outTable.Specs == nil {
-							outTable.Specs = data.Specs
-						}
-						outTable.Data = append(outTable.Data, data.Data...)
+						outMetadata = metadata
+						outData = append(outData, data.([][]string)...)
 					}
-					return exec_ops.WriteItem(url, outDataset, "union", outTable)
+					return exec_ops.WriteItem(url, outDataset, "union", outData, outMetadata)
 				} else {
-					// must be sequence data
-					builder := skyhook.DataImpls[dtype].Builder()
+					// Must be sequence data.
+					// Get the metadata, ext, and format from the first item.
+					outItem, err := exec_ops.AddItem(url, outDataset, "union", items[0].Ext, items[0].Format, items[0].DecodeMetadata())
+					if err != nil {
+						return err
+					}
+					writer := outItem.LoadWriter()
 					for _, item := range items {
-						data, err := item.LoadData()
-						if err != nil {
-							return err
-						}
-						rd := data.(skyhook.ReadableData).Reader()
+						reader, _ := item.LoadReader()
 						for {
-							cur, err := rd.Read(32)
+							cur, err := reader.Read(32)
 							if err == io.EOF {
 								break
 							} else if err != nil {
 								return err
 							}
-							builder.Write(cur)
+							writer.Write(cur)
 						}
+						reader.Close()
 					}
-					data, err := builder.Close()
-					if err != nil {
-						return err
-					}
-					return exec_ops.WriteItem(url, outDataset, "union", data)
+					return writer.Close()
 				}
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil

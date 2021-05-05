@@ -60,7 +60,7 @@
 				<td>{{ ds.Type }}</td>
 				<td>{{ $globals.dataTypes[ds.DataType] }}</td>
 				<td>
-					<button v-on:click="selectDataset(ds)" class="btn btn-sm btn-primary">Manage</button>
+					<router-link :to="'/ws/'+$route.params.ws+'/datasets/'+ds.ID" class="btn btn-sm btn-primary">Manage</router-link>
 					<button v-on:click="exportDataset(ds)" class="btn btn-sm btn-primary">Export</button>
 					<button v-on:click="deleteDataset(ds.ID)" class="btn btn-sm btn-danger">Delete</button>
 				</td>
@@ -110,9 +110,6 @@ const Datasets = {
 			utils.request(this, 'DELETE', '/datasets/'+dsID, null, () => {
 				this.fetchDatasets();
 			});
-		},
-		selectDataset: function(dataset) {
-			this.$router.push('/ws/'+this.$route.params.ws+'/datasets/'+dataset.ID);
 		},
 		exportDataset: function(dataset) {
 			let endpoint;

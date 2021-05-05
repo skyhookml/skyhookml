@@ -3,7 +3,6 @@ from skyhook.op.op import Operator
 import skyhook.common as lib
 import skyhook.io
 
-import io
 import requests
 
 class AllDecorateOperator(Operator):
@@ -14,28 +13,29 @@ class AllDecorateOperator(Operator):
 
 	def apply(self, task):
 		# Use LoadData to fetch datas one by one.
+		# We combine it with metadata to create the input arguments.
 		items = [item_list[0] for item_list in task['Items']['inputs']]
-		datas = []
+		args = []
 		for i, item in enumerate(items):
-			resp = requests.post(self.local_url + '/load-data', json=item, stream=True)
-			resp.raise_for_status()
-			data = skyhook.io.read_datas(resp.raw, [self.inputs[i]['DataType']])[0]
-			datas.append(data)
+			data, metadata = self.read_item(self.inputs[i], item)
+			args.append({
+				'Data': data,
+				'Metadata': metadata,
+			})
 
 		# Run the user-defined function.
-		outputs = self.f(*datas)
+		outputs = self.f(*args)
 		if not isinstance(outputs, tuple):
 			outputs = (outputs,)
 
 		# Write each output item.
 		for i, data in enumerate(outputs):
-			buf = io.BytesIO()
-			skyhook.io.write_json(buf, {
-				'Dataset': self.outputs[i],
-				'Key': task['Key'],
-			})
-			skyhook.io.write_datas(buf, [self.outputs[i]['DataType']], [data])
-			requests.post(self.local_url + '/write-item', data=buf.getvalue()).raise_for_status()
+			if instanceof(data, dict) and 'Data' in data:
+				data, metadata = data['Data'], data['Metadata']
+			else:
+				metadata = {}
+
+			self.write_item(self.outputs[i], task['Key'], data, metadata)
 
 def all_decorate(f):
 	def wrap(meta_packet):

@@ -110,12 +110,19 @@ export default {
 		utils.request(this, 'GET', '/datasets/'+dsID+'/items/'+itemKey, null, (item) => {
 			this.item = item;
 			this.downloadFormat = this.item.Format;
-			try {
-				this.metadata = JSON.parse(this.item.Metadata);
-				if(!this.metadata) {
-					this.metadata = {};
+
+			let metadata = {};
+			if(this.item.Dataset.Metadata) {
+				for(let [k, v] of Object.entries(JSON.parse(this.item.Dataset.Metadata))) {
+					metadata[k] = v;
 				}
-			} catch(e) {}
+			}
+			if(this.item.Metadata) {
+				for(let [k, v] of Object.entries(JSON.parse(this.item.Metadata))) {
+					metadata[k] = v;
+				}
+			}
+			this.metadata = metadata;
 
 			this.$store.commit('setRouteData', {
 				dataset: this.item.Dataset,

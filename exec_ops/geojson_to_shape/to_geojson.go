@@ -46,15 +46,13 @@ func ShapeToGeoJson(url string, outputDataset skyhook.Dataset, task skyhook.Exec
 	for _, items := range grouped {
 		geoItem := items["images"][0]
 		shapeItem := items["shapes"][0]
-		var geoMeta skyhook.GeoImageMetadata
-		skyhook.JsonUnmarshal([]byte(geoItem.Metadata), &geoMeta)
-		shapeData_, err := shapeItem.LoadData()
+		geoMeta := geoItem.DecodeMetadata().(skyhook.GeoImageMetadata)
+		shapeData, shapeMetadata, err := shapeItem.LoadData()
 		if err != nil {
 			return err
 		}
-		shapeData := shapeData_.(skyhook.ShapeData)
-		canvasDims := shapeData.Metadata.CanvasDims
-		for _, shape := range shapeData.Shapes[0] {
+		canvasDims := shapeMetadata.(skyhook.ShapeMetadata).CanvasDims
+		for _, shape := range shapeData.([][]skyhook.Shape)[0] {
 			geometry, err := getGeometry(shape, canvasDims, geoMeta)
 			if err != nil {
 				return err
@@ -65,7 +63,7 @@ func ShapeToGeoJson(url string, outputDataset skyhook.Dataset, task skyhook.Exec
 	}
 
 	// Write FeatureCollection to otuput dataset.
-	return exec_ops.WriteItem(url, outputDataset, "geojson", skyhook.GeoJsonData{Collection: fc})
+	return exec_ops.WriteItem(url, outputDataset, "geojson", fc, skyhook.NoMetadata{})
 }
 
 func init() {

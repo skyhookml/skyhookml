@@ -1,7 +1,6 @@
 package skyhook
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -49,40 +48,81 @@ func (bbox GeoBbox) Rect() gomapinfer.Rectangle {
 
 type GeoImageMetadata struct {
 	// either "webmercator" or "custom"
-	ReferenceType string
+	ReferenceType string `json:",omitempty"`
 
 	// For "webmercator" georeference type.
 	// Zoom, X, and Y specify the cell that the image spans.
-	Zoom int
-	X int
-	Y int
+	Zoom int `json:",omitempty"`
+	X int `json:",omitempty"`
+	Y int `json:",omitempty"`
 	// Scale specifies resolution of each cell. Usually it is 256.
-	Scale int
+	Scale int `json:",omitempty"`
 	// Offset specifies offset from the X,Y tile.
-	Offset [2]int
+	Offset [2]int `json:",omitempty"`
 
 	// Width and height corresponding to the specified zoom and scale.
 	// This does not necessarily match the image width and height, but if image
 	// is resized from this width and height then the x / y axis must still be proportional.
-	Width int
-	Height int
+	Width int `json:",omitempty"`
+	Height int `json:",omitempty"`
 
 	// For custom formats, optionally store the longitude-latitude of bottom-left and top-right corners.
 	// If set, we assume that the projection is like Mercator where compass direction matches image axes.
 	// If not set, we cannot transform between longitude-latitude and pixel coordinates.
-	Bbox [4]float64
+	Bbox [4]float64 `json:",omitempty"`
 
 	// image source type
 	// "local": image is stored in JPEG file
 	// "url": image comes from a tile server
 	// "dataset": image comes from another dataset
-	SourceType string
+	SourceType string `json:",omitempty"`
 
 	// For URL type, the tile server URL.
-	URL string
+	URL string `json:",omitempty"`
 
 	// For dataset type, define the source items.
-	Items []GeoImageItemSource
+	Items []GeoImageItemSource `json:",omitempty"`
+}
+
+func (m GeoImageMetadata) Update(other DataMetadata) DataMetadata {
+	other_ := other.(GeoImageMetadata)
+	if other_.ReferenceType != "" {
+		m.ReferenceType = other_.ReferenceType
+	}
+	if other_.Zoom != 0 {
+		m.Zoom = other_.Zoom
+	}
+	if other_.X != 0 {
+		m.X = other_.X
+	}
+	if other_.Y != 0 {
+		m.Y = other_.Y
+	}
+	if other_.Scale != 0 {
+		m.Scale = other_.Scale
+	}
+	if other_.Offset[0] != 0 {
+		m.Offset = other_.Offset
+	}
+	if other_.Width != 0 {
+		m.Width = other_.Width
+	}
+	if other_.Height != 0 {
+		m.Height = other_.Height
+	}
+	if other_.Bbox[0] != 0 {
+		m.Bbox = other_.Bbox
+	}
+	if other_.SourceType != "" {
+		m.SourceType = other_.SourceType
+	}
+	if other_.URL != "" {
+		m.URL = other_.URL
+	}
+	if len(other_.Items) > 0 {
+		m.Items = other_.Items
+	}
+	return m
 }
 
 // Assuming SourceType=="url", download a tile in this image from the URL.
@@ -135,104 +175,126 @@ func (m GeoImageMetadata) GetBbox() GeoBbox {
 	}
 }
 
-type GeoImageData struct {
-	Metadata GeoImageMetadata
-	Image Image
+type GeoImageDataSpec struct{}
+
+func (s GeoImageDataSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	if rawMetadata == "" {
+		return GeoImageMetadata{}
+	}
+	var m GeoImageMetadata
+	JsonUnmarshal([]byte(rawMetadata), &m)
+	return m
 }
 
-func (d GeoImageData) GetImage() (Image, error) {
-	if len(d.Image.Bytes) > 0 {
-		return d.Image, nil
+func (s GeoImageDataSpec) ReadStream(r io.Reader) (interface{}, error) {
+	var header ImageStreamHeader
+	if err := ReadJsonData(r, &header); err != nil {
+		return nil, err
+	}
+	if header.Length == 0 {
+		return nil, nil
+	}
+	bytes := make([]byte, header.Width*header.Height*3)
+	if _, err := io.ReadFull(r, bytes); err != nil {
+		return nil, err
+	}
+	image := Image{
+		Width: header.Width,
+		Height: header.Height,
+		Bytes: bytes,
+	}
+	return image, nil
+}
+
+func (s GeoImageDataSpec) WriteStream(data interface{}, w io.Writer) error {
+	image := data.(Image)
+	header := ImageStreamHeader{
+		Width: image.Width,
+		Height: image.Height,
+		Channels: 3,
+		Length: 1,
+		BytesPerElement: len(image.Bytes),
+	}
+	if err := WriteJsonData(header, w); err != nil {
+		return err
+	}
+	if _, err := w.Write(image.Bytes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GeoImageDataSpec) Read(format string, metadata_ DataMetadata, r io.Reader) (data interface{}, err error) {
+	// Check if image is available locally.
+	if format == "jpeg" {
+		image, err := ImageFromJPGReader(r)
+		if err != nil {
+			return nil, err
+		}
+		return image, nil
 	}
 
-	if d.Metadata.SourceType == "url" {
-		if d.Metadata.ReferenceType != "webmercator" {
+	metadata := metadata_.(GeoImageMetadata)
+
+	if metadata.SourceType == "url" {
+		if metadata.ReferenceType != "webmercator" {
 			return Image{}, fmt.Errorf("URL source type only supported for webmercator reference type")
 		}
 
 		// compute bounding box in global pixel coordinates
-		sx := d.Metadata.X * d.Metadata.Scale + d.Metadata.Offset[0]
-		sy := d.Metadata.Y * d.Metadata.Scale + d.Metadata.Offset[1]
-		ex := sx + d.Metadata.Width
-		ey := sy + d.Metadata.Height
+		sx := metadata.X * metadata.Scale + metadata.Offset[0]
+		sy := metadata.Y * metadata.Scale + metadata.Offset[1]
+		ex := sx + metadata.Width
+		ey := sy + metadata.Height
 
-		im := NewImage(d.Metadata.Width, d.Metadata.Height)
+		im := NewImage(metadata.Width, metadata.Height)
 
 		// download each tile and stick it in the right place
-		for i := sx/d.Metadata.Scale; i <= (ex-1)/d.Metadata.Scale; i++ {
-			for j := sy/d.Metadata.Scale; j <= (ey-1)/d.Metadata.Scale; j++ {
-				tile, err := d.Metadata.DownloadTile(i, j)
+		for i := sx/metadata.Scale; i <= (ex-1)/metadata.Scale; i++ {
+			for j := sy/metadata.Scale; j <= (ey-1)/metadata.Scale; j++ {
+				tile, err := metadata.DownloadTile(i, j)
 				if err != nil {
 					return Image{}, err
 				}
 				dstPos := [2]int{
-					i*d.Metadata.Scale - sx,
-					j*d.Metadata.Scale - sy,
+					i*metadata.Scale - sx,
+					j*metadata.Scale - sy,
 				}
 				im.DrawImage(dstPos[0], dstPos[1], tile)
 			}
 		}
 
 		return im, nil
-	} else if d.Metadata.SourceType == "dataset" {
-		im := NewImage(d.Metadata.Width, d.Metadata.Height)
-		for _, srcItem := range d.Metadata.Items {
-			data_, err := srcItem.Item.LoadData()
+	} else if metadata.SourceType == "dataset" {
+		im := NewImage(metadata.Width, metadata.Height)
+		for _, srcItem := range metadata.Items {
+			data, _, err := srcItem.Item.LoadData()
 			if err != nil {
 				return Image{}, fmt.Errorf("error loading source tile in dataset %d: %v", srcItem.Item.Dataset.ID, err)
 			}
-			data := data_.(GeoImageData)
-			tile, err := data.GetImage()
-			if err != nil {
-				return Image{}, fmt.Errorf("error loading source tile in dataset %d: %v", srcItem.Item.Dataset.ID, err)
-			}
-			im.DrawImage(srcItem.Offset[0], srcItem.Offset[1], tile)
+			im.DrawImage(srcItem.Offset[0], srcItem.Offset[1], data.(Image))
 		}
 
 		return im, nil
 	}
 
-	return Image{}, fmt.Errorf("unknown source type %s", d.Metadata.SourceType)
+	return nil, fmt.Errorf("unknown source type %s", metadata.SourceType)
 }
 
-type GeoImageStreamHeader struct {
-	Metadata GeoImageMetadata
-	Width int
-	Height int
-}
-
-func (d GeoImageData) EncodeStream(w io.Writer) error {
-	im, err := d.GetImage()
-	if err != nil {
-		return err
-	}
-	err = WriteJsonData(GeoImageStreamHeader{
-		Metadata: d.Metadata,
-		Width: im.Width,
-		Height: im.Height,
-	}, w)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(im.Bytes)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d GeoImageData) Encode(format string, w io.Writer) error {
+func (s GeoImageDataSpec) Write(data interface{}, format string, metadata_ DataMetadata, w io.Writer) error {
+	metadata := metadata_.(GeoImageMetadata)
 	if format == "txt" {
-		if d.Metadata.SourceType != "url" && d.Metadata.SourceType != "dataset" {
-			return fmt.Errorf("cannot encode GeoImage with source type %s to txt format", d.Metadata.SourceType)
+		if metadata.SourceType != "url" && metadata.SourceType != "dataset" {
+			return fmt.Errorf("cannot encode GeoImage with source type %s to txt format", metadata.SourceType)
 		}
 		// don't need to write anything since data is stored at the URL or dataset
 		return nil
 	} else if format == "jpeg" {
-		if d.Metadata.SourceType != "local" {
+		if metadata.SourceType != "local" {
 			return fmt.Errorf("only local source type can be encoded as jpeg")
 		}
-		bytes, err := d.Image.AsJPG()
+		image := data.(Image)
+		bytes, err := image.AsJPG()
 		if err != nil {
 			return err
 		}
@@ -242,60 +304,15 @@ func (d GeoImageData) Encode(format string, w io.Writer) error {
 	return fmt.Errorf("unknown format %s", format)
 }
 
-func (d GeoImageData) Type() DataType {
-	return GeoImageType
-}
-
-func (d GeoImageData) GetDefaultExtAndFormat() (string, string) {
-	if d.Metadata.SourceType == "local" {
+func (s GeoImageDataSpec) GetDefaultExtAndFormat(data interface{}, metadata_ DataMetadata) (ext string, format string) {
+	metadata := metadata_.(GeoImageMetadata)
+	if metadata.SourceType == "local" {
 		return "jpg", "jpeg"
 	} else {
 		return "txt", "txt"
 	}
 }
 
-func (d GeoImageData) GetMetadata() interface{} {
-	return d.Metadata
-}
-
 func init() {
-	DataImpls[GeoImageType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var header GeoImageStreamHeader
-			if err := ReadJsonData(r, &header); err != nil {
-				return nil, err
-			}
-			bytes := make([]byte, header.Width*header.Height*3)
-			if _, err := io.ReadFull(r, bytes); err != nil {
-				return nil, err
-			}
-			im := Image{
-				Width: header.Width,
-				Height: header.Height,
-				Bytes: bytes,
-			}
-			return GeoImageData{
-				Metadata: header.Metadata,
-				Image: im,
-			}, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var metadata GeoImageMetadata
-			if err := json.Unmarshal([]byte(metadataRaw), &metadata); err != nil {
-				return nil, err
-			}
-			data := GeoImageData{Metadata: metadata}
-			if format == "jpeg" {
-				var err error
-				data.Image, err = ImageFromJPGReader(r)
-				if err != nil {
-					return nil, err
-				}
-			}
-			return data, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "", "", fmt.Errorf("GetDefaultMetadata not supported for GeoImage datasets")
-		},
-	}
+	DataSpecs[GeoImageType] = GeoImageDataSpec{}
 }

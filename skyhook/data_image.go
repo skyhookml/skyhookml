@@ -6,35 +6,87 @@ import (
 	"path/filepath"
 )
 
-type ImageData struct {
-	Images []Image
+
+type ImageDataSpec struct{}
+
+func (s ImageDataSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	return NoMetadata{}
 }
 
 type ImageStreamHeader struct {
-	Length int
 	Width int
 	Height int
+	Channels int
+	Length int
+	BytesPerElement int
 }
 
-func (d ImageData) EncodeStream(w io.Writer) error {
-	WriteJsonData(ImageStreamHeader{
-		Length: len(d.Images),
-		Width: d.Images[0].Width,
-		Height: d.Images[0].Height,
-	}, w)
-	for _, image := range d.Images {
-		if _, err := w.Write(image.Bytes); err != nil {
-			return err
-		}
+func (s ImageDataSpec) ReadStream(r io.Reader) (interface{}, error) {
+	var header ImageStreamHeader
+	if err := ReadJsonData(r, &header); err != nil {
+		return nil, err
+	}
+	bytes := make([]byte, header.Width*header.Height*3)
+	if _, err := io.ReadFull(r, bytes); err != nil {
+		return nil, err
+	}
+	image := Image{
+		Width: header.Width,
+		Height: header.Height,
+		Bytes: bytes,
+	}
+	return image, nil
+}
+
+func (s ImageDataSpec) WriteStream(data interface{}, w io.Writer) error {
+	var image Image
+	if imageList, ok := data.([]Image); ok {
+		image = imageList[0]
+	} else {
+		image = data.(Image)
+	}
+	header := ImageStreamHeader{
+		Width: image.Width,
+		Height: image.Height,
+		Channels: 3,
+		Length: 1,
+		BytesPerElement: len(image.Bytes),
+	}
+	if err := WriteJsonData(header, w); err != nil {
+		return err
+	}
+	if _, err := w.Write(image.Bytes); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (d ImageData) Encode(format string, w io.Writer) error {
-	if len(d.Images) != 1 {
-		return fmt.Errorf("image data can only be encoded with one image")
+func (s ImageDataSpec) Read(format string, metadata DataMetadata, r io.Reader) (data interface{}, err error) {
+	var image Image
+	if format == "jpeg" {
+		image, err = ImageFromJPGReader(r)
+	} else if format == "png" {
+		image, err = ImageFromPNGReader(r)
+	} else {
+		err = fmt.Errorf("unknown format %s", format)
 	}
-	image := d.Images[0]
+	if err != nil {
+		return nil, err
+	}
+	return image, nil
+}
+
+func (s ImageDataSpec) Write(data interface{}, format string, metadata DataMetadata, w io.Writer) error {
+	// Data should usually just be an Image.
+	// But when using ImageDataSpec.Writer, we may end up with an []Image.
+	// So check for that here.
+	var image Image
+	if imageList, ok := data.([]Image); ok {
+		image = imageList[0]
+	} else {
+		image = data.(Image)
+	}
+
 	if format == "jpeg" {
 		bytes, err := image.AsJPG()
 		if err != nil {
@@ -53,93 +105,55 @@ func (d ImageData) Encode(format string, w io.Writer) error {
 	return fmt.Errorf("unknown format %s", format)
 }
 
-func (d ImageData) Type() DataType {
-	return ImageType
-}
-
-func (d ImageData) GetDefaultExtAndFormat() (string, string) {
+func (s ImageDataSpec) GetDefaultExtAndFormat(data interface{}, metadata DataMetadata) (ext string, format string) {
 	return "jpg", "jpeg"
 }
 
-func (d ImageData) GetMetadata() interface{} {
-	return nil
+func (s ImageDataSpec) Reader(format string, metadata DataMetadata, r io.Reader) SequenceReader {
+	return NewSliceReader(s, format, metadata, r)
 }
 
-// SliceData
-func (d ImageData) Length() int {
-	return len(d.Images)
-}
-func (d ImageData) Slice(i, j int) Data {
-	return ImageData{Images: d.Images[i:j]}
-}
-func (d ImageData) Append(other Data) Data {
-	return ImageData{
-		Images: append(d.Images, other.(ImageData).Images...),
+func (s ImageDataSpec) Writer(format string, metadata DataMetadata, w io.Writer) SequenceWriter {
+	return &SliceWriter{
+		Spec: s,
+		Format: format,
+		Metadata: metadata,
+		Writer: w,
 	}
 }
 
-func (d ImageData) Reader() DataReader {
-	return &SliceReader{Data: d}
+func (s ImageDataSpec) Length(data interface{}) int {
+	return 1
+}
+func (s ImageDataSpec) Append(data interface{}, more interface{}) interface{} {
+	panic(fmt.Errorf("ImageDataSpec.Append not supported"))
+}
+func (s ImageDataSpec) Slice(data interface{}, i int, j int) interface{} {
+	if i == 0 && j == 1 {
+		return []Image{data.(Image)}
+	}
+	panic(fmt.Errorf("ImageDataSpec.Slice not supported"))
+}
+
+func (s ImageDataSpec) GetMetadataFromFile(fname string) (format string, metadata DataMetadata, err error) {
+	ext := filepath.Ext(fname)
+	if ext == ".jpg" || ext == ".jpeg" {
+		return "jpeg", NoMetadata{}, nil
+	} else if ext == ".png" {
+		return "png", NoMetadata{}, nil
+	}
+	return "", nil, fmt.Errorf("unrecognized image extension %s in [%s]", ext, fname)
+}
+
+func (s ImageDataSpec) GetExtFromFormat(format string) (ext string) {
+	if format == "jpeg" {
+		return "jpg"
+	} else if format == "png" {
+		return "png"
+	}
+	return ""
 }
 
 func init() {
-	DataImpls[ImageType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var header ImageStreamHeader
-			if err := ReadJsonData(r, &header); err != nil {
-				return nil, err
-			}
-			var images []Image
-			for i := 0; i < header.Length; i++ {
-				bytes := make([]byte, header.Width*header.Height*3)
-				if _, err := io.ReadFull(r, bytes); err != nil {
-					return nil, err
-				}
-				images = append(images, Image{
-					Width: header.Width,
-					Height: header.Height,
-					Bytes: bytes,
-				})
-			}
-			return ImageData{Images: images}, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var image Image
-			var err error
-			if format == "jpeg" {
-				image, err = ImageFromJPGReader(r)
-			} else if format == "png" {
-				image, err = ImageFromPNGReader(r)
-			} else {
-				err = fmt.Errorf("unknown format %s", format)
-			}
-			if err != nil {
-				return nil, err
-			}
-			return ImageData{
-				Images: []Image{image},
-			}, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			ext := filepath.Ext(fname)
-			if ext == ".jpg" || ext == ".jpeg" {
-				return "jpeg", "", nil
-			} else if ext == ".png" {
-				return "png", "", nil
-			}
-			return "", "", fmt.Errorf("unrecognized image extension %s in [%s]", ext, fname)
-		},
-		Builder: func() ChunkBuilder {
-			return &SliceBuilder{Data: ImageData{}}
-		},
-		ChunkType: ImageType,
-		GetExtGivenFormat: func(format string) string {
-			if format == "jpeg" {
-				return "jpg"
-			} else if format == "png" {
-				return "png"
-			}
-			return ""
-		},
-	}
+	DataSpecs[ImageType] = ImageDataSpec{}
 }

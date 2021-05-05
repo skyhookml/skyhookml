@@ -37,20 +37,18 @@ func (e *Op) Parallelism() int {
 func (e *Op) Apply(task skyhook.ExecTask) error {
 	var metadata TaskMetadata
 	skyhook.JsonUnmarshal([]byte(task.Metadata), &metadata)
-	outputData := skyhook.GeoImageData{
-		Metadata: skyhook.GeoImageMetadata{
-			ReferenceType: "webmercator",
-			Zoom: e.Params.Zoom,
-			X: metadata.X,
-			Y: metadata.Y,
-			Scale: 256,
-			Width: 256,
-			Height: 256,
-			SourceType: "url",
-			URL: e.Params.URL,
-		},
+	outputMetadata := skyhook.GeoImageMetadata{
+		ReferenceType: "webmercator",
+		Zoom: e.Params.Zoom,
+		X: metadata.X,
+		Y: metadata.Y,
+		Scale: 256,
+		Width: 256,
+		Height: 256,
+		SourceType: "url",
+		URL: e.Params.URL,
 	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, outputData)
+	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, nil, outputMetadata)
 }
 
 func (e *Op) Close() {}

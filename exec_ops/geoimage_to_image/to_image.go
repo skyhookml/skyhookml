@@ -11,12 +11,8 @@ import (
 const MyName string = "geoimage_to_image"
 
 func init() {
-	myProviderFunc := func(item skyhook.Item, data skyhook.Data) (skyhook.Data, error) {
-		im, err := data.(skyhook.GeoImageData).GetImage()
-		if err != nil {
-			return nil, err
-		}
-		return skyhook.ImageData{Images: []skyhook.Image{im}}, nil
+	myProviderFunc := func(item skyhook.Item, data interface{}, metadata skyhook.DataMetadata) (interface{}, skyhook.DataMetadata, error) {
+		return data, skyhook.NoMetadata{}, nil
 	}
 	skyhook.ItemProviders[MyName] = skyhook.VirtualProvider(myProviderFunc, false)
 
@@ -43,15 +39,13 @@ func init() {
 				item := task.Items["input"][0][0]
 				dataset := node.OutputDatasets["output"]
 				if params.Materialize {
-					data, err := item.LoadData()
+					// A loaded GeoImage is just a skyhook.Image.
+					// So we can directly write that to the Image dataset.
+					data, _, err := item.LoadData()
 					if err != nil {
 						return err
 					}
-					imData, err := myProviderFunc(item, data)
-					if err != nil {
-						return err
-					}
-					return exec_ops.WriteItem(url, dataset, task.Key, imData)
+					return exec_ops.WriteItem(url, dataset, task.Key, data, skyhook.NoMetadata{})
 				} else {
 					return skyhook.JsonPostForm(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
 						"key": {task.Key},

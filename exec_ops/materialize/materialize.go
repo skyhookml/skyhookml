@@ -44,7 +44,7 @@ func init() {
 				for i, itemList := range task.Items["inputs"] {
 					for _, inItem := range itemList {
 						dataset := node.OutputDatasets[fmt.Sprintf("outputs%d", i)]
-						item, err := exec_ops.AddItem(url, dataset, task.Key, inItem.Ext, inItem.Format, inItem.Metadata)
+						item, err := exec_ops.AddItem(url, dataset, task.Key, inItem.Ext, inItem.Format, inItem.DecodeMetadata())
 						if err != nil {
 							return err
 						}

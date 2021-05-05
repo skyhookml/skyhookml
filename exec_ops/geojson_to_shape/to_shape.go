@@ -33,19 +33,18 @@ func GeoJsonToShape(url string, outputDataset skyhook.Dataset, task skyhook.Exec
 		}
 	}
 	for _, item := range task.Items["geojson"][0] {
-		data, err := item.LoadData()
+		data, _, err := item.LoadData()
 		if err != nil {
 			return err
 		}
-		addFeatures(data.(skyhook.GeoJsonData).Collection)
+		addFeatures(data.(*geojson.FeatureCollection))
 	}
 	log.Printf("[geojson_to_shape] got %d geometries from GeoJSON files", len(geometries))
 
 	// Loop over the images and find the geometries that intersect each one.
 	// For now we do O(n^2) loop but later we could create a spatial index.
 	for _, item := range task.Items["images"][0] {
-		var metadata skyhook.GeoImageMetadata
-		skyhook.JsonUnmarshal([]byte(item.Metadata), &metadata)
+		metadata := item.DecodeMetadata().(skyhook.GeoImageMetadata)
 		bbox := metadata.GetBbox()
 		rect := bbox.Rect()
 		dims := [2]int{metadata.Width, metadata.Height}
@@ -134,13 +133,9 @@ func GeoJsonToShape(url string, outputDataset skyhook.Dataset, task skyhook.Exec
 			}
 		}
 
-		shapeData := skyhook.ShapeData{
-			Shapes: [][]skyhook.Shape{shapes},
-			Metadata: skyhook.ShapeMetadata{
-				CanvasDims: dims,
-			},
-		}
-		err := exec_ops.WriteItem(url, outputDataset, item.Key, shapeData)
+		err := exec_ops.WriteItem(url, outputDataset, item.Key, [][]skyhook.Shape{shapes}, skyhook.ShapeMetadata{
+			CanvasDims: dims,
+		})
 		if err != nil {
 			return err
 		}

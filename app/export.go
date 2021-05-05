@@ -83,21 +83,21 @@ func (ds *DBDataset) ExportFiles(outFname string, opts ImportOptions) error {
 	opts.SetTasks(len(items))
 	for _, item := range items {
 		// We load the FileData, and write its bytes into a new file in the zip archive.
-		data, err := item.LoadData()
+		data, metadata, err := item.LoadData()
 		if err != nil {
 			return err
 		}
-		fdata := data.(skyhook.FileData)
-		w, err := zipWriter.Create(fdata.Metadata.Filename)
+		filename := metadata.(skyhook.FileMetadata).Filename
+		w, err := zipWriter.Create(filename)
 		if err != nil {
 			return err
 		}
-		if _, err := w.Write(fdata.Bytes); err != nil {
+		if _, err := w.Write(data.([]byte)); err != nil {
 			return err
 		}
 
 		// Update progress and make sure the job hasn't been terminated.
-		stopping := opts.CompletedTask(fmt.Sprintf("Added %s", fdata.Metadata.Filename), 1)
+		stopping := opts.CompletedTask(fmt.Sprintf("Added %s", filename), 1)
 		if stopping {
 			return fmt.Errorf("stopped by user")
 		}

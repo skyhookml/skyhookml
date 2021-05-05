@@ -14,38 +14,52 @@ type FilterOp struct {
 	outputDatasets map[string]skyhook.Dataset
 }
 
-func truthiness(data skyhook.Data) bool {
-	if data.Type() == skyhook.IntType {
-		for _, x := range data.(skyhook.IntData).Ints {
+var truthinessMap = map[skyhook.DataType]func(data interface{}) bool{
+	skyhook.IntType: func(data interface{}) bool {
+		for _, x := range data.([]int) {
 			if x != 0 {
 				return true
 			}
 		}
 		return false
-	} else if data.Type() == skyhook.DetectionType {
-		for _, dlist := range data.(skyhook.DetectionData).Detections {
+	},
+	skyhook.DetectionType: func(data interface{}) bool {
+		for _, dlist := range data.([][]skyhook.Detection) {
 			if len(dlist) > 0 {
 				return true
 			}
 		}
 		return false
-	} else if data.Type() == skyhook.ShapeType {
-		for _, shapes := range data.(skyhook.ShapeData).Shapes {
+	},
+	skyhook.ShapeType: func(data interface{}) bool {
+		for _, shapes := range data.([][]skyhook.Shape) {
 			if len(shapes) > 0 {
 				return true
 			}
 		}
 		return false
-	} else if data.Type() == skyhook.StringType {
-		for _, str := range data.(skyhook.StringData).Strings {
+	},
+	skyhook.StringType: func(data interface{}) bool {
+		for _, str := range data.([]string) {
 			if str != "" {
 				return true
 			}
 		}
 		return false
-	}
+	},
+}
 
-	return true
+func truthiness(item skyhook.Item) (bool, error) {
+	f, ok := truthinessMap[item.Dataset.DataType]
+	if !ok {
+		// Other types are always considered truthy.
+		return true, nil
+	}
+	data, _, err := item.LoadData()
+	if err != nil {
+		return false, err
+	}
+	return f(data), nil
 }
 
 func (e *FilterOp) Parallelism() int {
@@ -53,16 +67,15 @@ func (e *FilterOp) Parallelism() int {
 }
 
 func (e *FilterOp) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items["input"][0][0].LoadData()
+	truthy, err := truthiness(task.Items["input"][0][0])
 	if err != nil {
 		return err
-	}
-	if !truthiness(data) {
+	} else if !truthy {
 		return nil
 	}
 
-	mydata := skyhook.IntData{Ints: []int{1}}
-	err = exec_ops.WriteItem(e.url, e.outputDatasets["output"], task.Key, mydata)
+	mydata := []int{1}
+	err = exec_ops.WriteItem(e.url, e.outputDatasets["output"], task.Key, mydata, skyhook.IntMetadata{})
 	if err != nil {
 		return err
 	}
@@ -70,6 +83,7 @@ func (e *FilterOp) Apply(task skyhook.ExecTask) error {
 	for i, itemList := range task.Items["others"] {
 		item := itemList[0]
 		dsName := fmt.Sprintf("others%d", i)
+		// TODO: make this work even if Fname() isn't available.
 		err := skyhook.JsonPostForm(e.url, fmt.Sprintf("/datasets/%d/items", e.outputDatasets[dsName].ID), urllib.Values{
 			"key": {task.Key},
 			"ext": {item.Ext},

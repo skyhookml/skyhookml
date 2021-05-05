@@ -140,7 +140,7 @@ export default {
 			}, {
 				ID: "code",
 				Name: "Code",
-				Ops: ['pythonv2'],
+				Ops: ['python'],
 			}, {
 				ID: "convert",
 				Name: "Convert",

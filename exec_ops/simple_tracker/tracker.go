@@ -170,12 +170,11 @@ func (e *Tracker) Parallelism() int {
 }
 
 func (e *Tracker) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items["detections"][0][0].LoadData()
+	data, metadata, err := task.Items["detections"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
-	detectionData := data.(skyhook.DetectionData)
-	detections := detectionData.Detections
+	detections := data.([][]skyhook.Detection)
 
 	ndetections := make([][]skyhook.Detection, len(detections))
 	activeTracks := make(map[int][]TrackedDetection)
@@ -234,11 +233,7 @@ func (e *Tracker) Apply(task skyhook.ExecTask) error {
 		}
 	}
 
-	outputData := skyhook.DetectionData{
-		Detections: ndetections,
-		Metadata: detectionData.Metadata,
-	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, outputData)
+	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, ndetections, metadata)
 }
 
 func (e *Tracker) Close() {}

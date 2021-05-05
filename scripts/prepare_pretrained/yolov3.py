@@ -30,13 +30,9 @@ arch['Components'][0]['Params'] = json.dumps(comp_params)
 
 # example inputs
 im_data = numpy.zeros((416, 416, 3), dtype='uint8')
-detection_data = {
-    'Metadata': {'CanvasDims': [416, 416]},
-    'Detections': [],
-}
 example_inputs = [
-    util.collate('image', [util.prepare_input('image', im_data, {})]),
-    util.collate('detection', [util.prepare_input('detection', detection_data, {})]),
+    util.collate('image', [util.prepare_input('image', im_data, {}, {})]),
+    util.collate('detection', [util.prepare_input('detection', [], {'CanvasDims': [416, 416]}, {})]),
 ]
 util.inputs_to_device(example_inputs, device)
 

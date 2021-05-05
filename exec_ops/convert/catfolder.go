@@ -14,7 +14,7 @@ import (
 // Here we just have one folder per category, and put images into folder based on their category.
 
 func init() {
-	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+	imageSpec := skyhook.DataSpecs[skyhook.ImageType].(skyhook.ImageDataSpec)
 
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
@@ -45,23 +45,23 @@ func init() {
 				inLabelItem := task.Items["labels"][0][0]
 
 				// determine the category
-				data_, err := inLabelItem.LoadData()
+				labelData, labelMetadata, err := inLabelItem.LoadData()
 				if err != nil {
 					return err
 				}
-				data := data_.(skyhook.IntData)
-				x := data.Ints[0]
+				x := labelData.([]int)[0]
+				categories := labelMetadata.(skyhook.IntMetadata).Categories
 				var category string
-				if x >= 0 && x < len(data.Metadata.Categories) {
-					category = data.Metadata.Categories[x]
+				if x >= 0 && x < len(categories) {
+					category = categories[x]
 				} else {
 					category = strconv.Itoa(x)
 				}
 
 				// write the imag
-				outMetadata := string(skyhook.JsonMarshal(skyhook.FileMetadata{
+				outMetadata := skyhook.FileMetadata{
 					Filename: filepath.Join(category, task.Key+"."+inImageItem.Ext),
-				}))
+				}
 				outItem, err := exec_ops.AddItem(url, outDS, task.Key, inImageItem.Ext, "", outMetadata)
 				if err != nil {
 					return err
@@ -145,8 +145,7 @@ func init() {
 
 				// extract category from folder
 				// also extract the filename without extension
-				var metadata skyhook.FileMetadata
-				skyhook.JsonUnmarshal([]byte(inItem.Metadata), &metadata)
+				metadata := inItem.DecodeMetadata().(skyhook.FileMetadata)
 				category := filepath.Base(filepath.Dir(metadata.Filename))
 				x, ok := catSet[category]
 				if !ok {
@@ -157,9 +156,9 @@ func init() {
 				key := fname[0:len(fname)-len(filepath.Ext(fname))]
 
 				// copy the image
-				format, _, _ := imageImpl.GetDefaultMetadata(fname)
-				ext := imageImpl.GetExtGivenFormat(format)
-				outImageItem, err := exec_ops.AddItem(url, imageDS, key, ext, format, "")
+				format, _, _ := imageSpec.GetMetadataFromFile(fname)
+				ext := imageSpec.GetExtFromFormat(format)
+				outImageItem, err := exec_ops.AddItem(url, imageDS, key, ext, format, skyhook.NoMetadata{})
 				if err != nil {
 					return err
 				}
@@ -169,13 +168,9 @@ func init() {
 				}
 
 				// add the labels
-				outLabelData := skyhook.IntData{
-					Ints: []int{x},
-					Metadata: skyhook.IntMetadata{
-						Categories: categories,
-					},
-				}
-				err = exec_ops.WriteItem(url, labelDS, key, outLabelData)
+				err = exec_ops.WriteItem(url, labelDS, key, []int{x}, skyhook.IntMetadata{
+					Categories: categories,
+				})
 				if err != nil {
 					return err
 				}

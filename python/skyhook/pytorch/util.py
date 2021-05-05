@@ -12,6 +12,35 @@ def read_input(dataset, item):
 	data = lib.data_index(dataset['DataType'], data, 0)
 	return data
 
+def get_resize_dims(orig_dims, opt):
+	if opt.get('Mode', 'keep') == 'keep':
+		return orig_dims
+
+	# First, resize based on mode.
+	def get_mode_dims():
+		if opt['Mode'] == 'scale-down':
+			larger_dim = max(orig_dims)
+			if larger_dim <= opt['MaxDimension']:
+				return orig_dims
+			return (
+				orig_dims[0] * opt['MaxDimension'] // larger_dim,
+				orig_dims[1] * opt['MaxDimension'] // larger_dim,
+			)
+		elif opt['Mode'] == 'fixed':
+			return (opt['Width'], opt['Height'])
+		return orig_dims
+	dims = get_mode_dims()
+
+	# If opt['Multiple'] is set, we must ensure dimensions are a multiple of that number.
+	if opt.get('Multiple', 1) >= 2:
+		multiple = opt['Multiple']
+		dims = (
+			dims[0] // multiple * multiple,
+			dims[1] // multiple * multiple,
+		)
+
+	return dims
+
 # Image, video: represented as one tensor of size [batch, channels, height, width]
 # Integer: represented as integer tensor of size [batch, 1]
 # Floats: represented as float tensoro of size [batch, n]
@@ -24,50 +53,27 @@ def read_input(dataset, item):
 #   counts: [batch] number of detections in each shape
 #   detections: [sum(counts), 5] 0 is class, 1:4 is sx/sy/ex/ey
 # }
-def prepare_input(t, data, opt):
+def prepare_input(t, data, metadata, opt):
 	if t == 'image' or t == 'video' or t == 'array':
 		im = data
 		if opt.get('Mode', 'keep') != 'keep':
-			# Mode may be:
-			# 'scale-down': resize down so that maximum dimension is opt['MaxDimension']
-			# 'fixed': resize to a fixed resolution
-			# 'keep': don't resize, keep input as is
-			def get_resize_dims():
-				height = im.shape[0]
-				width = im.shape[1]
-				if opt['Mode'] == 'scale-down':
-					larger_dim = max(height, width)
-					if larger_dim <= opt['MaxDimension']:
-						return height, width
-					height = height * opt['MaxDimension'] // larger_dim
-					width = width * opt['MaxDimension'] // larger_dim
-				elif opt['Mode'] == 'fixed':
-					height, width = opt['Height'], opt['Width']
-				return height, width
-			height, width = get_resize_dims()
-
-			# If opt['Multiple'] is set, we must ensure dimensions are a multiple of that number.
-			if opt.get('Multiple', 1) >= 2:
-				multiple = opt['Multiple']
-				height = height // multiple * multiple
-				width = width // multiple * multiple
-
+			width, height = get_resize_dims((im.shape[1], im.shape[0]), opt)
 			im = skimage.transform.resize(im, [height, width], preserve_range=True).astype(im.dtype)
 
 		return im.transpose(2, 0, 1)
 	elif t == 'int':
-		return numpy.array(data['Ints'], dtype='int64')
+		return numpy.array(data, dtype='int64')
 	elif t == 'floats':
 		return numpy.array(data, dtype='float32')
 	elif t == 'shape':
 		# we will normalize the points by the canvas dims
-		dims = data['Metadata']['CanvasDims']
-		categories = data['Metadata'].get('Categories', [])
+		dims = metadata['CanvasDims']
+		categories = metadata.get('Categories', [])
 
 		# encode as 3-tuple: (# shapes, clsid + # points in each shape, flat points concat across the shapes)
-		shape_info = numpy.zeros((len(data['Shapes']), 2), dtype='int32')
+		shape_info = numpy.zeros((len(data), 2), dtype='int32')
 		points = []
-		for i, shape in enumerate(data['Shapes']):
+		for i, shape in enumerate(data):
 			if 'Category' in shape and shape['Category'] in categories:
 				shape_info[i, 0] = categories.index(shape['Category'])
 			shape_info[i, 1] = len(shape['Points'])
@@ -78,19 +84,19 @@ def prepare_input(t, data, opt):
 
 		points = numpy.array(points, dtype='float32')
 		return {
-			'counts': len(data['Shapes']),
+			'counts': len(data),
 			'infos': shape_info,
 			'points': points
 		}
 	elif t == 'detection':
 		# we will normalize the points by the canvas dims
-		dims = data['Metadata']['CanvasDims']
-		categories = data['Metadata'].get('Categories', [])
+		dims = metadtaa['CanvasDims']
+		categories = metadata.get('Categories', [])
 
 		# encode as 2-tuple: (# detections, then flat clsid+bboxes)
-		count = len(data['Detections'])
+		count = len(data)
 		detections = numpy.zeros((count, 5), dtype='float32')
-		for i, d in enumerate(data['Detections']):
+		for i, d in enumerate(data):
 			if 'Category' in d and d['Category'] in categories:
 				detections[i, 0] = categories.index(d['Category'])
 			detections[i, 1:5] = [

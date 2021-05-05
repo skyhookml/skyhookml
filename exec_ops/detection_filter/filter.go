@@ -25,12 +25,11 @@ func (e *DetectionFilter) Parallelism() int {
 }
 
 func (e *DetectionFilter) Apply(task skyhook.ExecTask) error {
-	data, err := task.Items["detections"][0][0].LoadData()
+	data, metadata, err := task.Items["detections"][0][0].LoadData()
 	if err != nil {
 		return err
 	}
-	detectionData := data.(skyhook.DetectionData)
-	detections := detectionData.Detections
+	detections := data.([][]skyhook.Detection)
 	ndetections := make([][]skyhook.Detection, len(detections))
 	for i, dlist := range detections {
 		ndetections[i] = []skyhook.Detection{}
@@ -43,11 +42,7 @@ func (e *DetectionFilter) Apply(task skyhook.ExecTask) error {
 			ndetections[i] = append(ndetections[i], d)
 		}
 	}
-	outputData := skyhook.DetectionData{
-		Detections: ndetections,
-		Metadata: detectionData.Metadata,
-	}
-	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, outputData)
+	return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, ndetections, metadata)
 }
 
 func (e *DetectionFilter) Close() {}

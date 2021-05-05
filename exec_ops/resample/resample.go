@@ -11,18 +11,6 @@ import (
 	urllib "net/url"
 )
 
-func init() {
-	// we use a virtual item provider for re-sampling video
-	// but only when video file is unavailable
-	skyhook.ItemProviders["resample_virtual"] = skyhook.VirtualProvider(func(item skyhook.Item, data skyhook.Data) (skyhook.Data, error) {
-		vdata := data.(skyhook.VideoData)
-		var metadata skyhook.VideoMetadata
-		skyhook.JsonUnmarshal([]byte(item.Metadata), &metadata)
-		vdata.Metadata = metadata
-		return vdata, nil
-	}, true)
-}
-
 type Params struct {
 	Fraction string
 }
@@ -56,8 +44,7 @@ func (e *Resample) Apply(task skyhook.ExecTask) error {
 		if item.Dataset.DataType == skyhook.VideoType {
 			// all we need to do is update the framerate in the metadata
 
-			var metadata skyhook.VideoMetadata
-			skyhook.JsonUnmarshal([]byte(item.Metadata), &metadata)
+			metadata := item.DecodeMetadata().(skyhook.VideoMetadata)
 			metadata.Framerate = [2]int{metadata.Framerate[0]*fraction[0], metadata.Framerate[1]*fraction[1]}
 
 			fname := item.Fname()
@@ -73,39 +60,32 @@ func (e *Resample) Apply(task skyhook.ExecTask) error {
 					"provider_info": {item.Fname()},
 				}, nil)
 			} else {
-				// if no filename is available, we need to stack a virtual operation
-				// on top of the input dataset
-				return skyhook.JsonPostForm(e.URL, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
-					"key": {task.Key},
-					"ext": {item.Ext},
-					"format": {item.Format},
-					"metadata": {string(skyhook.JsonMarshal(metadata))},
-					"provider": {"resample_virtual"},
-					"provider_info": {string(skyhook.JsonMarshal(item))},
-				}, nil)
+				// Filename should always be available since we shouldn't be loading video into memory.
+				return fmt.Errorf("cannot resample video item that is not available on disk")
 			}
 		}
 
-		// re-sample by building via slice method
-		// if not video, the input must be slice type
-		data, err := item.LoadData()
+		// re-sample by building via Writer
+		// if not video, the input must be sequence type
+		data, metadata, err := item.LoadData()
 		if err != nil {
 			return err
 		}
-		sliceData := data.(skyhook.SliceData)
+		spec := item.DataSpec().(skyhook.SequenceDataSpec)
 
-		builder := skyhook.DataImpls[data.Type()].Builder()
-		outputLength := sliceData.Length() * fraction[0] / fraction[1]
+		outItem, err := exec_ops.AddItem(e.URL, dataset, task.Key, item.Ext, item.Format, metadata)
+		if err != nil {
+			return err
+		}
+		writer := outItem.LoadWriter()
+
+		outputLength := spec.Length(data) * fraction[0] / fraction[1]
 		for i := 0; i < outputLength; i++ {
 			idx := i*fraction[1]/fraction[0]
-			builder.Write(sliceData.Slice(idx, idx+1))
+			writer.Write(spec.Slice(data, idx, idx+1))
 		}
 
-		outputData, err := builder.Close()
-		if err != nil {
-			return err
-		}
-		return exec_ops.WriteItem(e.URL, dataset, task.Key, outputData)
+		return writer.Close()
 	}
 
 	for i, itemList := range task.Items["inputs"] {

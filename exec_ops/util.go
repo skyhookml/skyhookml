@@ -157,29 +157,28 @@ func SingleTask(key string) func(skyhook.Runnable, map[string][][]skyhook.Item) 
 	}
 }
 
-func AddItem(url string, dataset skyhook.Dataset, key string, ext string, format string, metadata string) (skyhook.Item, error) {
+func AddItem(url string, dataset skyhook.Dataset, key string, ext string, format string, metadata skyhook.DataMetadata) (skyhook.Item, error) {
 	var item skyhook.Item
 	err := skyhook.JsonPostForm(url, fmt.Sprintf("/datasets/%d/items", dataset.ID), urllib.Values{
 		"key": {key},
 		"ext": {ext},
 		"format": {format},
-		"metadata": {metadata},
+		"metadata": {string(skyhook.JsonMarshal(metadata))},
 	}, &item)
 	return item, err
 }
 
-func WriteItemWithFormat(url string, dataset skyhook.Dataset, key string, data skyhook.Data, ext string, format string) error {
-	metadata := string(skyhook.JsonMarshal(data.GetMetadata()))
+func WriteItemWithFormat(url string, dataset skyhook.Dataset, key string, data interface{}, metadata skyhook.DataMetadata, ext string, format string) error {
 	item, err := AddItem(url, dataset, key, ext, format, metadata)
 	if err != nil {
 		return err
 	}
-	return item.UpdateData(data)
+	return item.UpdateData(data, metadata)
 }
 
-func WriteItem(url string, dataset skyhook.Dataset, key string, data skyhook.Data) error {
-	ext, format := data.GetDefaultExtAndFormat()
-	return WriteItemWithFormat(url, dataset, key, data, ext, format)
+func WriteItem(url string, dataset skyhook.Dataset, key string, data interface{}, metadata skyhook.DataMetadata) error {
+	ext, format := dataset.DataSpec().GetDefaultExtAndFormat(data, metadata)
+	return WriteItemWithFormat(url, dataset, key, data, metadata, ext, format)
 }
 
 func MapGetOutputKeys(node skyhook.ExecNode, inputs map[string][][]string) []string {

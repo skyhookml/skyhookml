@@ -4,9 +4,7 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"bytes"
 	"fmt"
-	"io"
 	"runtime"
 	"strconv"
 )
@@ -43,47 +41,63 @@ func (e *Render) Parallelism() int {
 	return runtime.NumCPU()
 }
 
-func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
+func renderFrame(dtypes []skyhook.DataType, datas []interface{}, metadatas []skyhook.DataMetadata) (skyhook.Image, error) {
 	var canvas skyhook.Image
 	var canvases []skyhook.Image
-	for _, data := range datas {
-		if data.Type() == skyhook.ImageType {
-			canvas = data.(skyhook.ImageData).Images[0].Copy()
+	for i, data := range datas {
+		if dtypes[i] == skyhook.ImageType || dtypes[i] == skyhook.VideoType {
+			canvas = data.([]skyhook.Image)[0].Copy()
 			canvases = append(canvases, canvas)
+			continue
 		}
 
-		if data.Type() == skyhook.IntType {
-			intData := data.(skyhook.IntData)
-			x := intData.Ints[0]
+		if dtypes[i] == skyhook.IntType {
+			x := data.([]int)[0]
 			var text string
-			if x >= 0 && x < len(intData.Metadata.Categories) {
-				text = intData.Metadata.Categories[x]
+			categories := metadatas[i].(skyhook.IntMetadata).Categories
+			if x >= 0 && x < len(categories) {
+				text = categories[x]
 			} else {
 				text = strconv.Itoa(x)
 			}
 			canvas.DrawText(skyhook.RichText{Text: text})
-		} else if data.Type() == skyhook.StringType {
-			strData := data.(skyhook.StringData)
-			text := strData.Strings[0]
+		} else if dtypes[i] == skyhook.StringType {
+			text := data.([]string)[0]
 			canvas.DrawText(skyhook.RichText{Text: text})
-		} else if data.Type() == skyhook.ShapeType {
-			shapes := data.(skyhook.ShapeData).Shapes[0]
+		} else if dtypes[i] == skyhook.ShapeType {
+			shapes := data.([][]skyhook.Shape)[0]
+			origDims := metadatas[i].(skyhook.ShapeMetadata).CanvasDims
+			targetDims := [2]int{canvas.Width, canvas.Height}
+			if origDims[0] == 0 {
+				origDims = targetDims
+			}
 			for _, shape := range shapes {
 				if shape.Type == "box" {
 					bounds := shape.Bounds()
-					canvas.DrawRectangle(bounds[0], bounds[1], bounds[2], bounds[3], 2, [3]uint8{255, 0, 0})
+					canvas.DrawRectangle(
+						bounds[0]*targetDims[0]/origDims[0],
+						bounds[1]*targetDims[1]/origDims[1],
+						bounds[2]*targetDims[0]/origDims[0],
+						bounds[3]*targetDims[1]/origDims[1],
+						2, [3]uint8{255, 0, 0},
+					)
 				} else if shape.Type == "line" {
-					canvas.DrawLine(shape.Points[0][0], shape.Points[0][1], shape.Points[1][0], shape.Points[1][1], 1, [3]uint8{255, 0, 0})
+					canvas.DrawLine(
+						shape.Points[0][0]*targetDims[0]/origDims[0],
+						shape.Points[0][1]*targetDims[1]/origDims[1],
+						shape.Points[1][0]*targetDims[0]/origDims[0],
+						shape.Points[1][1]*targetDims[1]/origDims[1],
+						1, [3]uint8{255, 0, 0},
+					)
 				}
 			}
-		} else if data.Type() == skyhook.DetectionType {
-			detectionData := data.(skyhook.DetectionData)
-			detections := detectionData.Detections[0]
-			detectionDims := detectionData.Metadata.CanvasDims
+		} else if dtypes[i] == skyhook.DetectionType {
+			detections := data.([][]skyhook.Detection)[0]
+			origDims := metadatas[i].(skyhook.DetectionMetadata).CanvasDims
 			targetDims := [2]int{canvas.Width, canvas.Height}
 			for _, d := range detections {
-				if detectionDims[0] != 0 && detectionDims != targetDims {
-					d = d.Rescale(detectionDims, targetDims)
+				if origDims[0] != 0 && origDims != targetDims {
+					d = d.Rescale(origDims, targetDims)
 				}
 				color := Colors[d.TrackID % len(Colors)]
 				canvas.DrawRectangle(d.Left, d.Top, d.Right, d.Bottom, 2, color)
@@ -112,93 +126,74 @@ func renderFrame(datas []skyhook.Data) (skyhook.Image, error) {
 }
 
 func (e *Render) Apply(task skyhook.ExecTask) error {
-	inputDatas := make([]skyhook.Data, len(task.Items["inputs"]))
-	for i, input := range task.Items["inputs"] {
-		data, err := input[0].LoadData()
-		if err != nil {
-			return err
-		}
-		inputDatas[i] = data
+	var inputItems []skyhook.Item
+	for _, itemList := range task.Items["inputs"] {
+		inputItems = append(inputItems, itemList[0])
 	}
+	outputType := inputItems[0].Dataset.DataType
 
-	// first input should be video data or image data
-	// there may be multiple video/image that we want to render
-	// but they should all be the same type (and, if video, they must have same framerates)
-	// the output will have all the video/image stacked vertically
-	if inputDatas[0].Type() == skyhook.VideoType {
-		// use video metadata to determine the canvas dimensions
+	var outputItem skyhook.Item
+	// First input should be video data or image data.
+	// There may be multiple video/image that we want to render.
+	// But they should all be the same type (and, if video, they must have same framerates).
+	// The output will have all the video/image stacked vertically.
+	if outputType == skyhook.VideoType {
+		// Use video metadata of all video inputs to determine the canvas dimensions.
 		var dims [2]int
-		var videoMetadata skyhook.VideoMetadata
-		for _, data := range inputDatas {
-			if data.Type() != skyhook.VideoType {
+		var outputMetadata skyhook.VideoMetadata
+		for _, item := range inputItems {
+			if item.Dataset.DataType != skyhook.VideoType {
 				continue
 			}
-			videoData := data.(skyhook.VideoData)
-			videoMetadata = videoData.Metadata
-			curDims := videoData.Metadata.Dims
+			curMetadata := item.DecodeMetadata().(skyhook.VideoMetadata)
+			outputMetadata = curMetadata
+			curDims := curMetadata.Dims
 			if curDims[0] > dims[0] {
 				dims[0] = curDims[0]
 			}
 			dims[1] += curDims[1]
 		}
+		outputMetadata.Dims = dims
 
-		imCh := make(chan skyhook.Image)
-		doneCh := make(chan error)
-		rd, cmd := skyhook.MakeVideo(&skyhook.ChanReader{imCh}, dims, videoMetadata.Framerate)
-		// save encoded video to buffer in background
-		buf := new(bytes.Buffer)
-		go func() {
-			_, err := io.Copy(buf, rd)
-			cmd.Wait()
-
-			// in case ffmpeg failed prematurely, make sure we finish capturing the writes
-			for _ = range imCh {}
-
-			doneCh <- err
-		}()
-
-		perFrameErr := skyhook.PerFrame(inputDatas, func(pos int, datas []skyhook.Data) error {
-			im, err := renderFrame(datas)
-			if err != nil {
-				return err
-			}
-			imCh <- im
-			return nil
-		})
-		close(imCh)
-
-		// check donech err first, since we need to make sure we read from donech
-		err := <- doneCh
+		var err error
+		outputItem, err = exec_ops.AddItem(e.URL, e.Dataset, task.Key, inputItems[0].Ext, inputItems[0].Format, outputMetadata)
 		if err != nil {
 			return err
 		}
-
-		if perFrameErr != nil {
-			return perFrameErr
-		}
-
-		output := skyhook.VideoData{
-			Bytes: buf.Bytes(),
-			Metadata: videoMetadata,
-		}
-		return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
-	} else if inputDatas[0].Type() == skyhook.ImageType {
-		var output skyhook.ImageData
-		err := skyhook.PerFrame(inputDatas, func(pos int, datas []skyhook.Data) error {
-			im, err := renderFrame(datas)
-			if err != nil {
-				return err
-			}
-			output.Images = append(output.Images, im)
-			return nil
-		})
+	} else if outputType == skyhook.ImageType {
+		var err error
+		outputItem, err = exec_ops.AddItem(e.URL, e.Dataset, task.Key, inputItems[0].Ext, inputItems[0].Format, skyhook.NoMetadata{})
 		if err != nil {
 			return err
 		}
-		return exec_ops.WriteItem(e.URL, e.Dataset, task.Key, output)
 	} else {
-		return fmt.Errorf("first input must be either video or image")
+		return fmt.Errorf("first item must be either video or image type")
 	}
+
+	writer := outputItem.LoadWriter()
+
+	var dtypes []skyhook.DataType
+	var metadatas []skyhook.DataMetadata
+	for _, item := range inputItems {
+		dtypes = append(dtypes, item.Dataset.DataType)
+		metadatas = append(metadatas, item.DecodeMetadata())
+	}
+	err := skyhook.PerFrame(inputItems, func(pos int, datas []interface{}) error {
+		im, err := renderFrame(dtypes, datas, metadatas)
+		if err != nil {
+			return err
+		}
+		err = writer.Write([]skyhook.Image{im})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return writer.Close()
 }
 
 func (e *Render) Close() {}

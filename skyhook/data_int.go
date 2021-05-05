@@ -1,97 +1,73 @@
 package skyhook
 
 import (
-	"io"
-	"io/ioutil"
+	"encoding/json"
 )
 
 type IntMetadata struct {
 	Categories []string `json:",omitempty"`
 }
 
-type IntData struct {
-	Ints []int
-	Metadata IntMetadata
-}
-
-func (d IntData) EncodeStream(w io.Writer) error {
-	return WriteJsonData(d, w)
-}
-
-func (d IntData) Encode(format string, w io.Writer) error {
-	_, err := w.Write(JsonMarshal(d.Ints))
-	return err
-}
-
-func (d IntData) Type() DataType {
-	return IntType
-}
-
-func (d IntData) GetDefaultExtAndFormat() (string, string) {
-	return "json", "json"
-}
-
-func (d IntData) GetMetadata() interface{} {
-	return d.Metadata
-}
-
-// SliceData
-func (d IntData) Length() int {
-	return len(d.Ints)
-}
-func (d IntData) Slice(i, j int) Data {
-	return IntData{
-		Ints: d.Ints[i:j],
-		Metadata: d.Metadata,
+func (m IntMetadata) Update(other DataMetadata) DataMetadata {
+	other_ := other.(IntMetadata)
+	if len(other_.Categories) > 0 {
+		m.Categories = other_.Categories
 	}
-}
-func (d IntData) Append(other_ Data) Data {
-	other := other_.(IntData)
-	return IntData{
-		Ints: append(d.Ints, other.Ints...),
-		Metadata: other.Metadata,
-	}
+	return m
 }
 
-func (d IntData) Reader() DataReader {
-	return &SliceReader{Data: d}
+type IntJsonSpec struct {}
+
+func (s IntJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	if rawMetadata == "" {
+		return IntMetadata{}
+	}
+	var m IntMetadata
+	JsonUnmarshal([]byte(rawMetadata), &m)
+	return m
+}
+
+func (s IntJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
+	var data []int
+	for i := 0; (i < n || n == -1) && dec.More(); i++ {
+		var cur int
+		err := dec.Decode(&cur)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, cur)
+	}
+	return data, nil
+}
+
+func (s IntJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
+	for _, cur := range data.([]int) {
+		err := enc.Encode(cur)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s IntJsonSpec) GetEmptyData() (data interface{}) {
+	return []int{}
+}
+
+func (s IntJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {
+	return IntMetadata{}
+}
+
+func (s IntJsonSpec) Length(data interface{}) int {
+	return len(data.([]int))
+}
+func (s IntJsonSpec) Append(data interface{}, more interface{}) interface{} {
+	return append(data.([]int), more.([]int)...)
+}
+func (s IntJsonSpec) Slice(data interface{}, i int, j int) interface{} {
+	return data.([]int)[i:j]
 }
 
 func init() {
-	DataImpls[IntType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var data IntData
-			if err := ReadJsonData(r, &data); err != nil {
-				return nil, err
-			}
-			return data, nil
-		},
-		DecodeFile: func(format string, metadataRaw string, fname string) (Data, error) {
-			var metadata IntMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			data := IntData{Metadata: metadata}
-			ReadJSONFile(fname, &data.Ints)
-			return data, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var metadata IntMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			bytes, err := ioutil.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-			data := IntData{Metadata: metadata}
-			JsonUnmarshal(bytes, &data.Ints)
-			return data, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "json", "{}", nil
-		},
-		Builder: func() ChunkBuilder {
-			return &SliceBuilder{Data: IntData{}}
-		},
-		ChunkType: IntType,
-	}
+	DataSpecs[IntType] = SequenceJsonDataImpl{IntJsonSpec{}}
 }

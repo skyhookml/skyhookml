@@ -48,7 +48,6 @@ let components = {
 	'geoimage_to_image': GeoImageToImage,
 	'make_geoimage': MakeGeoImage,
 	'python': Python,
-	'pythonv2': Python,
 	'pytorch_train': PytorchTrain,
 	'pytorch_infer': PytorchInfer,
 	'pytorch_resnet_train': PytorchResnetTrain,

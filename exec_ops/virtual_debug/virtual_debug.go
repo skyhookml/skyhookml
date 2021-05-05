@@ -14,8 +14,8 @@ import (
 )
 
 func init() {
-	skyhook.ItemProviders["virtual_debug"] = skyhook.VirtualProvider(func(item skyhook.Item, data skyhook.Data) (skyhook.Data, error) {
-		return data, nil
+	skyhook.ItemProviders["virtual_debug"] = skyhook.VirtualProvider(func(item skyhook.Item, data interface{}, metadata skyhook.DataMetadata) (interface{}, skyhook.DataMetadata, error) {
+		return data, metadata, nil
 	}, false)
 
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{

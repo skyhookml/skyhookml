@@ -75,17 +75,16 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		videoItem, detectionItem := l[0], l[1]
 		key := detectionItem.Key
 
-		// compute match lengths for this key based on the video framerate
-		var videoMetadata skyhook.VideoMetadata
-		skyhook.JsonUnmarshal([]byte(videoItem.Metadata), &videoMetadata)
+		// compute match lengths for this key based on the video framerat
+		videoMetadata := videoItem.DecodeMetadata().(skyhook.VideoMetadata)
 		matchLengths := params.GetMatchLengths(videoMetadata.Framerate)
 
 		log.Printf("[reid] pre-processing key %s with match_lengths=%v", key, matchLengths)
-		labelData, err := detectionItem.LoadData()
+		labelData, _, err := detectionItem.LoadData()
 		if err != nil {
 			return fmt.Errorf("error loading label (detection) data: %v", err)
 		}
-		detections := labelData.(skyhook.DetectionData).Detections
+		detections := labelData.([][]skyhook.Detection)
 		matches := PreprocessMatches(detections, matchLengths)
 		var matchList [][4]int
 		for k, v := range matches {
@@ -123,7 +122,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// add to the file dataset
 	fileMetadata := skyhook.FileMetadata{Filename: "model.pt"}
-	_, err = exec_ops.AddItem(e.url, e.dataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
+	_, err = exec_ops.AddItem(e.url, e.dataset, "model", "pt", "", fileMetadata)
 	if err != nil {
 		return err
 	}

@@ -1,14 +1,24 @@
 package skyhook
 
 import (
-	"io"
-	"io/ioutil"
+	"encoding/json"
 	"math"
 )
 
 type DetectionMetadata struct {
-	CanvasDims [2]int
+	CanvasDims [2]int `json:",omitempty"`
 	Categories []string `json:",omitempty"`
+}
+
+func (m DetectionMetadata) Update(other DataMetadata) DataMetadata {
+	other_ := other.(DetectionMetadata)
+	if other_.CanvasDims[0] > 0 {
+		m.CanvasDims = other_.CanvasDims
+	}
+	if len(other_.Categories) > 0 {
+		m.Categories = other_.Categories
+	}
+	return m
 }
 
 type Detection struct {
@@ -39,89 +49,58 @@ func (d Detection) Rescale(origDims [2]int, newDims [2]int) Detection {
 	return copy
 }
 
-type DetectionData struct {
-	Detections [][]Detection
-	Metadata DetectionMetadata
-}
+type DetectionJsonSpec struct {}
 
-func (d DetectionData) EncodeStream(w io.Writer) error {
-	return WriteJsonData(d, w)
-}
-
-func (d DetectionData) Encode(format string, w io.Writer) error {
-	_, err := w.Write(JsonMarshal(d.Detections))
-	return err
-}
-
-func (d DetectionData) Type() DataType {
-	return DetectionType
-}
-
-func (d DetectionData) GetDefaultExtAndFormat() (string, string) {
-	return "json", "json"
-}
-
-func (d DetectionData) GetMetadata() interface{} {
-	return d.Metadata
-}
-
-// SliceData
-func (d DetectionData) Length() int {
-	return len(d.Detections)
-}
-func (d DetectionData) Slice(i, j int) Data {
-	return DetectionData{
-		Detections: d.Detections[i:j],
-		Metadata: d.Metadata,
+func (s DetectionJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	if rawMetadata == "" {
+		return DetectionMetadata{}
 	}
-}
-func (d DetectionData) Append(other Data) Data {
-	other_ := other.(DetectionData)
-	return DetectionData{
-		Detections: append(d.Detections, other_.Detections...),
-		Metadata: other_.Metadata,
-	}
+	var m DetectionMetadata
+	JsonUnmarshal([]byte(rawMetadata), &m)
+	return m
 }
 
-func (d DetectionData) Reader() DataReader {
-	return &SliceReader{Data: d}
+func (s DetectionJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
+	var data [][]Detection
+	for i := 0; (i < n || n == -1) && dec.More(); i++ {
+		var dlist []Detection
+		err := dec.Decode(&dlist)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, dlist)
+	}
+	return data, nil
+}
+
+func (s DetectionJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
+	for _, dlist := range data.([][]Detection) {
+		err := enc.Encode(dlist)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s DetectionJsonSpec) GetEmptyData() (data interface{}) {
+	return [][]Detection{}
+}
+
+func (s DetectionJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {
+	return DetectionMetadata{}
+}
+
+func (s DetectionJsonSpec) Length(data interface{}) int {
+	return len(data.([][]Detection))
+}
+func (s DetectionJsonSpec) Append(data interface{}, more interface{}) interface{} {
+	return append(data.([][]Detection), more.([][]Detection)...)
+}
+func (s DetectionJsonSpec) Slice(data interface{}, i int, j int) interface{} {
+	return data.([][]Detection)[i:j]
 }
 
 func init() {
-	DataImpls[DetectionType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var data DetectionData
-			if err := ReadJsonData(r, &data); err != nil {
-				return nil, err
-			}
-			return data, nil
-		},
-		DecodeFile: func(format string, metadataRaw string, fname string) (Data, error) {
-			var metadata DetectionMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			data := DetectionData{Metadata: metadata}
-			ReadJSONFile(fname, &data.Detections)
-			return data, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var metadata DetectionMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			bytes, err := ioutil.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-			data := DetectionData{Metadata: metadata}
-			JsonUnmarshal(bytes, &data.Detections)
-			return data, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "json", "{}", nil
-		},
-		Builder: func() ChunkBuilder {
-			return &SliceBuilder{Data: DetectionData{}}
-		},
-		ChunkType: DetectionType,
-	}
+	DataSpecs[DetectionType] = SequenceJsonDataImpl{DetectionJsonSpec{}}
 }

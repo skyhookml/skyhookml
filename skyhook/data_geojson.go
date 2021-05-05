@@ -1,6 +1,7 @@
 package skyhook
 
 import (
+	"encoding/json"
 	"io"
 	"io/ioutil"
 
@@ -11,52 +12,48 @@ type GeoJsonData struct {
 	Collection *geojson.FeatureCollection
 }
 
-func (d GeoJsonData) EncodeStream(w io.Writer) error {
-	return WriteJsonData(d.Collection, w)
+type GeoJsonDataSpec struct{}
+
+func (s GeoJsonDataSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	return NoMetadata{}
 }
 
-func (d GeoJsonData) Encode(format string, w io.Writer) error {
-	_, err := w.Write(JsonMarshal(d.Collection))
-	return err
+func (s GeoJsonDataSpec) ReadStream(r io.Reader) (interface{}, error) {
+	var data *geojson.FeatureCollection
+	if err := ReadJsonData(r, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
-func (d GeoJsonData) Type() DataType {
-	return GeoJsonType
-}
-
-func (d GeoJsonData) GetDefaultExtAndFormat() (string, string) {
-	return "json", "json"
-}
-
-func (d GeoJsonData) GetMetadata() interface{} {
+func (s GeoJsonDataSpec) WriteStream(data interface{}, w io.Writer) error {
+	if err := WriteJsonData(data, w); err != nil {
+		return err
+	}
 	return nil
 }
 
-func init() {
-	DataImpls[GeoJsonType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var data GeoJsonData
-			if err := ReadJsonData(r, &data.Collection); err != nil {
-				return nil, err
-			}
-			return data, nil
-		},
-		DecodeFile: func(format string, metadataRaw string, fname string) (Data, error) {
-			var data GeoJsonData
-			ReadJSONFile(fname, &data.Collection)
-			return data, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			bytes, err := ioutil.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-			var data GeoJsonData
-			JsonUnmarshal(bytes, &data.Collection)
-			return data, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "json", "", nil
-		},
+func (s GeoJsonDataSpec) Read(format string, metadata DataMetadata, r io.Reader) (interface{}, error) {
+	bytes, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
 	}
+	var data *geojson.FeatureCollection
+	if err := json.Unmarshal(bytes, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (s GeoJsonDataSpec) Write(data interface{}, format string, metadata DataMetadata, w io.Writer) error {
+	_, err := w.Write(JsonMarshal(data))
+	return err
+}
+
+func (s GeoJsonDataSpec) GetDefaultExtAndFormat(data interface{}, metadata DataMetadata) (ext string, format string) {
+	return "json", "json"
+}
+
+func init() {
+	DataSpecs[GeoJsonType] = GeoJsonDataSpec{}
 }

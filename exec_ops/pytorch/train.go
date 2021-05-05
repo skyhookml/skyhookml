@@ -3,7 +3,7 @@ package pytorch
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
-	"github.com/skyhookml/skyhookml/exec_ops/pythonv2"
+	"github.com/skyhookml/skyhookml/exec_ops/python"
 
 	"bufio"
 	"encoding/json"
@@ -218,7 +218,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 
 	// add to the file dataset
 	fileMetadata := skyhook.FileMetadata{Filename: "model.pt"}
-	_, err = exec_ops.AddItem(e.url, e.outputDataset, "model", "pt", "", string(skyhook.JsonMarshal(fileMetadata)))
+	_, err = exec_ops.AddItem(e.url, e.outputDataset, "model", "pt", "", fileMetadata)
 	if err != nil {
 		return err
 	}

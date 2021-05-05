@@ -4,6 +4,7 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 
 	"bytes"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -163,22 +164,24 @@ func init() {
 
 		ds := &DBDataset{Dataset: annoset.Dataset}
 		item := ds.GetItem(request.Key)
+		metadata := ds.DataSpec().DecodeMetadata(request.Metadata)
 		buf := bytes.NewBuffer([]byte(request.Data))
-		data, err := skyhook.DecodeData(annoset.Dataset.DataType, request.Format, request.Metadata, buf)
+		data, err := ds.DataSpec().Read(request.Format, metadata, buf)
 		if err != nil {
-			panic(err)
+			http.Error(w, fmt.Sprintf("error decoding data: %v", err), 400)
+			return
 		}
 
 		if item == nil {
 			// new key
-			_, err := ds.WriteItem(request.Key, data)
+			_, err := ds.WriteItem(request.Key, data, metadata)
 			if err != nil {
 				http.Error(w, err.Error(), 400)
 				return
 			}
 		} else {
-			item.SetMetadata(request.Format, request.Metadata)
-			err := item.UpdateData(data)
+			item.SetMetadata(request.Format, metadata)
+			err := item.UpdateData(data, metadata)
 			if err != nil {
 				http.Error(w, err.Error(), 400)
 				return

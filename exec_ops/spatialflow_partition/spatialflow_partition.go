@@ -22,13 +22,13 @@ type Params struct {
 	Buffer int
 }
 
-// TODO: Should split this into multiple tasks so that they can run in parallel. 
+// TODO: Should split this into multiple tasks so that they can run in parallel.
 func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhook.ExecTask, params Params) error {
 	// Parameters (should be assigned from UI)
 	var zoom int = params.Zoom
 	var shapeBuffer int = params.Buffer
 	mapurl := params.URL
-	
+
 	// Load all GeoJSON geometries.
 	var geometries []*geojson.Geometry
 	addFeatures := func(collection *geojson.FeatureCollection) {
@@ -51,15 +51,15 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 		}
 	}
 	for _, item := range task.Items["geojson"][0] {
-		data, err := item.LoadData()
+		data, _, err := item.LoadData()
 		if err != nil {
 			return err
 		}
-		addFeatures(data.(skyhook.GeoJsonData).Collection)
+		addFeatures(data.(*geojson.FeatureCollection))
 	}
 	log.Printf("[spatialflow_partition] got %d geometries from GeoJSON files", len(geometries))
 
-	// Compute the bounding box 
+	// Compute the bounding box
 	var geometriesBBox gomapinfer.Rectangle = gomapinfer.EmptyRectangle
 	handlePointBBox := func(coordinate []float64) {
 		p := gomapinfer.Point{coordinate[0], coordinate[1]}
@@ -114,7 +114,7 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 		startTile[1], endTile[1] = endTile[1], startTile[1]
 	}
 	log.Printf("[spatialflow_partition] checking candidate tiles from %v to %v", startTile, endTile)
-	buffer := float64(shapeBuffer) / 256.0 
+	buffer := float64(shapeBuffer) / 256.0
 	bufferTiles := int(math.Ceil(buffer))
 	corner1 := gomapinfer.Point{0.0 - buffer, 0.0 - buffer}
 	corner2 := gomapinfer.Point{1.0 + buffer, 0.0 - buffer}
@@ -132,12 +132,12 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 
 			p1 := geocoords.MapboxToLonLat(gomapinfer.Point{0,0}, zoom, [2]int{i,j})
 			p2 := geocoords.MapboxToLonLat(gomapinfer.Point{0,0}, zoom, [2]int{i+1,j+1})
-			
+
 			toRelativePixelCoordinate := func(coordinate []float64) gomapinfer.Point {
 				var point gomapinfer.Point
 				point.X = (coordinate[0] - p1.X) / (p2.X - p1.X)
 				point.Y = (coordinate[1] - p1.Y) / (p2.Y - p1.Y)
-				return point 
+				return point
 			}
 
 			isOverlapped := false
@@ -147,7 +147,7 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 				p := toRelativePixelCoordinate(coordinate)
 				if p.X >= -buffer && p.X <= 1.0 + buffer && p.Y >= -buffer && p.Y <= 1.0 + buffer {
 					isOverlapped = true
-				}  
+				}
 			}
 
 			handleLineString := func(coordinates [][]float64) {
@@ -155,10 +155,10 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 					p := toRelativePixelCoordinate(coordinate)
 					if p.X >= -buffer && p.X <= 1.0 + buffer && p.Y >= -buffer && p.Y <= 1.0 + buffer {
 						isOverlapped = true
-					}  
+					}
 				}
 				if isOverlapped {
-					return 
+					return
 				}
 				for ind, _ := range coordinates {
 					if ind == len(coordinates)-1 {
@@ -167,23 +167,23 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 
 					p1 := toRelativePixelCoordinate(coordinates[ind])
 					p2 := toRelativePixelCoordinate(coordinates[ind+1])
-					
+
 					segment := gomapinfer.Segment{p1,p2}
 					if segment.Intersection(gomapinfer.Segment{corner1, corner2}) != nil {
 						isOverlapped = true
-						return 
+						return
 					}
 					if segment.Intersection(gomapinfer.Segment{corner2, corner3}) != nil {
 						isOverlapped = true
-						return 
+						return
 					}
 					if segment.Intersection(gomapinfer.Segment{corner3, corner4}) != nil {
 						isOverlapped = true
-						return 
+						return
 					}
 					if segment.Intersection(gomapinfer.Segment{corner4, corner1}) != nil {
 						isOverlapped = true
-						return 
+						return
 					}
 				}
 			}
@@ -197,22 +197,22 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 				if isOverlapped {
 					return
 				}
-				
+
 				var polygon gomapinfer.Polygon
 				for _, coordinate := range coordinates[0] {
 					p := toRelativePixelCoordinate(coordinate)
 					polygon = append(polygon, p)
 				}
-				
+
 				for _, corner := range corners {
 					if polygon.Contains(corner) {
 						isOverlapped = true
-						return 
+						return
 					}
 				}
 
 			}
-			
+
 			for _, g := range geometries {
 				if g.Type == geojson.GeometryPoint {
 					handlePoint(g.Point)
@@ -239,28 +239,26 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 				}
 			}
 
-			// If the current tile doesn't overlap with the ROI, skip it. 
+			// If the current tile doesn't overlap with the ROI, skip it.
 			if !isOverlapped {
-				continue 
+				continue
 			}
 
 			// If the current tile overlaps with the ROI, store it in a dataset
 			if isOverlapped {
 				log.Printf("[spatialflow_partition] create tile %s", fmt.Sprintf("%d_%d_%d", zoom, i, j))
-				outputData := skyhook.GeoImageData{
-					Metadata: skyhook.GeoImageMetadata{
-						ReferenceType: "webmercator",
-						Zoom: zoom,
-						X: i,
-						Y: j,
-						Scale: 256,
-						Width: 256,
-						Height: 256,
-						SourceType: "url",
-						URL: mapurl,
-					},
+				outputMetadata := skyhook.GeoImageMetadata{
+					ReferenceType: "webmercator",
+					Zoom: zoom,
+					X: i,
+					Y: j,
+					Scale: 256,
+					Width: 256,
+					Height: 256,
+					SourceType: "url",
+					URL: mapurl,
 				}
-				err := exec_ops.WriteItem(url, outputDataset, fmt.Sprintf("%d_%d_%d", zoom, i, j), outputData)
+				err := exec_ops.WriteItem(url, outputDataset, fmt.Sprintf("%d_%d_%d", zoom, i, j), nil, outputMetadata)
 				if err != nil {
 					return err
 				}
@@ -270,7 +268,7 @@ func SpatialFlowPartition(url string, outputDataset skyhook.Dataset, task skyhoo
 	}
 
 	log.Printf("[spatialflow_partition] found %d tiles overlapping with the ROI from %d tiles", kept_tiles, total_tiles)
-				
+
 
 	return nil
 }
@@ -298,7 +296,7 @@ func init() {
 			}
 
 			applyFunc := func(task skyhook.ExecTask) error {
-				return SpatialFlowPartition(url, node.OutputDatasets["geoimages"], task, params) 
+				return SpatialFlowPartition(url, node.OutputDatasets["geoimages"], task, params)
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},

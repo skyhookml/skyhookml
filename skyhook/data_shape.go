@@ -1,13 +1,23 @@
 package skyhook
 
 import (
-	"io"
-	"io/ioutil"
+	"encoding/json"
 )
 
 type ShapeMetadata struct {
-	CanvasDims [2]int
+	CanvasDims [2]int `json:",omitempty"`
 	Categories []string `json:",omitempty"`
+}
+
+func (m ShapeMetadata) Update(other DataMetadata) DataMetadata {
+	other_ := other.(ShapeMetadata)
+	if other_.CanvasDims[0] > 0 {
+		m.CanvasDims = other_.CanvasDims
+	}
+	if len(other_.Categories) > 0 {
+		m.Categories = other_.Categories
+	}
+	return m
 }
 
 // Shape types.
@@ -52,89 +62,58 @@ func (shp Shape) Bounds() [4]int {
 	return [4]int{sx, sy, ex, ey}
 }
 
-type ShapeData struct {
-	Shapes [][]Shape
-	Metadata ShapeMetadata
-}
+type ShapeJsonSpec struct {}
 
-func (d ShapeData) EncodeStream(w io.Writer) error {
-	return WriteJsonData(d, w)
-}
-
-func (d ShapeData) Encode(format string, w io.Writer) error {
-	_, err := w.Write(JsonMarshal(d.Shapes))
-	return err
-}
-
-func (d ShapeData) Type() DataType {
-	return ShapeType
-}
-
-func (d ShapeData) GetDefaultExtAndFormat() (string, string) {
-	return "json", "json"
-}
-
-func (d ShapeData) GetMetadata() interface{} {
-	return d.Metadata
-}
-
-// SliceData
-func (d ShapeData) Length() int {
-	return len(d.Shapes)
-}
-func (d ShapeData) Slice(i, j int) Data {
-	return ShapeData{
-		Metadata: d.Metadata,
-		Shapes: d.Shapes[i:j],
+func (s ShapeJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	if rawMetadata == "" {
+		return ShapeMetadata{}
 	}
-}
-func (d ShapeData) Append(other Data) Data {
-	other_ := other.(ShapeData)
-	return ShapeData{
-		Metadata: other_.Metadata,
-		Shapes: append(d.Shapes, other_.Shapes...),
-	}
+	var m ShapeMetadata
+	JsonUnmarshal([]byte(rawMetadata), &m)
+	return m
 }
 
-func (d ShapeData) Reader() DataReader {
-	return &SliceReader{Data: d}
+func (s ShapeJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
+	var data [][]Shape
+	for i := 0; (i < n || n == -1) && dec.More(); i++ {
+		var cur []Shape
+		err := dec.Decode(&cur)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, cur)
+	}
+	return data, nil
+}
+
+func (s ShapeJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
+	for _, cur := range data.([][]Shape) {
+		err := enc.Encode(cur)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s ShapeJsonSpec) GetEmptyData() (data interface{}) {
+	return [][]Shape{}
+}
+
+func (s ShapeJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {
+	return ShapeMetadata{}
+}
+
+func (s ShapeJsonSpec) Length(data interface{}) int {
+	return len(data.([][]Shape))
+}
+func (s ShapeJsonSpec) Append(data interface{}, more interface{}) interface{} {
+	return append(data.([][]Shape), more.([][]Shape)...)
+}
+func (s ShapeJsonSpec) Slice(data interface{}, i int, j int) interface{} {
+	return data.([][]Shape)[i:j]
 }
 
 func init() {
-	DataImpls[ShapeType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var data ShapeData
-			if err := ReadJsonData(r, &data); err != nil {
-				return nil, err
-			}
-			return data, nil
-		},
-		DecodeFile: func(format string, metadataRaw string, fname string) (Data, error) {
-			var metadata ShapeMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			data := ShapeData{Metadata: metadata}
-			ReadJSONFile(fname, &data.Shapes)
-			return data, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var metadata ShapeMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			bytes, err := ioutil.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-			data := ShapeData{Metadata: metadata}
-			JsonUnmarshal(bytes, &data.Shapes)
-			return data, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "json", "{}", nil
-		},
-		Builder: func() ChunkBuilder {
-			return &SliceBuilder{Data: ShapeData{}}
-		},
-		ChunkType: ShapeType,
-	}
+	DataSpecs[ShapeType] = SequenceJsonDataImpl{ShapeJsonSpec{}}
 }

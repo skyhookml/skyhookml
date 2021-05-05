@@ -32,13 +32,15 @@ func NewHttpServer(url string, f func(*http.ServeMux) error) (HttpServer, error)
 		if err := skyhook.ParseJsonRequest(w, r, &item); err != nil {
 			return
 		}
-		data, err := item.LoadData()
+		data, _, err := item.LoadData()
 		if err != nil {
-			http.Error(w, "no such item", 404)
+			log.Printf("[/load-data] error loading data: %v", err)
+			http.Error(w, err.Error(), 400)
+			s.Close()
 			return
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
-		err = data.EncodeStream(w)
+		err = item.DataSpec().WriteStream(data, w)
 		if err != nil {
 			log.Printf("[/load-data] error serving item %s: %v", item.Key, err)
 			s.Close()
@@ -51,20 +53,10 @@ func NewHttpServer(url string, f func(*http.ServeMux) error) (HttpServer, error)
 		if err := skyhook.ParseJsonRequest(w, r, &items); err != nil {
 			return
 		}
-		inputDatas := make([]skyhook.Data, len(items))
-		for i := range inputDatas {
-			var err error
-			inputDatas[i], err = items[i].LoadData()
-			if err != nil {
-				http.Error(w, fmt.Sprintf("load data error: %v", err), 400)
-				s.Close()
-				return
-			}
-		}
 		w.Header().Set("Content-Type", "application/octet-stream")
-		err := skyhook.TrySynchronizedReader(inputDatas, 32, func(pos int, length int, datas []skyhook.Data) error {
-			for _, data := range datas {
-				err := data.EncodeStream(w)
+		err := skyhook.TrySynchronizedReader(items, 32, func(pos int, length int, datas []interface{}) error {
+			for i, data := range datas {
+				err := items[i].DataSpec().WriteStream(data, w)
 				if err != nil {
 					return err
 				}
@@ -83,17 +75,23 @@ func NewHttpServer(url string, f func(*http.ServeMux) error) (HttpServer, error)
 			var metaPacket struct {
 				Dataset skyhook.Dataset
 				Key string
+				Metadata string
 			}
 			err := skyhook.ReadJsonData(r.Body, &metaPacket)
 			if err != nil {
-				return err
+				return fmt.Errorf("error reading meta packet: %v", err)
 			}
-			dataImpl := skyhook.DataImpls[metaPacket.Dataset.DataType]
-			data, err := dataImpl.DecodeStream(r.Body)
+			spec := metaPacket.Dataset.DataSpec()
+			metadata := spec.DecodeMetadata(metaPacket.Metadata)
+			data, err := spec.ReadStream(r.Body)
 			if err != nil {
-				return err
+				return fmt.Errorf("error reading data: %v", err)
 			}
-			return exec_ops.WriteItem(url, metaPacket.Dataset, metaPacket.Key, data)
+			err = exec_ops.WriteItem(url, metaPacket.Dataset, metaPacket.Key, data, metadata)
+			if err != nil {
+				return fmt.Errorf("error writing item: %v", err)
+			}
+			return nil
 		}()
 		if err != nil {
 			log.Printf("[/write-item] error writing data: %v", err)
@@ -103,54 +101,60 @@ func NewHttpServer(url string, f func(*http.ServeMux) error) (HttpServer, error)
 		}
 	})
 
-	// Create items using Builder.
+	// Create items using SequenceWriter.
 	// We need to support creating multiple items in parallel here, since Python's
 	// typical libraries for HTTP requests do not handle performing multiple
 	// requests in parallel.
 	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		err := func() error {
-			// Initialize the builders.
+			// Read metadata packet.
 			var metas []struct{
 				Dataset skyhook.Dataset
 				Key string
+				Metadata string
 			}
 			err := skyhook.ReadJsonData(r.Body, &metas)
 			if err != nil {
-				return err
-			}
-			builders := make([]skyhook.ChunkBuilder, len(metas))
-			for i, meta := range metas {
-				dataImpl := skyhook.DataImpls[meta.Dataset.DataType]
-				builders[i] = dataImpl.Builder()
+				return fmt.Errorf("error reading meta packet: %v", err)
 			}
 
 			// Read and add to builders until EOF.
+			// We initialize the writers after receiving the first datas.
+			// This is so that we can use GetDefaultExtAndFormat to create the items.
+			writers := make([]skyhook.SequenceWriter, len(metas))
 			eof := false
 			for !eof {
 				for i, meta := range metas {
-					dataImpl := skyhook.DataImpls[meta.Dataset.DataType]
-					data, err := dataImpl.DecodeStream(r.Body)
-					if err == io.EOF {
+					spec := meta.Dataset.DataSpec()
+					data, err := spec.ReadStream(r.Body)
+					if i == 0 && err == io.EOF {
 						eof = true
 						break
 					} else if err != nil {
-						return err
+						return fmt.Errorf("error reading data: %v", err)
 					}
-					if err := builders[i].Write(data); err != nil {
-						return err
+
+					if writers[i] == nil {
+						metadata := spec.DecodeMetadata(meta.Metadata)
+						ext, format := spec.GetDefaultExtAndFormat(data, metadata)
+						item, err := exec_ops.AddItem(url, meta.Dataset, meta.Key, ext, format, metadata)
+						if err != nil {
+							return err
+						}
+						writers[i] = item.LoadWriter()
+					}
+
+					if err := writers[i].Write(data); err != nil {
+						return fmt.Errorf("error writing data: %v", err)
 					}
 				}
 			}
 
-			// Add the extracted items to their respective datasets.
-			for i, meta := range metas {
-				data, err := builders[i].Close()
+			// Close the writers.
+			for _, writer := range writers {
+				err := writer.Close()
 				if err != nil {
-					return err
-				}
-				err = exec_ops.WriteItem(url, meta.Dataset, meta.Key, data)
-				if err != nil {
-					return err
+					return fmt.Errorf("error closing writer: %v", err)
 				}
 			}
 			return nil

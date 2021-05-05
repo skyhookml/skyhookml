@@ -78,7 +78,7 @@ type CocoJSON struct {
 }
 
 func init() {
-	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+	imageSpec := skyhook.DataSpecs[skyhook.ImageType].(skyhook.ImageDataSpec)
 
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
@@ -122,7 +122,7 @@ func init() {
 				params.Format = "jpeg"
 			}
 
-			outputExt := imageImpl.GetExtGivenFormat(params.Format)
+			outputExt := imageSpec.GetExtFromFormat(params.Format)
 			if outputExt == "" {
 				// unknown format...? just use the format as ext
 				outputExt = params.Format
@@ -133,9 +133,9 @@ func init() {
 				// write each image independently to filename based on key
 				for _, itemList := range task.Items["images"] {
 					for _, inImageItem := range itemList {
-						outImageMetadata := string(skyhook.JsonMarshal(skyhook.FileMetadata{
+						outImageMetadata := skyhook.FileMetadata{
 							Filename: inImageItem.Key+"."+outputExt,
-						}))
+						}
 						outImageItem, err := exec_ops.AddItem(url, outDS, inImageItem.Key+"-image", outputExt, "", outImageMetadata)
 						if err != nil {
 							return err
@@ -154,13 +154,12 @@ func init() {
 				var coco CocoJSON
 				for _, itemList := range task.Items["detections"] {
 					for _, item := range itemList {
-						data_, err := item.LoadData()
+						data, metadata_, err := item.LoadData()
 						if err != nil {
 							return err
 						}
-						data := data_.(skyhook.DetectionData)
-						metadata := data.Metadata
-						detections := data.Detections
+						detections := data.([][]skyhook.Detection)
+						metadata := metadata_.(skyhook.DetectionMetadata)
 
 						// add categories if not already populated
 						if len(coco.Categories) == 0 {
@@ -219,13 +218,9 @@ func init() {
 					}
 				}
 				bytes := skyhook.JsonMarshal(coco)
-				outFileData := skyhook.FileData{
-					Bytes: bytes,
-					Metadata: skyhook.FileMetadata{
-						Filename: "annotations.json",
-					},
-				}
-				err := exec_ops.WriteItem(url, outDS, "annotations", outFileData)
+				err := exec_ops.WriteItem(url, outDS, "annotations", bytes, skyhook.FileMetadata{
+					Filename: "annotations.json",
+				})
 				if err != nil {
 					return err
 				}
@@ -278,17 +273,14 @@ func init() {
 
 				if inItem.Ext != "json" {
 					// just copy the image
-					var imageFileMetadata skyhook.FileMetadata
-					skyhook.JsonUnmarshal([]byte(inItem.Metadata), &imageFileMetadata)
-					format, _, _ := imageImpl.GetDefaultMetadata(imageFileMetadata.Filename)
-					ext := imageImpl.GetExtGivenFormat(format)
+					imageFileMetadata := inItem.DecodeMetadata().(skyhook.FileMetadata)
+					format, _, _ := imageSpec.GetMetadataFromFile(imageFileMetadata.Filename)
+					ext := imageSpec.GetExtFromFormat(format)
 
 					// determine key to save this file under
-					var metadata skyhook.FileMetadata
-					skyhook.JsonUnmarshal([]byte(inItem.Metadata), &metadata)
-					key := filenameToKey(metadata.Filename)
+					key := filenameToKey(imageFileMetadata.Filename)
 
-					outImageItem, err := exec_ops.AddItem(url, imageDS, key, ext, format, "")
+					outImageItem, err := exec_ops.AddItem(url, imageDS, key, ext, format, skyhook.NoMetadata{})
 					if err != nil {
 						return err
 					}
@@ -305,15 +297,15 @@ func init() {
 				// (2) group annotations by image ID
 				// (3) loop over images
 
-				data_, err := inItem.LoadData()
+				data, metadata, err := inItem.LoadData()
 				if err != nil {
 					return err
 				}
-				data := data_.(skyhook.FileData)
+				filename := metadata.(skyhook.FileMetadata).Filename
 				var coco CocoJSON
-				err = json.Unmarshal(data.Bytes, &coco)
+				err = json.Unmarshal(data.([]byte), &coco)
 				if err != nil {
-					return fmt.Errorf("error decoding annotation JSON (%s): %v", data.Metadata.Filename, err)
+					return fmt.Errorf("error decoding annotation JSON (%s): %v", filename, err)
 				}
 
 				var categories []string
@@ -341,15 +333,11 @@ func init() {
 							Category: idToCategory[a.CategoryID],
 						})
 					}
-					outData := skyhook.DetectionData{
-						Detections: [][]skyhook.Detection{detections},
-						Metadata: skyhook.DetectionMetadata{
-							CanvasDims: [2]int{image.Width, image.Height},
-							Categories: categories,
-						},
-					}
 					key := filenameToKey(image.Filename)
-					err := exec_ops.WriteItem(url, labelDS, key, outData)
+					err := exec_ops.WriteItem(url, labelDS, key, [][]skyhook.Detection{detections}, skyhook.DetectionMetadata{
+						CanvasDims: [2]int{image.Width, image.Height},
+						Categories: categories,
+					})
 					if err != nil {
 						return err
 					}

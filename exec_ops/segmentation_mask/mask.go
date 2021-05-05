@@ -26,7 +26,7 @@ func (e *Mask) Parallelism() int {
 }
 
 // TODO: handle numCategories>256
-func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byte, error) {
+func (e *Mask) renderFrame(dtype skyhook.DataType, data interface{}, metadata skyhook.DataMetadata, categoryMap map[string]int) ([]byte, error) {
 	dims := e.Params.Dims
 	padding := e.Params.Padding
 	canvas := make([]byte, dims[0]*dims[1])
@@ -58,10 +58,9 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 		return -1
 	}
 
-	if data.Type() == skyhook.ShapeType {
-		shapeData := data.(skyhook.ShapeData)
-		shapes := shapeData.Shapes[0]
-		shapeDims := shapeData.Metadata.CanvasDims
+	if dtype == skyhook.ShapeType {
+		shapes := data.([][]skyhook.Shape)[0]
+		shapeDims := metadata.(skyhook.ShapeMetadata).CanvasDims
 		if shapeDims[0] == 0 {
 			// if no dims set in data, assume it corresponds to output dims
 			shapeDims = dims
@@ -158,10 +157,9 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 				panic(fmt.Errorf("mask for shape type %s not implemented", shape.Type))
 			}
 		}
-	} else if data.Type() == skyhook.DetectionType {
-		detectionData := data.(skyhook.DetectionData)
-		detections := detectionData.Detections[0]
-		detDims := detectionData.Metadata.CanvasDims
+	} else if dtype == skyhook.DetectionType {
+		detections := data.([][]skyhook.Detection)[0]
+		detDims := metadata.(skyhook.DetectionMetadata).CanvasDims
 		for _, d := range detections {
 			if detDims[0] != 0 && detDims != dims {
 				d = d.Rescale(detDims, dims)
@@ -178,16 +176,15 @@ func (e *Mask) renderFrame(data skyhook.Data, categoryMap map[string]int) ([]byt
 }
 
 func (e *Mask) Apply(task skyhook.ExecTask) error {
-	input, err := task.Items["input"][0][0].LoadData()
-	if err != nil {
-		return err
-	}
+	inputItem := task.Items["input"][0][0]
+	dtype := inputItem.Dataset.DataType
+	inputMetadata := inputItem.DecodeMetadata()
 
 	var categories []string
-	if input.Type() == skyhook.ShapeType {
-		categories = input.(skyhook.ShapeData).Metadata.Categories
-	} else if input.Type() == skyhook.DetectionType {
-		categories = input.(skyhook.DetectionData).Metadata.Categories
+	if dtype == skyhook.ShapeType {
+		categories = inputMetadata.(skyhook.ShapeMetadata).Categories
+	} else if dtype == skyhook.DetectionType {
+		categories = inputMetadata.(skyhook.DetectionMetadata).Categories
 	}
 
 	numCategories := len(categories)+1
@@ -204,30 +201,28 @@ func (e *Mask) Apply(task skyhook.ExecTask) error {
 		}
 	}
 
-	metadata := skyhook.ArrayMetadata{
+	outputMetadata := skyhook.ArrayMetadata{
 		Width: e.Params.Dims[0],
 		Height: e.Params.Dims[1],
 		Channels: 1,
 		Type: "uint8",
 	}
-
-	builder := skyhook.DataImpls[skyhook.ArrayType].Builder()
-	skyhook.PerFrame([]skyhook.Data{input}, func(pos int, datas []skyhook.Data) error {
-		frameBytes, err := e.renderFrame(datas[0], categoryMap)
-		if err != nil {
-			return err
-		}
-		return builder.Write(skyhook.ArrayData{
-			Bytes: frameBytes,
-			Metadata: metadata,
-		})
-	})
-
-	output, err := builder.Close()
+	outputItem, err := exec_ops.AddItem(e.URL, e.OutputDataset, task.Key, "bin", "bin", outputMetadata)
 	if err != nil {
 		return err
 	}
-	return exec_ops.WriteItem(e.URL, e.OutputDataset, task.Key, output)
+	writer := outputItem.LoadWriter()
+	err = skyhook.PerFrame([]skyhook.Item{inputItem}, func(pos int, datas []interface{}) error {
+		frameBytes, err := e.renderFrame(dtype, datas[0], inputMetadata, categoryMap)
+		if err != nil {
+			return err
+		}
+		return writer.Write([][]byte{frameBytes})
+	})
+	if err != nil {
+		return err
+	}
+	return writer.Close()
 }
 
 func (e *Mask) Close() {}

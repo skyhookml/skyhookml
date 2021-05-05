@@ -15,7 +15,7 @@ import (
 // An obj.names file is also created for the category names.
 
 func init() {
-	imageImpl := skyhook.DataImpls[skyhook.ImageType]
+	imageSpec := skyhook.DataSpecs[skyhook.ImageType].(skyhook.ImageDataSpec)
 
 	skyhook.AddExecOpImpl(skyhook.ExecOpImpl{
 		Config: skyhook.ExecOpConfig{
@@ -68,14 +68,14 @@ func init() {
 				if outImageFormat == "" {
 					outImageFormat = inImageItem.Format
 				}
-				outImageExt := imageImpl.GetExtGivenFormat(outImageFormat)
+				outImageExt := imageSpec.GetExtFromFormat(outImageFormat)
 				if outImageExt == "" {
 					// unknown format...? just use the format as ext
 					outImageExt = outImageFormat
 				}
-				outImageMetadata := string(skyhook.JsonMarshal(skyhook.FileMetadata{
+				outImageMetadata := skyhook.FileMetadata{
 					Filename: task.Key+"."+outImageExt,
-				}))
+				}
 				outImageItem, err := exec_ops.AddItem(url, outDS, task.Key+"-image", outImageExt, "", outImageMetadata)
 				if err != nil {
 					return err
@@ -87,18 +87,18 @@ func init() {
 
 				// write the labels
 				// we need to convert coordinates and also change category string to category ID
-				data, err := inLabelItem.LoadData()
+				labelData, labelMetadata_, err := inLabelItem.LoadData()
 				if err != nil {
 					return err
 				}
-				labelData := data.(skyhook.DetectionData)
-				canvasDims := labelData.Metadata.CanvasDims
+				labelMetadata := labelMetadata_.(skyhook.DetectionMetadata)
+				canvasDims := labelMetadata.CanvasDims
 				categoryToID := make(map[string]int)
-				for i, category := range labelData.Metadata.Categories {
+				for i, category := range labelMetadata.Categories {
 					categoryToID[category] = i
 				}
 				var lines []string
-				for _, detection := range labelData.Detections[0] {
+				for _, detection := range labelData.([][]skyhook.Detection)[0] {
 					cx := float64(detection.Left+detection.Right)/2/float64(canvasDims[0])
 					cy := float64(detection.Top+detection.Bottom)/2/float64(canvasDims[1])
 					width := float64(detection.Right-detection.Left)/float64(canvasDims[0])
@@ -108,27 +108,19 @@ func init() {
 					lines = append(lines, line)
 				}
 				bytes := []byte(strings.Join(lines, "\n")+"\n")
-				outFileData := skyhook.FileData{
-					Bytes: bytes,
-					Metadata: skyhook.FileMetadata{
-						Filename: task.Key+".txt",
-					},
-				}
-				err = exec_ops.WriteItem(url, outDS, task.Key+"-label", outFileData)
+				err = exec_ops.WriteItem(url, outDS, task.Key+"-label", bytes, skyhook.FileMetadata{
+					Filename: task.Key+".txt",
+				})
 				if err != nil {
 					return err
 				}
 
 				// we may also need to write obj.names, if this is the one task assigned to it
 				if task.Metadata == "obj.names" {
-					bytes := []byte(strings.Join(labelData.Metadata.Categories, "\n")+"\n")
-					fileData := skyhook.FileData{
-						Bytes: bytes,
-						Metadata: skyhook.FileMetadata{
-							Filename: "obj.names",
-						},
-					}
-					err := exec_ops.WriteItem(url, outDS, "obj.names", fileData)
+					bytes := []byte(strings.Join(labelMetadata.Categories, "\n")+"\n")
+					err := exec_ops.WriteItem(url, outDS, "obj.names", bytes, skyhook.FileMetadata{
+						Filename: "obj.names",
+					})
 					if err != nil {
 						return err
 					}
@@ -164,12 +156,12 @@ func init() {
 			var categories []string
 			for _, fname := range []string{"obj.names", "label_map.txt", "labels.txt"} {
 				if item, ok := files[fname]; ok {
-					 data, err := item.LoadData()
+					 data, _, err := item.LoadData()
 					 if err != nil {
 						 return nil, fmt.Errorf("from_yolo: error loading categories: %v", err)
 					 }
-					 fileData := data.(skyhook.FileData)
-					 for _, line := range strings.Split(string(fileData.Bytes), "\n") {
+					 bytes := data.([]byte)
+					 for _, line := range strings.Split(string(bytes), "\n") {
 						 line = strings.TrimSpace(line)
 						 if line == "" {
 							 continue
@@ -230,12 +222,12 @@ func init() {
 				}
 
 				// convert the labels .txt file to skyhook detection format
-				inLabelData, err := inLabelItem.LoadData()
+				inLabelData, _, err := inLabelItem.LoadData()
 				if err != nil {
 					return err
 				}
 				var detections []skyhook.Detection
-				for _, line := range strings.Split(string(inLabelData.(skyhook.FileData).Bytes), "\n") {
+				for _, line := range strings.Split(string(inLabelData.([]byte)), "\n") {
 					line = strings.TrimSpace(line)
 					if line == "" {
 						continue
@@ -262,25 +254,20 @@ func init() {
 				}
 
 				// add the detections
-				outLabelData := skyhook.DetectionData{
-					Detections: [][]skyhook.Detection{detections},
-					Metadata: skyhook.DetectionMetadata{
-						CanvasDims: dims,
-						Categories: categories,
-					},
-				}
-				err = exec_ops.WriteItem(url, labelDS, task.Key, outLabelData)
+				err = exec_ops.WriteItem(url, labelDS, task.Key, [][]skyhook.Detection{detections}, skyhook.DetectionMetadata{
+					CanvasDims: dims,
+					Categories: categories,
+				})
 				if err != nil {
 					return err
 				}
 
 				// add the image
 				// we use the original filename to determine skyhook ext/format
-				var imageFileMetadata skyhook.FileMetadata
-				skyhook.JsonUnmarshal([]byte(inImageItem.Metadata), &imageFileMetadata)
-				format, _, _ := imageImpl.GetDefaultMetadata(imageFileMetadata.Filename)
-				ext := imageImpl.GetExtGivenFormat(format)
-				outImageItem, err := exec_ops.AddItem(url, imageDS, task.Key, ext, format, "")
+				imageFileMetadata := inImageItem.DecodeMetadata().(skyhook.FileMetadata)
+				format, _, _ := imageSpec.GetMetadataFromFile(imageFileMetadata.Filename)
+				ext := imageSpec.GetExtFromFormat(format)
+				outImageItem, err := exec_ops.AddItem(url, imageDS, task.Key, ext, format, skyhook.NoMetadata{})
 				if err != nil {
 					return err
 				}

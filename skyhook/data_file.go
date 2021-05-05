@@ -1,90 +1,87 @@
 package skyhook
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 )
 
 type FileMetadata struct {
-	Filename string
+	Filename string `json:",omitempty"`
 }
 
-type FileHeader struct {
-	FileMetadata
+func (m FileMetadata) Update(other DataMetadata) DataMetadata {
+	other_ := other.(FileMetadata)
+	if other_.Filename != "" {
+		m.Filename = other_.Filename
+	}
+	return m
+}
+
+type FileTypeDataSpec struct{}
+
+func (s FileTypeDataSpec) DecodeMetadata(rawMetadata string) DataMetadata {
+	if rawMetadata == "" {
+		return FileMetadata{}
+	}
+	var m FileMetadata
+	JsonUnmarshal([]byte(rawMetadata), &m)
+	return m
+}
+
+type FileStreamHeader struct {
 	Length int
 }
 
-type FileData struct {
-	Bytes []byte
-	Metadata FileMetadata
+func (s FileTypeDataSpec) ReadStream(r io.Reader) (interface{}, error) {
+	var header FileStreamHeader
+	if err := ReadJsonData(r, &header); err != nil {
+		return nil, err
+	}
+	bytes := make([]byte, header.Length)
+	if _, err := io.ReadFull(r, bytes); err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
-func (d FileData) EncodeStream(w io.Writer) error {
-	WriteJsonData(FileHeader{
-		FileMetadata: d.Metadata,
-		Length: len(d.Bytes),
-	}, w)
-	if _, err := w.Write(d.Bytes); err != nil {
+func (s FileTypeDataSpec) WriteStream(data interface{}, w io.Writer) error {
+	bytes := data.([]byte)
+	header := FileStreamHeader{
+		Length: len(bytes),
+	}
+	if err := WriteJsonData(header, w); err != nil {
+		return err
+	}
+	if _, err := w.Write(bytes); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d FileData) Encode(format string, w io.Writer) error {
-	_, err := w.Write(d.Bytes)
+func (s FileTypeDataSpec) Read(format string, metadata DataMetadata, r io.Reader) (data interface{}, err error) {
+	bytes, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (s FileTypeDataSpec) Write(data interface{}, format string, metadata DataMetadata, w io.Writer) error {
+	bytes := data.([]byte)
+	_, err := w.Write(bytes)
 	return err
 }
 
-func (d FileData) Type() DataType {
-	return FileType
-}
-
-func (d FileData) GetDefaultExtAndFormat() (string, string) {
-	ext := filepath.Ext(d.Metadata.Filename)
+func (s FileTypeDataSpec) GetDefaultExtAndFormat(data interface{}, metadata DataMetadata) (ext string, format string) {
+	metadata_ := metadata.(FileMetadata)
+	ext = filepath.Ext(metadata_.Filename)
 	if len(ext) > 0 {
 		ext = ext[1:]
 	}
 	return ext, ""
 }
 
-func (d FileData) GetMetadata() interface{} {
-	return d.Metadata
-}
-
 func init() {
-	DataImpls[FileType] = DataImpl{
-		DecodeStream: func(r io.Reader) (Data, error) {
-			var header FileHeader
-			if err := ReadJsonData(r, &header); err != nil {
-				return nil, err
-			}
-			bytes := make([]byte, header.Length)
-			if _, err := io.ReadFull(r, bytes); err != nil {
-				return nil, err
-			}
-			return FileData{
-				Metadata: header.FileMetadata,
-				Bytes: bytes,
-			}, nil
-		},
-		Decode: func(format string, metadataRaw string, r io.Reader) (Data, error) {
-			var metadata FileMetadata
-			JsonUnmarshal([]byte(metadataRaw), &metadata)
-
-			bytes, err := ioutil.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-
-			return FileData{
-				Metadata: metadata,
-				Bytes: bytes,
-			}, nil
-		},
-		GetDefaultMetadata: func(fname string) (format string, metadataRaw string, err error) {
-			return "", "", fmt.Errorf("file metadata cannot be determined from file")
-		},
-	}
+	DataSpecs[FileType] = FileTypeDataSpec{}
 }

@@ -4,10 +4,8 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
 	"runtime"
@@ -33,172 +31,137 @@ func (e *VideoSample) Parallelism() int {
 }
 
 func (e *VideoSample) Apply(task skyhook.ExecTask) error {
-	// decode task metadata to get the samples we need to extract
+	// Decode task metadata to get the samples we need to extract.
 	var samples [][2]int
 	skyhook.JsonUnmarshal([]byte(task.Metadata), &samples)
 
 	log.Printf("extracting %d samples from %s", len(samples), task.Key)
 
-	processVideo := func(vdata skyhook.VideoData) (map[string]skyhook.Data, error) {
-		// create map of where samples start
-		startToEnd := make(map[int][]int)
-		for _, sample := range samples {
-			startToEnd[sample[0]] = append(startToEnd[sample[0]], sample[1])
-		}
-
-		outputs := make(map[string]skyhook.Data)
-
-		type ProcessingClip struct {
-			Key string
-			Start int
-			End int
-			Ch chan skyhook.Image
-		}
-		type PendingResponse struct {
-			Key string
-			Data skyhook.VideoData
-			Error error
-		}
-		// segments where we're currently in the middle of the intervals
-		processing := make(map[string]ProcessingClip)
-		// segments that we finished providing input, and just need to wait for the encoded video bytes
-		pending := make(map[string]bool)
-		ch := make(chan PendingResponse)
-
-		counter := 0
-		err := vdata.Iterator().Iterate(32, func(im skyhook.Image) {
-			// add segments that start at this frame to the processing set
-			for _, end := range startToEnd[counter] {
-				sampleKey := fmt.Sprintf("%s_%d_%d", task.Key, counter, end)
-				if _, ok := processing[sampleKey]; ok {
-					// duplicate interval
-					continue
-				}
-
-				// for images, we can do it quickly
-				if end - counter == 1 {
-					outputs[sampleKey] = skyhook.ImageData{Images: []skyhook.Image{im}}
-					continue
-				}
-
-				pc := ProcessingClip{
-					Key: sampleKey,
-					Start: counter,
-					End: end,
-					Ch: make(chan skyhook.Image),
-				}
-				processing[sampleKey] = pc
-				pending[sampleKey] = true
-				go func() {
-					r, cmd := skyhook.MakeVideo(&skyhook.ChanReader{pc.Ch}, vdata.Metadata.Dims, vdata.Metadata.Framerate)
-					buf := new(bytes.Buffer)
-					_, err := io.Copy(buf, r)
-					if err != nil {
-						r.Close()
-						cmd.Wait()
-						ch <- PendingResponse{sampleKey, skyhook.VideoData{}, err}
-						return
-					}
-					r.Close()
-					cmd.Wait()
-					sampleMeta := skyhook.VideoMetadata{
-						Dims: vdata.Metadata.Dims,
-						Framerate: vdata.Metadata.Framerate,
-						Duration: float64((pc.End-pc.Start)*vdata.Metadata.Framerate[1])/float64(vdata.Metadata.Framerate[0]),
-					}
-					sampleData := skyhook.VideoData{
-						Metadata: sampleMeta,
-						Bytes: buf.Bytes(),
-					}
-					ch <- PendingResponse{sampleKey, sampleData, nil}
-				}()
-			}
-
-			// push image onto processing segments
-			for _, pc := range processing {
-				pc.Ch <- im
-			}
-
-			counter++
-
-			// remove processing segments that end here
-			for sampleKey, pc := range processing {
-				if counter < pc.End {
-					continue
-				}
-				close(pc.Ch)
-				delete(processing, sampleKey)
-			}
-		})
-
-		// before checking err, finish getting all the pending responses
-		for sampleKey, pc := range processing {
-			close(pc.Ch)
-			delete(processing, sampleKey)
-			if err == nil {
-				err = fmt.Errorf("segment still processing after iteration")
-			}
-		}
-		for len(pending) > 0 {
-			resp := <- ch
-			delete(pending, resp.Key)
-			if resp.Error == nil {
-				outputs[resp.Key] = resp.Data
-			} else if err == nil {
-				err = resp.Error
-			}
-		}
-
-		return outputs, err
+	// Create map of where samples start.
+	startToEnd := make(map[int][]int)
+	for _, sample := range samples {
+		startToEnd[sample[0]] = append(startToEnd[sample[0]], sample[1])
 	}
 
-	process := func(item skyhook.Item) (map[string]skyhook.Data, error) {
-		data, err := item.LoadData()
-		if err != nil {
-			return nil, err
-		}
-
-		if data.Type() == skyhook.VideoType {
-			return processVideo(data.(skyhook.VideoData))
-		}
-
-		// if this isn't video, then we currently assume we can slice the data directly
-		sliceData := data.(skyhook.SliceData)
-		outputs := make(map[string]skyhook.Data)
-		for _, sample := range samples {
-			sampleKey := fmt.Sprintf("%s_%d_%d", task.Key, sample[0], sample[1])
-			sampleData := sliceData.Slice(sample[0], sample[1])
-			outputs[sampleKey] = sampleData
-		}
-		return outputs, nil
+	type ProcessingSample struct {
+		Key string
+		Start int
+		End int
+		Writers []skyhook.SequenceWriter
 	}
 
-	processAndWrite := func(item skyhook.Item, dataset skyhook.Dataset) error {
-		outputs, err := process(item)
-		if err != nil {
-			return err
-		}
-		for key, data := range outputs {
-			err := exec_ops.WriteItem(e.URL, dataset, key, data)
-			if err != nil {
-				return fmt.Errorf("error writing item to dataset %d: %v", dataset.ID, err)
-			}
-		}
-		return nil
-	}
+	// Load input items, output datasets, and metadatas.
+	var inputs []skyhook.Item
+	var outputDatasets []skyhook.Dataset
+	var metadatas []skyhook.DataMetadata
 
-	err := processAndWrite(task.Items["video"][0][0], e.Datasets["samples"])
-	if err != nil {
-		return err
-	}
+	inputs = append(inputs, task.Items["video"][0][0])
+	outputDatasets = append(outputDatasets, e.Datasets["samples"])
+	metadatas = append(metadatas, inputs[0].DecodeMetadata())
+
 	for i, itemList := range task.Items["others"] {
-		err := processAndWrite(itemList[0], e.Datasets[fmt.Sprintf("others%d", i)])
-		if err != nil {
-			return err
+		inputs = append(inputs, itemList[0])
+		outputDatasets = append(outputDatasets, e.Datasets[fmt.Sprintf("others%d", i)])
+		metadatas = append(metadatas, itemList[0].DecodeMetadata())
+	}
+
+	// Samples where we're currently in the middle of the intervals.
+	processing := make(map[string]ProcessingSample)
+
+	err := skyhook.PerFrame(inputs, func(pos int, datas []interface{}) error {
+		// add segments that start at this frame to the processing set
+		for _, end := range startToEnd[pos] {
+			sampleKey := fmt.Sprintf("%s_%d_%d", task.Key, pos, end)
+			if _, ok := processing[sampleKey]; ok {
+				// duplicate interval
+				continue
+			}
+
+			sample := ProcessingSample{
+				Key: sampleKey,
+				Start: pos,
+				End: end,
+				Writers: make([]skyhook.SequenceWriter, len(inputs)),
+			}
+
+			for i, ds := range outputDatasets {
+				// Add an item to the dataset first.
+				// To do so, we need to know the ext/format/metadata.
+				// If input/output type match, then we can copy it from the input.
+				// If they don't match (video input, image output), we handle the special case.
+				var ext, format string
+				var metadata skyhook.DataMetadata
+				if inputs[i].Dataset.DataType == skyhook.VideoType && ds.DataType == skyhook.ImageType {
+					ext = "jpg"
+					format = "jpeg"
+					metadata = skyhook.NoMetadata{}
+				} else {
+					metadata = metadatas[i]
+					ext, format = inputs[i].DataSpec().GetDefaultExtAndFormat(datas[i], metadatas[i])
+				}
+				if ds.DataType == skyhook.VideoType {
+					// For video outputs, update the Duration of the metadata so that it matches the sample duration.
+					vmeta := metadata.(skyhook.VideoMetadata)
+					vmeta.Duration = float64((end-pos)*vmeta.Framerate[1])/float64(vmeta.Framerate[0])
+					metadata = vmeta
+				}
+				item, err := exec_ops.AddItem(e.URL, ds, sampleKey, ext, format, metadata)
+				if err != nil {
+					return err
+				}
+				sample.Writers[i] = item.LoadWriter()
+			}
+
+			processing[sampleKey] = sample
+		}
+
+		// push data onto processing segments
+		for _, sample := range processing {
+			for i := range datas {
+				err := sample.Writers[i].Write(datas[i])
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// remove processing segments that end here
+		for sampleKey, sample := range processing {
+			if pos < sample.End {
+				continue
+			}
+			delete(processing, sampleKey)
+			// Close the writers, and return if we encounter an error.
+			// But we have to be a bit careful to always close all the writers here,
+			// now that we've removed the sample from the processing set.
+			var closeErr error
+			for _, writer := range sample.Writers {
+				err := writer.Close()
+				if err != nil {
+					closeErr = err
+				}
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		}
+
+		return nil
+	})
+
+	// Before checking err, finish closing any remaining writers.
+	// On a successful run, they should've all been closed already.
+	for sampleKey, sample := range processing {
+		delete(processing, sampleKey)
+		for _, writer := range sample.Writers {
+			writer.Close()
+		}
+		if err == nil {
+			err = fmt.Errorf("segment still processing after iteration")
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (e *VideoSample) Close() {}
@@ -235,11 +198,7 @@ func init() {
 			var videoItems []Item
 			for _, group := range groupedItems {
 				item := group["video"][0]
-				var metadata skyhook.VideoMetadata
-				err := json.Unmarshal([]byte(item.Metadata), &metadata)
-				if err != nil {
-					continue
-				}
+				metadata := item.DecodeMetadata().(skyhook.VideoMetadata)
 
 				// estimate num frames from framerate and duration
 				numFrames := int(metadata.Duration * float64(metadata.Framerate[0])) / metadata.Framerate[1]

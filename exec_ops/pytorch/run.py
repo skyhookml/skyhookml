@@ -1,7 +1,10 @@
 import sys
 sys.path.append('./python')
 import skyhook.common as lib
+import skyhook.io
+from skyhook.op.op import Operator
 
+import io
 import json
 import numpy
 import os, os.path
@@ -16,7 +19,9 @@ import skyhook.pytorch.util as util
 
 in_dataset_id = int(sys.argv[1])
 params_arg = sys.argv[2]
-batch_size = 16
+# TODO: make Python /synchronized-reader endpoint accept batch size
+# TODO: make batch size configurable and have auto-reduce-batch-size option
+#batch_size = 16
 
 params = json.loads(params_arg)
 
@@ -51,104 +56,176 @@ input_options = {}
 for spec in params['InputOptions']:
 	input_options[spec['Idx']] = json.loads(spec['Value'])
 
-meta = None
-def meta_func(x):
-	global meta
-	meta = x
+class InferOperator(Operator):
+	def __init__(self, meta_packet):
+		super(InferOperator, self).__init__(meta_packet)
 
-@torch.no_grad()
-def callback_func(*args):
-	job_desc = args[0]
-	args = args[1:]
-	if job_desc['type'] == 'finish':
-		lib.output_data_finish(job_desc['key'], job_desc['key'])
-		return
-	elif job_desc['type'] != 'job':
-		return
+	def parallelism(self):
+		# Use more than one parallelism since ffmpeg on input side may be bottleneck.
+		return min(4, os.cpu_count()//2)
 
-	input_len = lib.data_len(meta['InputTypes'][0], args[0])
-	# process the inputs one batch size at a time
-	for inp_start in range(0, input_len, batch_size):
-		inp_end = min(inp_start+batch_size, input_len)
-
-		# find the dimensions of the first input image
-		# we currently use this to fill canvas_dims of detection/shape outputs
-		canvas_dims = None
-
-		# get the slice corresponding to current batch from args
-		# and convert it to our pytorch input form
-		datas = []
-		for ds_idx, arg in enumerate(args):
-			t = meta['InputTypes'][ds_idx]
-
-			if t == 'video':
-				# we optimize inference over video by handling input options in golang
-				# so here we just need to transpose
-				data = torch.from_numpy(arg[inp_start:inp_end, :, :, :]).permute(0, 3, 1, 2)
+	def apply(self, task):
+		items = [item_list[0] for item_list in task['Items']['inputs']]
+		in_metadatas = []
+		for item in items:
+			if item['Metadata']:
+				in_metadatas.append(json.loads(item['Metadata']))
 			else:
-				opts = input_options.get(ds_idx, {})
-				cur_datas = []
-				for i in range(inp_start, inp_end):
-					input = lib.data_index(t, arg, i)
-					data = util.prepare_input(t, input, opts)
-					if canvas_dims is None and (t == 'image' or t == 'video' or t == 'array'):
-						canvas_dims = [data.shape[2], data.shape[1]]
-					cur_datas.append(data)
-				data = util.collate(t, cur_datas)
+				in_metadatas.append({})
 
-			datas.append(data)
-		if not canvas_dims:
-			canvas_dims = [1280, 720]
+		# We optimize inference over video data by handling input options in ffmpeg.
+		# Here, we loop over items and update metadata to match the desired resolution.
+		# We also get the framerate of the first video input (if any).
+		framerate = None
+		for i, item in enumerate(items):
+			if item['Dataset']['DataType'] != 'video':
+				continue
+			opt = input_options.get(i, {})
+			orig_dims = in_metadatas[i]['Dims']
+			new_dims = util.get_resize_dims(orig_dims, opt)
+			in_metadatas[i]['Dims'] = new_dims
+			item['Metadata'] = json.dumps(in_metadatas[i])
+			if framerate is None:
+				framerate = in_metadatas[i]['Framerate']
 
-		# process this batch through the model
-		util.inputs_to_device(datas, device)
-		y = net(*datas)
+		if framerate is None:
+			framerate = [10, 1]
 
-		# extract and emit outputs
-		out_datas = []
-		for out_idx, t in enumerate(meta['OutputTypes']):
-			cur = y[out_idx]
-			if t in ['image', 'video', 'array']:
-				out_datas.append(cur.permute(0, 2, 3, 1).cpu().numpy())
-			elif t == 'detection':
-				# detections are represented as a dict
-				# - cur['counts'] is # detections in each image
-				# - cur['detections'] is the flat list of detections (cls, xyxy, conf)
-				# - cur['categories'] is optional string category list
-				# first, convert from boxes to skyhookml detections
-				flat_detections = []
-				for box in cur['detections'].tolist():
-					cls, left, top, right, bottom, conf = box
-					if 'categories' in cur:
-						category = cur['categories'][int(cls)]
+		rd_resp = requests.post(self.local_url + '/synchronized-reader', json=items, stream=True)
+		rd_resp.raise_for_status()
+
+		in_dtypes = [ds['DataType'] for ds in self.inputs]
+		out_dtypes = [ds['DataType'] for ds in self.outputs]
+
+		# Define generator function that will apply model on each batch from reader.
+		def gen():
+			sent_meta = False
+
+			while True:
+				# Read a batch.
+				try:
+					datas = skyhook.io.read_datas(rd_resp.raw, in_dtypes, in_metadatas)
+				except EOFError:
+					break
+
+				# Find the dimensions of the first input image.
+				# We currently use this to fill canvas_dims of detection/shape outputs.
+				canvas_dims = None
+
+				# Convert datas to our input form.
+				data_len = lib.data_len(in_dtypes[0], datas[0])
+				pytorch_datas = []
+				for ds_idx, data in enumerate(datas):
+					t = in_dtypes[ds_idx]
+
+					if t == 'video':
+						# We already handled input options by mutating the item metadata.
+						# So, here, we just need to transpose.
+						pytorch_data = torch.from_numpy(data).permute(0, 3, 1, 2)
 					else:
-						category = 'category{}'.format(int(cls))
-					flat_detections.append({
-						'Left': int(left*canvas_dims[0]),
-						'Top': int(top*canvas_dims[1]),
-						'Right': int(right*canvas_dims[0]),
-						'Bottom': int(bottom*canvas_dims[1]),
-						'Score': float(conf),
-						'Category': category,
-					})
-				# second, group up the boxes
-				prefix_sum = 0
-				detections = []
-				for count in cur['counts']:
-					detections.append(flat_detections[prefix_sum:prefix_sum+count])
-					prefix_sum += count
-				out_datas.append({
-					'Detections': detections,
-					'Metadata': {
-						'CanvasDims': canvas_dims,
-					},
-				})
-			elif t == 'int':
-				out_datas.append({
-					'Ints': cur.tolist(),
-				})
-			else:
-				out_datas.append(cur.tolist())
-		lib.output_datas(job_desc['key'], job_desc['key'], out_datas)
+						opt = input_options.get(ds_idx, {})
+						cur_pytorch_datas = []
+						for i in range(data_len):
+							element = lib.data_index(t, data, i)
+							pytorch_data = util.prepare_input(t, element, in_metadatas[ds_idx], opt)
+							cur_pytorch_datas.append(pytorch_data)
+						pytorch_data = util.collate(t, cur_pytorch_datas)
 
-lib.run(callback_func, meta_func)
+					if canvas_dims is None and (t == 'image' or t == 'video' or t == 'array'):
+						canvas_dims = [pytorch_data.shape[3], pytorch_data.shape[2]]
+
+					pytorch_datas.append(pytorch_data)
+
+				if not canvas_dims:
+					canvas_dims = [1280, 720]
+
+				# Apply the model.
+				util.inputs_to_device(pytorch_datas, device)
+				y = net(*pytorch_datas)
+
+				# Convert back from pytorch to skyhookml stream data format.
+				out_datas = []
+				out_metadatas = []
+				for out_idx, t in enumerate(out_dtypes):
+					cur = y[out_idx]
+					if t in ['image', 'video', 'array']:
+						cur = cur.permute(0, 2, 3, 1).cpu().numpy()
+						out_datas.append(cur)
+						if t == 'image':
+							out_metadatas.append({})
+						elif t == 'video':
+							out_metadatas.append({
+								'Framerate': framerate,
+								'Dims': [cur.shape[2], cur.shape[1]],
+							})
+						elif t == 'array':
+							out_metadatas.append({
+								'Width': cur.shape[2],
+								'Height': cur.shape[1],
+								'Channels': cur.shape[3],
+								'Type': cur.dtype.name,
+							})
+					elif t == 'detection':
+						# detections are represented as a dict
+						# - cur['counts'] is # detections in each image
+						# - cur['detections'] is the flat list of detections (cls, xyxy, conf)
+						# - cur['categories'] is optional string category list
+						# first, convert from boxes to skyhookml detections
+						flat_detections = []
+						for box in cur['detections'].tolist():
+							cls, left, top, right, bottom, conf = box
+							if 'categories' in cur:
+								category = cur['categories'][int(cls)]
+							else:
+								category = 'category{}'.format(int(cls))
+							flat_detections.append({
+								'Left': int(left*canvas_dims[0]),
+								'Top': int(top*canvas_dims[1]),
+								'Right': int(right*canvas_dims[0]),
+								'Bottom': int(bottom*canvas_dims[1]),
+								'Score': float(conf),
+								'Category': category,
+							})
+						# second, group up the boxes
+						prefix_sum = 0
+						detections = []
+						for count in cur['counts']:
+							detections.append(flat_detections[prefix_sum:prefix_sum+count])
+							prefix_sum += count
+						out_datas.append(detections)
+						out_metadatas.append({
+							'CanvasDims': canvas_dims,
+						})
+					else:
+						out_datas.append(cur.tolist())
+						out_metadatas.append({})
+
+				# If we haven't sent the meta packet yet, send it.
+				# We delay until here so that we have metadatas.
+				if not sent_meta:
+					sent_meta = True
+					metas = []
+					for out_idx, ds in enumerate(self.outputs):
+						metas.append({
+							'Dataset': ds,
+							'Key': task['Key'],
+							'Metadata': json.dumps(out_metadatas[out_idx]),
+						})
+					buf = io.BytesIO()
+					skyhook.io.write_json(buf, metas)
+					yield buf.getvalue()
+
+				# Stack the outputs, encode them, and yield the bytes.
+				outputs_stacked = []
+				for i, t in enumerate(out_dtypes):
+					data = lib.data_stack(t, [output[i] for output in out_datas])
+					outputs_stacked.append(data)
+				buf = io.BytesIO()
+				skyhook.io.write_datas(buf, out_dtypes, outputs_stacked)
+				yield buf.getvalue()
+
+		# Make the build request.
+		requests.post(self.local_url + '/build', data=gen()).raise_for_status()
+
+with torch.no_grad():
+	lib.run(InferOperator)

@@ -65,7 +65,7 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 	for _, l := range items {
 		counter += 1
 
-		imData, err := l[0].LoadData()
+		imData, imMetadata, err := l[0].LoadData()
 		if err != nil {
 			return err
 		}
@@ -74,17 +74,16 @@ func (e *TrainOp) Apply(task skyhook.ExecTask) error {
 		if err != nil {
 			return err
 		}
-		imData.Encode("jpeg", file)
+		imageDataset.DataSpec().Write(imData, "jpeg", imMetadata, file)
 		file.Close()
 		imFnames = append(imFnames, imPath)
 
-		labelData, err := l[1].LoadData()
+		labelData, labelMetadata, err := l[1].LoadData()
 		if err != nil {
 			return err
 		}
-		labelData_ := labelData.(skyhook.DetectionData)
-		detections := labelData_.Detections[0]
-		canvasDims := labelData_.Metadata.CanvasDims
+		detections := labelData.([][]skyhook.Detection)[0]
+		canvasDims := labelMetadata.(skyhook.DetectionMetadata).CanvasDims
 		file, err = os.Create(filepath.Join(exportPath, fmt.Sprintf("%d.txt", counter)))
 		if err != nil {
 			return err
@@ -248,7 +247,7 @@ backup=%s
 		key := fname[0:len(fname)-len(ext)]
 		ext = ext[1:]
 		fileMetadata := skyhook.FileMetadata{Filename: fname}
-		_, err := exec_ops.AddItem(e.url, e.dataset, key, ext, "", string(skyhook.JsonMarshal(fileMetadata)))
+		_, err := exec_ops.AddItem(e.url, e.dataset, key, ext, "", fileMetadata)
 		if err != nil {
 			return err
 		}
