@@ -83,8 +83,10 @@ func (s DetectionJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
 	return nil
 }
 
-func (s DetectionJsonSpec) GetEmptyData() (data interface{}) {
-	return [][]Detection{}
+func (s DetectionJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
+	var data [][]Detection
+	err := json.Unmarshal(bytes, &data)
+	return data, err
 }
 
 func (s DetectionJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {

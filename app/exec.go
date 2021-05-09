@@ -574,7 +574,7 @@ func (node *DBExecNode) Incremental(opts IncrementalOptions) error {
 			curOutputKeys := neededOutputKeys[cur.ID]
 			log.Printf("[exec-node %s] [incremental] computing %d output keys at node %s", node.Name, len(curOutputKeys), cur.Name)
 
-			rd, err := node.PrepareRun(ExecRunOptions{
+			rd, err := cur.PrepareRun(ExecRunOptions{
 				Incremental: true,
 				LimitOutputKeys: curOutputKeys,
 			})

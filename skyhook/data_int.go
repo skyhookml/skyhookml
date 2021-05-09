@@ -50,8 +50,10 @@ func (s IntJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
 	return nil
 }
 
-func (s IntJsonSpec) GetEmptyData() (data interface{}) {
-	return []int{}
+func (s IntJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
+	var data []int
+	err := json.Unmarshal(bytes, &data)
+	return data, err
 }
 
 func (s IntJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {

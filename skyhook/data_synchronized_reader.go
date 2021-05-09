@@ -97,8 +97,8 @@ func PerFrame(items []Item, f func(pos int, datas []interface{}) error) error {
 	return SynchronizedReader(items, 32, func(pos int, length int, datas []interface{}) error {
 		for i := 0; i < length; i++ {
 			var cur []interface{}
-			for _, d := range datas {
-				cur = append(cur, specs[i].Slice(d, i, i+1))
+			for itemIdx, d := range datas {
+				cur = append(cur, specs[itemIdx].Slice(d, i, i+1))
 			}
 			err := f(pos+i, cur)
 			if err != nil {

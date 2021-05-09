@@ -33,8 +33,10 @@ func (s StringJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
 	return nil
 }
 
-func (s StringJsonSpec) GetEmptyData() (data interface{}) {
-	return []string{}
+func (s StringJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
+	var data []string
+	err := json.Unmarshal(bytes, &data)
+	return data, err
 }
 
 func (s StringJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {

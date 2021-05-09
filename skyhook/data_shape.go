@@ -96,8 +96,10 @@ func (s ShapeJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
 	return nil
 }
 
-func (s ShapeJsonSpec) GetEmptyData() (data interface{}) {
-	return [][]Shape{}
+func (s ShapeJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
+	var data [][]Shape
+	err := json.Unmarshal(bytes, &data)
+	return data, err
 }
 
 func (s ShapeJsonSpec) GetEmptyMetadata() (metadata DataMetadata) {

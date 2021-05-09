@@ -81,6 +81,10 @@ def load_item(dataset, item):
 					continue
 				data.append(json.loads(line))
 
+				# Correct cases where Golang encodes nil slice as "null" instead of list.
+				if data[-1] is None:
+					data[-1] = []
+
 		return data
 
 def load_video(dataset, item):

@@ -21,6 +21,17 @@ type ImageStreamHeader struct {
 	BytesPerElement int
 }
 
+// Image is usually stored as Image but may become []Image since we support
+// slice operations (so that operations can process Video/Image in the same way
+// through SynchronizedReader).
+// So this helper function tries both and returns just the Image.
+func (s ImageDataSpec) getImage(data interface{}) Image {
+	if image, ok := data.(Image); ok {
+		return image
+	}
+	return data.([]Image)[0]
+}
+
 func (s ImageDataSpec) ReadStream(r io.Reader) (interface{}, error) {
 	var header ImageStreamHeader
 	if err := ReadJsonData(r, &header); err != nil {
@@ -39,12 +50,7 @@ func (s ImageDataSpec) ReadStream(r io.Reader) (interface{}, error) {
 }
 
 func (s ImageDataSpec) WriteStream(data interface{}, w io.Writer) error {
-	var image Image
-	if imageList, ok := data.([]Image); ok {
-		image = imageList[0]
-	} else {
-		image = data.(Image)
-	}
+	image := s.getImage(data)
 	header := ImageStreamHeader{
 		Width: image.Width,
 		Height: image.Height,
@@ -77,16 +83,7 @@ func (s ImageDataSpec) Read(format string, metadata DataMetadata, r io.Reader) (
 }
 
 func (s ImageDataSpec) Write(data interface{}, format string, metadata DataMetadata, w io.Writer) error {
-	// Data should usually just be an Image.
-	// But when using ImageDataSpec.Writer, we may end up with an []Image.
-	// So check for that here.
-	var image Image
-	if imageList, ok := data.([]Image); ok {
-		image = imageList[0]
-	} else {
-		image = data.(Image)
-	}
-
+	image := s.getImage(data)
 	if format == "jpeg" {
 		bytes, err := image.AsJPG()
 		if err != nil {
@@ -130,7 +127,8 @@ func (s ImageDataSpec) Append(data interface{}, more interface{}) interface{} {
 }
 func (s ImageDataSpec) Slice(data interface{}, i int, j int) interface{} {
 	if i == 0 && j == 1 {
-		return []Image{data.(Image)}
+		image := s.getImage(data)
+		return []Image{image}
 	}
 	panic(fmt.Errorf("ImageDataSpec.Slice not supported"))
 }

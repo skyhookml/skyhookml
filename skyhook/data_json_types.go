@@ -1,6 +1,7 @@
 package skyhook
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ type SequenceJsonSpec interface {
 	DecodeMetadata(rawMetadata string) DataMetadata
 	Decode(dec *json.Decoder, n int) (data interface{}, err error)
 	Encode(enc *json.Encoder, data interface{}) error
-	GetEmptyData() (data interface{})
+	DecodeData(bytes []byte) (interface{}, error)
 	GetEmptyMetadata() (metadata DataMetadata)
 
 	Length(data interface{}) int
@@ -28,8 +29,18 @@ func (s SequenceJsonDataImpl) DecodeMetadata(rawMetadata string) DataMetadata {
 }
 
 func (s SequenceJsonDataImpl) ReadStream(r io.Reader) (data interface{}, err error) {
-	data = s.Spec.GetEmptyData()
-	if err := ReadJsonData(r, &data); err != nil {
+	// Copied from ReadJsonData.
+	// But instead of decoding directly, we pass to spec.DecodeData.
+	blen := make([]byte, 4)
+	if _, err := io.ReadFull(r, blen); err != nil {
+		return nil, err
+	}
+	bytes := make([]byte, binary.BigEndian.Uint32(blen))
+	if _, err := io.ReadFull(r, bytes); err != nil {
+		return nil, err
+	}
+	data, err = s.Spec.DecodeData(bytes)
+	if err != nil {
 		return nil, err
 	}
 	return data, nil
