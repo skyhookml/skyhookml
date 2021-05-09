@@ -193,7 +193,7 @@ func (ds *DBDataset) getDB() *Database {
 			-- 'data' or 'computed'
 			type TEXT,
 			data_type TEXT,
-			metadata TEXT,
+			metadata TEXT DEFAULT '',
 			-- only set if computed
 			hash TEXT
 		)`)

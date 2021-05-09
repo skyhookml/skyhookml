@@ -90,7 +90,7 @@ def prepare_input(t, data, metadata, opt):
 		}
 	elif t == 'detection':
 		# we will normalize the points by the canvas dims
-		dims = metadtaa['CanvasDims']
+		dims = metadata['CanvasDims']
 		categories = metadata.get('Categories', [])
 
 		# encode as 2-tuple: (# detections, then flat clsid+bboxes)

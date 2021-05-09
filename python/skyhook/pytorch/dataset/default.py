@@ -27,7 +27,7 @@ class Dataset(torch.utils.data.Dataset):
 		for key in self.keys:
 			cur = []
 			for dataset in self.datasets:
-				item = items[dataset['ID']]
+				item = self.items[key][dataset['ID']]
 				metadata = lib.decode_metadata(dataset, item)
 				cur.append(metadata)
 			self.metadatas[key] = cur
