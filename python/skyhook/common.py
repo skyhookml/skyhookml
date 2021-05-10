@@ -73,17 +73,13 @@ def load_item(dataset, item):
 		dt = dt.newbyteorder('>')
 		return numpy.fromfile(fname, dtype=dt).reshape(-1, metadata['Height'], metadata['Width'], metadata['Channels'])
 	else:
-		data = []
 		with open(fname, 'r') as f:
-			for line in f:
-				line = line.strip()
-				if not line:
-					continue
-				data.append(json.loads(line))
+			data = json.load(f)
 
-				# Correct cases where Golang encodes nil slice as "null" instead of list.
-				if data[-1] is None:
-					data[-1] = []
+		# Correct cases where Golang encodes nil slice as "null" instead of list.
+		for i in range(len(data)):
+			if data[i] is None:
+				data[i] = []
 
 		return data
 

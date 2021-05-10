@@ -60,29 +60,6 @@ func (s DetectionJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
 	return m
 }
 
-func (s DetectionJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
-	var data [][]Detection
-	for i := 0; (i < n || n == -1) && dec.More(); i++ {
-		var dlist []Detection
-		err := dec.Decode(&dlist)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, dlist)
-	}
-	return data, nil
-}
-
-func (s DetectionJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
-	for _, dlist := range data.([][]Detection) {
-		err := enc.Encode(dlist)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s DetectionJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
 	var data [][]Detection
 	err := json.Unmarshal(bytes, &data)

@@ -73,29 +73,6 @@ func (s ShapeJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
 	return m
 }
 
-func (s ShapeJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
-	var data [][]Shape
-	for i := 0; (i < n || n == -1) && dec.More(); i++ {
-		var cur []Shape
-		err := dec.Decode(&cur)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, cur)
-	}
-	return data, nil
-}
-
-func (s ShapeJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
-	for _, cur := range data.([][]Shape) {
-		err := enc.Encode(cur)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s ShapeJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
 	var data [][]Shape
 	err := json.Unmarshal(bytes, &data)

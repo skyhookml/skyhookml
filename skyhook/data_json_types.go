@@ -2,16 +2,14 @@ package skyhook
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 )
 
 // Implement DataSpec using simple JSON-only format.
 type SequenceJsonSpec interface {
 	DecodeMetadata(rawMetadata string) DataMetadata
-	Decode(dec *json.Decoder, n int) (data interface{}, err error)
-	Encode(enc *json.Encoder, data interface{}) error
 	DecodeData(bytes []byte) (interface{}, error)
 	GetEmptyMetadata() (metadata DataMetadata)
 
@@ -57,8 +55,15 @@ func (s SequenceJsonDataImpl) Read(format string, metadata DataMetadata, r io.Re
 	if format != "json" {
 		return nil, fmt.Errorf("format must be json")
 	}
-	decoder := json.NewDecoder(r)
-	return s.Spec.Decode(decoder, -1)
+	bytes, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	data, err = s.Spec.DecodeData(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (s SequenceJsonDataImpl) Write(data interface{}, format string, metadata DataMetadata, w io.Writer) error {
@@ -68,8 +73,9 @@ func (s SequenceJsonDataImpl) Write(data interface{}, format string, metadata Da
 	if format != "json" {
 		return fmt.Errorf("format must be json")
 	}
-	encoder := json.NewEncoder(w)
-	return s.Spec.Encode(encoder, data)
+	bytes := JsonMarshal(data)
+	_, err := w.Write(bytes)
+	return err
 }
 
 func (s SequenceJsonDataImpl) GetDefaultExtAndFormat(data interface{}, metadata DataMetadata) (ext string, format string) {
@@ -81,36 +87,24 @@ func (s SequenceJsonDataImpl) GetMetadataFromFile(fname string) (format string, 
 	return "json", metadata, nil
 }
 
-type SequenceJsonReader struct {
-	Spec SequenceJsonSpec
-	Decoder *json.Decoder
-}
-
-func (r SequenceJsonReader) Read(n int) (interface{}, error) {
-	return r.Spec.Decode(r.Decoder, n)
-}
-
-func (r SequenceJsonReader) Close() {}
-
 func (s SequenceJsonDataImpl) Reader(format string, metadata DataMetadata, r io.Reader) SequenceReader {
-	decoder := json.NewDecoder(r)
-	return SequenceJsonReader{s.Spec, decoder}
+	data, err := s.Read(format, metadata, r)
+	if err != nil {
+		return ErrorSequenceReader{err}
+	}
+	return &SliceReader{
+		Data: data,
+		Spec: s,
+	}
 }
-
-type SequenceJsonWriter struct {
-	Spec SequenceJsonSpec
-	Encoder *json.Encoder
-}
-
-func (w SequenceJsonWriter) Write(data interface{}) error {
-	return w.Spec.Encode(w.Encoder, data)
-}
-
-func (w SequenceJsonWriter) Close() error { return nil }
 
 func (s SequenceJsonDataImpl) Writer(format string, metadata DataMetadata, w io.Writer) SequenceWriter {
-	encoder := json.NewEncoder(w)
-	return SequenceJsonWriter{s.Spec, encoder}
+	return &SliceWriter{
+		Spec: s,
+		Format: format,
+		Metadata: metadata,
+		Writer: w,
+	}
 }
 
 func (s SequenceJsonDataImpl) Length(data interface{}) int { return s.Spec.Length(data) }

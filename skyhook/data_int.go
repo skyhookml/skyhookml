@@ -27,29 +27,6 @@ func (s IntJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
 	return m
 }
 
-func (s IntJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
-	var data []int
-	for i := 0; (i < n || n == -1) && dec.More(); i++ {
-		var cur int
-		err := dec.Decode(&cur)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, cur)
-	}
-	return data, nil
-}
-
-func (s IntJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
-	for _, cur := range data.([]int) {
-		err := enc.Encode(cur)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s IntJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
 	var data []int
 	err := json.Unmarshal(bytes, &data)

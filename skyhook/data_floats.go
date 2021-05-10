@@ -10,29 +10,6 @@ func (s FloatJsonSpec) DecodeMetadata(rawMetadata string) DataMetadata {
 	return NoMetadata{}
 }
 
-func (s FloatJsonSpec) Decode(dec *json.Decoder, n int) (interface{}, error) {
-	var data [][]float64
-	for i := 0; (i < n || n == -1) && dec.More(); i++ {
-		var cur []float64
-		err := dec.Decode(&cur)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, cur)
-	}
-	return data, nil
-}
-
-func (s FloatJsonSpec) Encode(enc *json.Encoder, data interface{}) error {
-	for _, cur := range data.([][]float64) {
-		err := enc.Encode(cur)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s FloatJsonSpec) DecodeData(bytes []byte) (interface{}, error) {
 	var data [][]float64
 	err := json.Unmarshal(bytes, &data)
