@@ -137,54 +137,58 @@ export default {
 
 			let typeHelpTexts = {
 				'image': {
-					'per_frame': 'A numpy array with dimensions (width, height, 3).',
-					'all': 'A numpy array with dimensions (1, width, height, 3).',
+					'per_frame': ['Data: A numpy array with dimensions (width, height, 3).', 'Metadata: N/A.'],
+					'all': ['Data: A numpy array with dimensions (1, width, height, 3).', 'Metadata: N/A.'],
 				},
 				'video': {
-					'per_frame': 'A numpy array with dimensions (width, height, 3).',
-					'all': 'A numpy array with dimensions (nframes, width, height, 3).',
+					'per_frame': ['Data: A numpy array with dimensions (width, height, 3).', 'Metadata: N/A.'],
+					'all': ['Data: A numpy array with dimensions (nframes, width, height, 3).', 'Metadata: N/A.'],
 				},
 				'detection': [
-					'A dictionary with two keys, Detections and Metadata.',
-					'Detections is a list (or list of lists) of bounding boxes.',
+					'Data: Object detections: a list (or list of lists) of bounding boxes.',
+					'Each detection has keys Left, Top, Right, Bottom, and optionally Category, TrackID, Score, Metadata.',
+					'Metadata: Optional keys CanvasDims and Categories.',
 					'Example: {"Detections": [{"Left": 100, "Right": 150, "Top": 300, "Bottom": 350}], "Metadata": {"CanvasDims": [1280, 720]}}',
 				],
 				'shape': [
-					'A dictionary with two keys, Shapes and Metadata.',
-					'Shapes is a list (or list of lists) of shapes.',
+					'Data: Shapes: a list (or list of lists) of shapes.',
+					'Each shape has keys Type, Points, and optionally Category, TrackID, Metadata.',
+					'Metadata: Optional keys CanvasDims and Categories.',
 					'Example: {"Shapes": [{"Type": "point", Points: [[100, 100]]}], "Metadata": {"CanvasDims": [1280, 720]}}',
 				],
 				'int': [
-					'A dictionary with two keys, Ints and Metadata.',
+					'Data: A list of integers, or a single integer.',
+					'Metadata: Optional key Categories.',
 					'Example: {"Ints": 2, "Metadata": {"Categories": ["person", "car", "giraffe"]}}',
 				],
 				'floats': {
-					'per_frame': 'A list of floats.',
-					'all': 'A list of lists of floats.',
+					'per_frame': ['Data: A list of floats.', 'Metadata: N/A.'],
+					'all': ['Data: A list of lists of floats.', 'Metadata: N/A.'],
 				},
 				'string': {
-					'per_frame': 'A string.',
-					'all': 'A list of strings.',
+					'per_frame': ['Data: A string.', 'Metadata: N/A.'],
+					'all': ['Data: A list of strings.', 'Metadata: N/A.'],
 				},
 				'array': {
-					'per_frame': 'A numpy array with dimensions (width, height, channels).',
-					'all': 'A numpy array with dimensions (length, width, height, channels).',
+					'per_frame': ['Data: A numpy array with dimensions (width, height, channels).', 'Metadata: A dict with keys Width, Height, Channels, Type.'],
+					'all': ['Data: A numpy array with dimensions (length, width, height, channels).', 'Metadata: A dict with keys Width, Height, Channels, Type.'],
 				},
 				'table': [
-					'A dictionary with two keys, Specs and Data.',
+					'Data: A list of list of strings, where each sub-list corresponds to the values in one row.',
+					'Metadata: A list of each columns, where each column is specified by a dict with keys Label, Type.',
 					'Example: {"Specs": [{"Label": "Column 1", "Type": "string"}], "Data": [["Row 1"], ["Row 2"]]}',
 				],
 			};
-			let tmpl = `
+			let tmpl = `from skyhook.op import per_frame, all_decorate
 # Template for inputting data one element at a time.
 # Only works for sequence data types.
-@lib.per_frame_decorate
+@per_frame
 def f(ARGLIST):
 PER_FRAME_DOC
 	pass
 
 # Template for inputting entire data item at once.
-@lib.all_decorate
+@all_decorate
 def f(ARGLIST):
 ALL_DOC
 	pass`;
@@ -223,11 +227,11 @@ ALL_DOC
 
 			// helper function to get doc string part for one mode (per_frame/all)
 			let getDoc = function(mode) {
-				let doc = "\t'''\n\tInputs:\n";
+				let doc = "\t'''\n\tInputs (each input is a dict with keys 'Data' and 'Metadata'):\n";
 				for(let i = 0; i < inputTypes.length; i++) {
 					doc += getHelpText(variableNames[i], inputTypes[i], mode);
 				}
-				doc += '\tReturns a tuple consisting of:\n'
+				doc += "\tReturns: a tuple where elements are either data only or a dict with keys 'Data' and 'Metadata'\n"
 				for(let i = 0; i < outputs.length; i++) {
 					let name = 'Index ' + i + ' (' + outputs[i].Name + ')';
 					doc += getHelpText(name, outputs[i].DataType, mode);
