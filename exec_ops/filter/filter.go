@@ -107,7 +107,7 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "filter",
 			Name: "Filter",
-			Description: "Filter",
+			Description: "Select the subset of input items that are non-zero/non-empty",
 		},
 		Inputs: []skyhook.ExecInput{
 			{Name: "input"},

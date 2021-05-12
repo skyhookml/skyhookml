@@ -1,13 +1,11 @@
-package virtual_debug
-
-// Merge all input items into one output item.
-// For table inputs, this is like SQL UNION operation.
+package union
 
 import (
 	"github.com/skyhookml/skyhookml/skyhook"
-	"github.com/skyhookml/skyhookml/exec_ops"
 
-	"io"
+	"fmt"
+	"strconv"
+	urllib "net/url"
 )
 
 func init() {
@@ -15,63 +13,55 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "union",
 			Name: "Union",
-			Description: "Combine many items into one",
+			Description: "Create an output dataset that includes all items from all input datasets",
 		},
-		Inputs: []skyhook.ExecInput{{Name: "input"}},
+		Inputs: []skyhook.ExecInput{{Name: "inputs", Variable: true}},
 		GetOutputs: func(params string, inputTypes map[string][]skyhook.DataType) []skyhook.ExecOutput {
-			if len(inputTypes["input"]) == 0 {
+			if len(inputTypes["inputs"]) == 0 {
 				return nil
 			}
-			return []skyhook.ExecOutput{{Name: "output", DataType: inputTypes["input"][0]}}
+			return []skyhook.ExecOutput{{Name: "output", DataType: inputTypes["inputs"][0]}}
 		},
 		Requirements: func(node skyhook.Runnable) map[string]int {
 			return nil
 		},
-		GetTasks: exec_ops.SingleTask("union"),
+		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
+			// Create one task per item.
+			// We set the Key of the task to the output key that we want to write as.
+			// This may not match the input key in the case that there are duplicate keys across input datasets.
+			seenKeys := make(map[string]bool)
+			var tasks []skyhook.ExecTask
+			for _, itemList := range rawItems["inputs"] {
+				for _, item := range itemList {
+					key := item.Key
+					for i := 1; seenKeys[key]; i++ {
+						key = item.Key + "-" + strconv.Itoa(i)
+					}
+					seenKeys[key] = true
+					tasks = append(tasks, skyhook.ExecTask{
+						Key: key,
+						Items: map[string][][]skyhook.Item{"inputs": {{item}}},
+					})
+				}
+			}
+			return tasks, nil
+		},
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {
 			applyFunc := func(task skyhook.ExecTask) error {
-				items := task.Items["input"][0]
+				item := task.Items["inputs"][0][0]
 				outDataset := node.OutputDatasets["output"]
-				dtype := outDataset.DataType
-				// we support:
-				// - Table: combine all rows into one table.
-				// - Any sequence type: use ChunkBuilder to build the sequence.
-				// TODO: make Table a sequence type so we don't have to have this special case.
-				if dtype == skyhook.TableType {
-					var outData [][]string
-					var outMetadata skyhook.DataMetadata
-					for _, item := range items {
-						data, metadata, err := item.LoadData()
-						if err != nil {
-							return err
-						}
-						outMetadata = metadata
-						outData = append(outData, data.([][]string)...)
-					}
-					return exec_ops.WriteItem(url, outDataset, "union", outData, outMetadata)
-				} else {
-					// Must be sequence data.
-					// Get the metadata, ext, and format from the first item.
-					outItem, err := exec_ops.AddItem(url, outDataset, "union", items[0].Ext, items[0].Format, items[0].DecodeMetadata())
-					if err != nil {
-						return err
-					}
-					writer := outItem.LoadWriter()
-					for _, item := range items {
-						reader, _ := item.LoadReader()
-						for {
-							cur, err := reader.Read(32)
-							if err == io.EOF {
-								break
-							} else if err != nil {
-								return err
-							}
-							writer.Write(cur)
-						}
-						reader.Close()
-					}
-					return writer.Close()
+				err := skyhook.JsonPostForm(url, fmt.Sprintf("/datasets/%d/items", outDataset.ID), urllib.Values{
+					"key": {task.Key},
+					"ext": {item.Ext},
+					"format": {item.Format},
+					"metadata": {item.Metadata},
+					"provider": {"reference"},
+					"provider_info": {item.Fname()},
+				}, nil)
+				if err != nil {
+					return err
 				}
+				return nil
 			}
 			return skyhook.SimpleExecOp{ApplyFunc: applyFunc}, nil
 		},

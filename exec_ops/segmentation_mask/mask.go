@@ -232,7 +232,7 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "segmentation_mask",
 			Name: "Segmentation Mask",
-			Description: "Create segmentation mask from shapes or detections",
+			Description: "Create segmentation masks from shapes or detections",
 		},
 		Inputs: []skyhook.ExecInput{{Name: "input", DataTypes: []skyhook.DataType{skyhook.DetectionType, skyhook.ShapeType}}},
 		Outputs: []skyhook.ExecOutput{{Name: "output", DataType: skyhook.ArrayType}},

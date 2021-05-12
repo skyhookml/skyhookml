@@ -1,6 +1,7 @@
 package ops
 
 import (
+	_ "github.com/skyhookml/skyhookml/exec_ops/concatenate"
 	_ "github.com/skyhookml/skyhookml/exec_ops/convert"
 	_ "github.com/skyhookml/skyhookml/exec_ops/cropresize"
 	_ "github.com/skyhookml/skyhookml/exec_ops/detection_filter"

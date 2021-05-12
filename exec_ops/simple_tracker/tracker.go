@@ -243,7 +243,7 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "simple_tracker",
 			Name: "Simple Tracker",
-			Description: "Simple Tracker",
+			Description: "A simple, heuristic object tracker",
 		},
 		Inputs: []skyhook.ExecInput{{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}}},
 		Outputs: []skyhook.ExecOutput{{Name: "tracks", DataType: skyhook.DetectionType}},

@@ -52,7 +52,7 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "detection_filter",
 			Name: "Detection Filter",
-			Description: "Detection Filter",
+			Description: "Filter detections based on confidence score or object category",
 		},
 		Inputs: []skyhook.ExecInput{{Name: "detections", DataTypes: []skyhook.DataType{skyhook.DetectionType}}},
 		Outputs: []skyhook.ExecOutput{{Name: "detections", DataType: skyhook.DetectionType}},

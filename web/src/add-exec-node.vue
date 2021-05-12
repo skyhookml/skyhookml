@@ -117,9 +117,13 @@ export default {
 			name: '',
 			op: null,
 			categories: [{
-				ID: "basic",
-				Name: "Basic",
-				Ops: ['filter', 'detection_filter', 'simple_tracker', 'reid_tracker', 'resample', 'segmentation_mask', 'union', 'sample', 'split'],
+				ID: "general",
+				Name: "General",
+				Ops: [
+					'filter', 'resample',
+					'concatenate', 'union',
+					'sample', 'split',
+				],
 			}, {
 				ID: "model",
 				Name: "Model",
@@ -135,8 +139,21 @@ export default {
 				],
 			}, {
 				ID: "video",
-				Name: "Image and Video",
+				Name: "Image/Video",
 				Ops: ['video_sample', 'render', 'cropresize'],
+			}, {
+				ID: "detection",
+				Name: "Detection/Tracking",
+				Ops: [
+					'detection_filter',
+					'simple_tracker', 'reid_tracker',
+				],
+			},{
+				ID: "segmentation",
+				Name: "Segmentation",
+				Ops: [
+					'segmentation_mask',
+				],
 			}, {
 				ID: "code",
 				Name: "Code",
@@ -146,13 +163,9 @@ export default {
 				Name: "Convert",
 				Ops: ['from_yolo', 'to_yolo', 'from_coco', 'to_coco', 'from_catfolder', 'to_catfolder'],
 			}, {
-				ID: "geoimage",
-				Name: "Geo-Image",
+				ID: "geospatial",
+				Name: "Geospatial",
 				Ops: ['make_geoimage', 'geoimage_to_image', 'geojson_to_shape', 'shape_to_geojson', 'spatialflow_partition'],
-			}, {
-				ID: "debug",
-				Name: "Debug",
-				Ops: ['virtual_debug'],
 			}],
 		};
 	},

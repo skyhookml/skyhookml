@@ -218,7 +218,7 @@ func init() {
 		Config: skyhook.ExecOpConfig{
 			ID: "reid_tracker",
 			Name: "Reid Tracker",
-			Description: "Tracker using Re-identification Model",
+			Description: "Apply a re-identification model for object tracking",
 		},
 		Inputs: []skyhook.ExecInput{
 			{Name: "model", DataTypes: []skyhook.DataType{skyhook.FileType}},
