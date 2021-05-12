@@ -30,7 +30,7 @@ class AllDecorateOperator(Operator):
 
 		# Write each output item.
 		for i, data in enumerate(outputs):
-			if instanceof(data, dict) and 'Data' in data:
+			if isinstance(data, dict) and 'Data' in data:
 				data, metadata = data['Data'], data['Metadata']
 			else:
 				metadata = {}

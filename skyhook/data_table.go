@@ -89,7 +89,7 @@ func (s TableDataSpec) Read(format string, metadata DataMetadata, r io.Reader) (
 	return nil, fmt.Errorf("unknown format %s", format)
 }
 
-func (d TableDataSpec) WriteSQLFile(data [][]string, metadata TableMetadata, fname string) error {
+func (d TableDataSpec) WriteSQLFile(data TableData, metadata TableMetadata, fname string) error {
 	db, err := sql.Open("sqlite3", fname)
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ func (d TableDataSpec) WriteSQLFile(data [][]string, metadata TableMetadata, fna
 }
 
 func (s TableDataSpec) Write(data interface{}, format string, metadata_ DataMetadata, w io.Writer) error {
-	rows := data.([][]string)
+	rows := data.(TableData)
 	metadata := metadata_.(TableMetadata)
 
 	if format == "json" {

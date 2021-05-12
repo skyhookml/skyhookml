@@ -148,18 +148,18 @@ export default {
 					'Data: Object detections: a list (or list of lists) of bounding boxes.',
 					'Each detection has keys Left, Top, Right, Bottom, and optionally Category, TrackID, Score, Metadata.',
 					'Metadata: Optional keys CanvasDims and Categories.',
-					'Example: {"Detections": [{"Left": 100, "Right": 150, "Top": 300, "Bottom": 350}], "Metadata": {"CanvasDims": [1280, 720]}}',
+					'Example: {"Data": [{"Left": 100, "Right": 150, "Top": 300, "Bottom": 350}], "Metadata": {"CanvasDims": [1280, 720]}}',
 				],
 				'shape': [
 					'Data: Shapes: a list (or list of lists) of shapes.',
 					'Each shape has keys Type, Points, and optionally Category, TrackID, Metadata.',
 					'Metadata: Optional keys CanvasDims and Categories.',
-					'Example: {"Shapes": [{"Type": "point", Points: [[100, 100]]}], "Metadata": {"CanvasDims": [1280, 720]}}',
+					'Example: {"Data": [{"Type": "point", Points: [[100, 100]]}], "Metadata": {"CanvasDims": [1280, 720]}}',
 				],
 				'int': [
 					'Data: A list of integers, or a single integer.',
 					'Metadata: Optional key Categories.',
-					'Example: {"Ints": 2, "Metadata": {"Categories": ["person", "car", "giraffe"]}}',
+					'Example: {"Data": 2, "Metadata": {"Categories": ["person", "car", "giraffe"]}}',
 				],
 				'floats': {
 					'per_frame': ['Data: A list of floats.', 'Metadata: N/A.'],
@@ -176,7 +176,7 @@ export default {
 				'table': [
 					'Data: A list of list of strings, where each sub-list corresponds to the values in one row.',
 					'Metadata: A list of each columns, where each column is specified by a dict with keys Label, Type.',
-					'Example: {"Specs": [{"Label": "Column 1", "Type": "string"}], "Data": [["Row 1"], ["Row 2"]]}',
+					'Example: {"Metadata": {"Columns": [{"Label": "Column 1", "Type": "string"}]}, "Data": [["Row 1"], ["Row 2"]]}',
 				],
 			};
 			let tmpl = `from skyhook.op import per_frame, all_decorate
