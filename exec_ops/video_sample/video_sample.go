@@ -127,7 +127,7 @@ func (e *VideoSample) Apply(task skyhook.ExecTask) error {
 
 		// remove processing segments that end here
 		for sampleKey, sample := range processing {
-			if pos < sample.End {
+			if pos+1 < sample.End {
 				continue
 			}
 			delete(processing, sampleKey)
@@ -210,7 +210,8 @@ func init() {
 
 			// select the samples
 			samples := make(map[string][][2]int)
-			if params.Mode == "random" {
+			// TODO: uniform not implemented yet, so we just silently do random
+			if params.Mode == "random" || params.Mode == "uniform" {
 				// sample item based on how many possible segments there are in the item
 				// (which depends on item and segment lengths)
 				weights := make([]int, len(videoItems))
