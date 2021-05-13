@@ -82,6 +82,9 @@
 				</div>
 			</div>
 		</template>
+		<template v-else>
+			<h3>Unknown Augmentation: {{ d.Op }} <button type="button" class="btn btn-sm btn-danger" v-on:click="removeAugmentation(i)">Remove</button></h3>
+		</template>
 	</template>
 	<h3>Add Data Augmentation</h3>
 	<fieldset class="form-group">
@@ -143,6 +146,9 @@ export default {
 		},
 		addAugmentation: function() {
 			let op = this.addForm.op;
+			if(!op) {
+				return;
+			}
 			this.resetAddForm();
 			let p = {};
 			if(op == 'random_resize') {
