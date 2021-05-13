@@ -123,6 +123,7 @@ export default {
 					'filter', 'resample',
 					'concatenate', 'union',
 					'sample', 'split',
+					'materialize',
 				],
 			}, {
 				ID: "model",
@@ -135,7 +136,7 @@ export default {
 					'pytorch_yolov3_train', 'pytorch_yolov3_infer',
 					'pytorch_yolov5_train', 'pytorch_yolov5_infer',
 					'yolov3_train', 'yolov3_infer',
-					'unsupervised_reid'
+					'unsupervised_reid',
 				],
 			}, {
 				ID: "video",
