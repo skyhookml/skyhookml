@@ -208,12 +208,6 @@ func (cmd *Cmd) Wait() error {
 		panic(fmt.Errorf("closed twice"))
 	}
 	cmd.closed = true
-	if cmd.stdin != nil {
-		cmd.stdin.Close()
-	}
-	if cmd.stdout != nil {
-		cmd.stdout.Close()
-	}
 	var lastLines []string
 	if cmd.stderrCh != nil {
 		lastLines = <- cmd.stderrCh
