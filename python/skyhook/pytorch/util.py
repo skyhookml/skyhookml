@@ -129,10 +129,15 @@ def collate(t, data_list):
 		return torch.stack([torch.from_numpy(data) for data in data_list], dim=0)
 
 def inputs_to_device(inputs, device):
+	def if_tensor_to_device(tensor):
+		if not isinstance(tensor, torch.Tensor):
+			return tensor
+		return tensor.to(device)
+
 	for i, d in enumerate(inputs):
 		if isinstance(d, tuple):
-			inputs[i] = [x.to(device) for x in d]
+			inputs[i] = [if_tensor_to_device(x) for x in d]
 		elif isinstance(d, dict):
-			inputs[i] = {k: x.to(device) for k, x in d.items()}
+			inputs[i] = {k: if_tensor_to_device(x) for k, x in d.items()}
 		else:
-			inputs[i] = d.to(device)
+			inputs[i] = if_tensor_to_device(d)

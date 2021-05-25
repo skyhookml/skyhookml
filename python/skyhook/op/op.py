@@ -62,3 +62,6 @@ class Operator:
 
 	def apply(self, task):
 		raise NotImplementedError
+
+	def close(self):
+		pass

@@ -133,6 +133,10 @@ def run(operator_provider, async_apply=False):
 		elif name == 'get_tasks':
 			response = operator.get_tasks(params)
 		elif name == 'apply':
+			if async_apply:
+				operator.apply(id, params)
+				continue
+
 			operator.apply(params)
 
 		packet = {
@@ -141,3 +145,5 @@ def run(operator_provider, async_apply=False):
 		if response is not None:
 			packet['JSON'] = json.dumps(response)
 		print('skjson'+json.dumps(packet), flush=True)
+
+	operator.close()
