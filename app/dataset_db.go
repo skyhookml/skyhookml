@@ -268,6 +268,7 @@ func (ds *DBDataset) WriteItem(key string, data interface{}, metadata skyhook.Da
 
 func (ds *DBDataset) Delete() {
 	ds.Clear()
+	DeleteReferencesToDataset(ds)
 	db.Exec("DELETE FROM datasets WHERE id = ?", ds.ID)
 	db.Exec("DELETE FROM exec_ds_refs WHERE dataset_id = ?", ds.ID)
 }
