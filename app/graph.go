@@ -217,7 +217,7 @@ func RunNode(targetNode *DBExecNode, opts RunNodeOptions) error {
 		}
 
 		// Check for conflicts.
-		rows := db.Query("SELECT metadata FROM jobs WHERE done = 0 AND type = 'multiexec' AND id != ?", jobID)
+		rows := db.Query("SELECT metadata FROM jobs WHERE done = 0 AND type = 'multiexec' AND id != ? AND metadata != ''", jobID)
 		for rows.Next() {
 			var metadataRaw string
 			rows.Scan(&metadataRaw)

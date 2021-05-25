@@ -712,7 +712,7 @@ func init() {
 			fmt.Sprintf("Exec Tree %s", node.Name),
 			"multiexec",
 			"multiexec",
-			fmt.Sprintf("%d", node.ID),
+			"",
 		)
 		jobOp := &MultiExecJobOp{Job: job}
 		job.AttachOp(jobOp)
@@ -812,7 +812,7 @@ func init() {
 			fmt.Sprintf("Partial Execution %s", node.Name),
 			"multiexec",
 			"multiexec",
-			fmt.Sprintf("%d", node.ID),
+			"",
 		)
 		jobOp := &MultiExecJobOp{Job: job}
 		job.AttachOp(jobOp)
