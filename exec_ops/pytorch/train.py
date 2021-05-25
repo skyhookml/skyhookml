@@ -199,7 +199,11 @@ class StopCondition(object):
 		return False
 
 def save_model():
-	torch.save(net.get_save_dict(), 'data/items/{}/model.pt'.format(out_dataset_id))
+	# Save to a different filename first to reduce the chance of model being corrupted
+	# if job is terminated.
+	out_dir = os.path.join('data/items', str(out_dataset_id))
+	torch.save(net.get_save_dict(), os.path.join(out_dir, 'model_.pt'))
+	os.rename(os.path.join(out_dir, 'model_.pt'), os.path.join(out_dir, 'model.pt'))
 
 class ModelSaver(object):
 	def __init__(self, params):
