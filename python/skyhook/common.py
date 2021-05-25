@@ -88,7 +88,25 @@ def load_video(dataset, item):
 	metadata = decode_metadata(dataset, item)
 	return ffmpeg.Ffmpeg(fname, metadata['Dims'], metadata['Framerate'])
 
-def run(operator_provider):
+def get_tracks(detections):
+	track_dict = {}
+	for frame_idx, dlist in enumerate(detections):
+		for detection in dlist:
+			detection['FrameIdx'] = frame_idx
+			track_id = detection['TrackID']
+			if track_id not in track_dict:
+				track_dict[track_id] = []
+			track_dict[track_id].append(detection)
+	return track_dict.values()
+
+def tracks_to_detections(tracks, nframes):
+	detections = [[] for _ in range(nframes)]
+	for track in tracks:
+		for detection in track:
+			detections[detection['FrameIdx']].append(detection)
+	return detections
+
+def run(operator_provider, async_apply=False):
 	import importlib
 	import json
 
