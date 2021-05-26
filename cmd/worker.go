@@ -68,7 +68,7 @@ func main() {
 	}
 
 	// Returns (container base URL, error)
-	startContainer := func(uuid string, imageName string, jobID *int, coordinatorURL string, instanceID string) (string, error) {
+	startContainer := func(uuid string, imageName string, jobID *int, coordinatorURL string, instanceID string, needsGPU bool) (string, error) {
 		mu.Lock()
 		containerPort := getPort()
 		containerBaseURL := fmt.Sprintf("http://%s:%d", myIP, containerPort)
@@ -89,16 +89,23 @@ func main() {
 			if instanceID != "" {
 				dataDir = filepath.Join(dataDir, filepath.Base(instanceID))
 			}
-			cmd = exec.Command(
+			args := []string{
 				"docker", "run",
 				"--mount", fmt.Sprintf("\"src=%s\",target=/usr/src/app/skyhook/data,type=bind", dataDir),
-				"--gpus", "all",
 				"-p", fmt.Sprintf("%d:8080", containerPort),
 				"--name", uuid,
 				// pytorch DataLoader needs more than tiny default 64MB shared memory
 				"--shm-size", "1G",
-				imageName,
-			)
+			}
+			if needsGPU {
+				args = append(args, []string{
+					"--gpus", "all",
+				}...)
+			}
+			args = append(args, []string{
+				strings.ReplaceAll(imageName, "skyhookml/", "skyhookml/demo-"),
+			}...)
+			cmd = exec.Command(args[0], args[1:]...)
 		} else if mode == "process" {
 			cmd = exec.Command(
 				"go", "run", "cmd/container.go", fmt.Sprintf(":%d", containerPort),
@@ -171,8 +178,9 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+			needsGPU := request.Node.GetOp().Requirements(request.Node)["gpu"] > 0
 
-			baseURL, err := startContainer(uuid, imageName, request.JobID, request.CoordinatorURL, request.InstanceID)
+			baseURL, err := startContainer(uuid, imageName, request.JobID, request.CoordinatorURL, request.InstanceID, needsGPU)
 			if err != nil {
 				// don't really need to do anything since startContainer will set containers[uuid].Error
 				return

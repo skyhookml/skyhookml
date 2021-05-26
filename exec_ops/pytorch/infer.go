@@ -76,7 +76,7 @@ var InferImpl = skyhook.ExecOpImpl{
 		return GetInferOutputs(params)
 	},
 	Requirements: func(node skyhook.Runnable) map[string]int {
-		return nil
+		return map[string]int{"gpu": 1}
 	},
 	GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 		// the model only has one dataset, we want to use all the other datasets

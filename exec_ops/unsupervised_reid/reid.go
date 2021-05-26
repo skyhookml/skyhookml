@@ -145,7 +145,7 @@ func init() {
 		},
 		Outputs: []skyhook.ExecOutput{{Name: "model", DataType: skyhook.FileType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
-			return nil
+			return map[string]int{"gpu": 1}
 		},
 		GetTasks: exec_ops.SingleTask("model"),
 		Prepare: func(url string, node skyhook.Runnable) (skyhook.ExecOp, error) {

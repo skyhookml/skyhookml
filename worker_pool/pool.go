@@ -4,10 +4,13 @@ import (
 	"github.com/skyhookml/skyhookml/skyhook"
 	gouuid "github.com/google/uuid"
 
+	_ "github.com/skyhookml/skyhookml/ops"
+
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +23,23 @@ type Worker struct {
 	ContainerUUID string
 	// UUID that we returned to coordinator
 	AllocationUUID string
+	// Resources corresponding to ExecOp.Requirements.
+	Resources map[string]int
+}
+
+// Check whether the worker satisfies the requirements.
+// Currently we require exact match to satisfy requirements since we don't want
+// to allocate GPU machine for CPU job.
+func (w Worker) Satisfies(requirements map[string]int) bool {
+	if len(requirements) != len(w.Resources) {
+		return false
+	}
+	for k, v := range requirements {
+		if w.Resources[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 type Request struct {
@@ -38,16 +58,32 @@ type AllocationResult struct {
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("usage: ./worker_pool [port] [worker list]")
-		fmt.Println("example: ./worker_pool 8081 http://1.2.3.4:8081,http://5.6.7.8:8081")
+		fmt.Println("example: ./worker_pool 8081 http://1.2.3.4:8081;gpu=1,x=1 http://5.6.7.8:8081")
 		return
 	}
 	myPort := skyhook.ParseInt(os.Args[1])
-	workerURLs := strings.Split(os.Args[2], ",")
+	workerSpecs := strings.Split(os.Args[2], " ")
 
 	// maintain state of the workers
-	workers := make([]*Worker, len(workerURLs))
-	for i, url := range workerURLs {
-		workers[i] = &Worker{URL: url}
+	workers := make([]*Worker, len(workerSpecs))
+	for i, spec := range workerSpecs {
+		parts := strings.Split(spec, ";")
+		url := parts[0]
+		resources := make(map[string]int)
+		if len(parts) >= 2 {
+			parts = strings.Split(parts[1], ",")
+			for _, part := range parts {
+				kv := strings.Split(part, "=")
+				k := strings.TrimSpace(kv[0])
+				v := strings.TrimSpace(kv[1])
+				x, _ := strconv.Atoi(v)
+				resources[k] = x
+			}
+		}
+		workers[i] = &Worker{
+			URL: url,
+			Resources: resources,
+		}
 	}
 	// maintain queue of container requests
 	var q []*Request
@@ -69,9 +105,12 @@ func main() {
 	go func() {
 		// helper function checking if there's an available worker
 		// caller must have the lock
-		getAvailableWorker := func() *Worker {
+		getAvailableWorker := func(requirements map[string]int) *Worker {
 			for _, worker := range workers {
 				if worker.ContainerUUID != "" {
+					continue
+				}
+				if !worker.Satisfies(requirements) {
 					continue
 				}
 				return worker
@@ -89,10 +128,11 @@ func main() {
 			log.Printf("[queue] got request %s, waiting for a worker", req.UUID)
 
 			// wait for a worker
-			for getAvailableWorker() == nil {
+			requirements := req.Node.GetOp().Requirements(req.Node)
+			for getAvailableWorker(requirements) == nil {
 				cond.Wait()
 			}
-			worker := getAvailableWorker()
+			worker := getAvailableWorker(requirements)
 			log.Printf("[req %s] got candidate worker at %s", req.UUID, worker.URL)
 			mu.Unlock()
 

@@ -156,7 +156,7 @@ func init() {
 		},
 		Outputs: []skyhook.ExecOutput{{Name: "detections", DataType: skyhook.DetectionType}},
 		Requirements: func(node skyhook.Runnable) map[string]int {
-			return nil
+			return map[string]int{"gpu": 1}
 		},
 		GetTasks: func(node skyhook.Runnable, rawItems map[string][][]skyhook.Item) ([]skyhook.ExecTask, error) {
 			// we want to use only images for SimpleTasks, not model
