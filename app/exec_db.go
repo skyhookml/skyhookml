@@ -243,3 +243,24 @@ func (node *DBExecNode) Delete() {
 
 	db.Exec("DELETE FROM exec_nodes WHERE id = ?", node.ID)
 }
+
+// Resolves an ExecParent to a dataset.
+// If the dataset is unavailable, returns an error.
+func ExecParentToDataset(parent skyhook.ExecParent) (*DBDataset, error) {
+	if parent.Type == "d" {
+		ds := GetDataset(parent.ID)
+		if ds == nil {
+			return nil, fmt.Errorf("no dataset found with the specified ID")
+		}
+		return ds, nil
+	} else if parent.Type == "n" {
+		otherNode := GetExecNode(parent.ID)
+		outputDatasets, _ := otherNode.GetDatasets(false)
+		ds := outputDatasets[parent.Name]
+		if ds == nil {
+			return nil, fmt.Errorf("node %s has no output named %s", otherNode.Name, parent.Name)
+		}
+		return ds, nil
+	}
+	return nil, fmt.Errorf("unknown parent type %s", parent.Type)
+}

@@ -790,15 +790,8 @@ func init() {
 		} else if params.Mode == "dataset" {
 			// If mode is dataset, we need to get the items in the dataset and determine
 			// the concrete list of keys that we should compute.
-			var dataset *DBDataset
-			if params.ParentSpec.Type == "d" {
-				dataset = GetDataset(params.ParentSpec.ID)
-			} else if params.ParentSpec.Type == "n" {
-				otherNode := GetExecNode(params.ParentSpec.ID)
-				outputDatasets, _ := otherNode.GetDatasets(false)
-				dataset = outputDatasets[params.ParentSpec.Name]
-			}
-			if dataset == nil {
+			dataset, err := ExecParentToDataset(params.ParentSpec)
+			if err != nil {
 				http.Error(w, "could not find the specified dataset; make sure the dataset specifying keys to compute is already computed", 400)
 				return
 			}

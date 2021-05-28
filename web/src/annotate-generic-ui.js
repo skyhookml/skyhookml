@@ -54,7 +54,7 @@ export default function(impl) {
 			utils.request(this, 'GET', '/annotate-datasets/'+setID, null, (annoset) => {
 				this.annoset = annoset;
 				this.dataType = annoset.Dataset.DataType;
-				this.source = annoset.Inputs[0];
+				this.source = annoset.InputDatasets[0];
 				this.sourceType = this.source.DataType;
 				this.url = '/annotate-datasets/'+this.annoset.ID+'/annotate';
 				if(impl.on_created_ready) {
@@ -318,10 +318,10 @@ export default function(impl) {
 			<div class="my-2 flex-content canvas-container">
 				<template v-if="frameIdx != null">
 					<template v-if="sourceType == 'video'">
-						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get-video-frame?idx='+frameIdx" class="fill-img" @load="imageLoaded" ref="image" />
+						<img :src="'/datasets/'+annoset.InputDatasets[0].ID+'/items/'+response.Key+'/get-video-frame?idx='+frameIdx" class="fill-img" @load="imageLoaded" ref="image" />
 					</template>
 					<template v-else>
-						<img :src="'/datasets/'+annoset.Inputs[0].ID+'/items/'+response.Key+'/get?format=jpeg'" class="fill-img" @load="imageLoaded" ref="image" />
+						<img :src="'/datasets/'+annoset.InputDatasets[0].ID+'/items/'+response.Key+'/get?format=jpeg'" class="fill-img" @load="imageLoaded" ref="image" />
 					</template>
 				</template>
 
@@ -355,7 +355,7 @@ export default function(impl) {
 				</div>
 				<div class="col-auto">
 					<template v-if="response != null">
-						<input v-model="jumpIdx" 
+						<input v-model="jumpIdx"
 							v-on:keyup.enter="(frameIdx=Math.min(jumpIdx,numFrames),jumpIdx=null)"
 							placeholder="jump to ...">
 						Frame {{ frameIdx }} / {{ numFrames }}
@@ -365,7 +365,7 @@ export default function(impl) {
 					<button v-on:click="getFrame(frameIdx+1)" type="button" class="btn btn-primary">Next Frame</button>
 				</div>
 			</div>
-			
+
 		</template>
 	</div>`;
 	for(var key in impl.methods) {

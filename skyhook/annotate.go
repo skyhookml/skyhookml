@@ -3,7 +3,7 @@ package skyhook
 type AnnotateDataset struct {
 	ID int
 	Dataset Dataset
-	Inputs []Dataset
+	Inputs []ExecParent
 	Tool string
 	Params string
 }

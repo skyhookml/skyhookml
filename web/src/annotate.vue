@@ -18,7 +18,7 @@
 			<tr v-for="set in annosets">
 				<td>{{ set.Dataset.Name }}</td>
 				<td>{{ set.Tool }}</td>
-				<td>{{ set.Inputs | niceInputs }}</td>
+				<td>{{ niceInputs[set.ID] }}</td>
 				<td>{{ $globals.dataTypes[set.Dataset.DataType] }}</td>
 				<td>
 					<router-link :to="'/ws/'+$route.params.ws+'/annotate/'+set.Tool+'/'+set.ID" class="btn btn-sm btn-primary">Annotate</router-link>
@@ -37,10 +37,24 @@ export default {
 	data: function() {
 		return {
 			annosets: [],
+
+			// For getting labels of inputs.
+			datasets: {},
+			nodes: {},
 		};
 	},
 	created: function() {
 		this.fetch();
+		utils.request(this, 'GET', '/datasets', null, (datasets) => {
+			for(let ds of datasets) {
+				this.datasets[ds.ID] = ds;
+			}
+		});
+		utils.request(this, 'GET', '/exec-nodes', null, (nodes) => {
+			for(let node of nodes) {
+				this.nodes[node.ID] = node;
+			}
+		});
 	},
 	methods: {
 		fetch: function() {
@@ -54,11 +68,24 @@ export default {
 			});
 		},
 	},
-	filters: {
-		// Format the Inputs of an annotation dataset.
-		niceInputs: function(inputs) {
-			let datasetNames = inputs.map((input) => input.Name);
-			return datasetNames.join(', ');
+	computed: {
+		// Format the Inputs of annotation datasets.
+		niceInputs: function() {
+			let setToNice = {};
+			for(let set of this.annosets) {
+				let names = [];
+				for(let input of set.Inputs) {
+					if(input.Type == 'd' && this.datasets[input.ID]) {
+						names.push(this.datasets[input.ID].Name);
+					} else if(input.Type == 'n' && this.nodes[input.ID]) {
+						names.push(this.nodes[input.ID].Name + ' [' + input.Name + ']');
+					} else {
+						names.push('Unknown');
+					}
+				}
+				setToNice[set.ID] = names.join(', ');
+			}
+			return setToNice;
 		},
 	},
 };

@@ -72,14 +72,13 @@
 				<div class="row mb-2">
 					<label class="col-sm-4 col-form-label">Input {{ input.Name }}</label>
 					<div class="col-sm-8">
-						<select v-model="addForm.inputIDs[i]" class="form-select" required>
-							<template v-for="ds in datasets">
-								<!-- Only show datasets that match the type of this input. -->
+						<select v-model="addForm.inputIndexes[i]" class="form-select" required>
+							<template v-for="(option, optionIdx) in options">
+								<!-- Only show options that match the type of this input. -->
 								<option
-									v-if="!input.DataTypes || input.DataTypes.includes(ds.DataType)"
-									:key="ds.ID"
-									:value="ds.ID">
-									{{ ds.Name }}
+									v-if="!input.DataTypes || input.DataTypes.includes(option.DataType)"
+									:value="optionIdx">
+									{{ option.Label }}
 								</option>
 							</template>
 						</select>
@@ -99,11 +98,14 @@
 
 <script>
 import utils from './utils.js';
+import get_parent_options from './get-parent-options.js';
 
 export default {
 	data: function() {
 		return {
-			datasets: [],
+			// ExecParent options to use for Inputs.
+			options: [],
+
 			addForm: {
 				// the selected tool ID and actual object
 				// object is filled in by changedTool
@@ -121,9 +123,10 @@ export default {
 				// existing dataset ID to add annotations to
 				datasetID: '',
 
-				// input dataset IDs to use for annotation
-				// corresponds to toolObj.Inputs
-				inputIDs: [],
+				// Input ExecParent objects to use for annotation.
+				// Refers to indexes in this.options.
+				// Inputs in this list correspond to elements in toolObj.Inputs.
+				inputIndexes: [],
 			},
 
 			tools: {
@@ -178,8 +181,8 @@ export default {
 		};
 	},
 	created: function() {
-		utils.request(this, 'GET', '/datasets', null, (data) => {
-			this.datasets = data;
+		get_parent_options(this.$route.params.ws, this, (options) => {
+			this.options = options;
 		});
 	},
 	methods: {
@@ -189,9 +192,9 @@ export default {
 			this.addForm.tool = tool;
 			let toolObj = this.tools[this.addForm.tool];
 			this.addForm.toolObj = toolObj;
-			this.addForm.inputIDs = [];
+			this.addForm.inputIndexes = [];
 			for(let i = 0; i < toolObj.Inputs.length; i++) {
-				this.addForm.inputIDs.push(null);
+				this.addForm.inputIndexes.push(null);
 			}
 			this.addForm.datasetType = '';
 			if(toolObj.DataType) {
@@ -217,15 +220,21 @@ export default {
 					datasetID = this.addForm.datasetID;
 				}
 
+				// Get ExecParents corresponding to inputIndexes.
+				let parents = [];
+				for(let optionIdx of this.addForm.inputIndexes) {
+					parents.push(this.options[optionIdx]);
+				}
+
 				let annoset;
 				try {
 					let params = {
-						ds_id: datasetID,
-						inputs: this.addForm.inputIDs.join(','),
-						tool: this.addForm.tool,
-						params: '',
+						DatasetID: datasetID,
+						Inputs: parents,
+						Tool: this.addForm.tool,
+						Params: '',
 					};
-					annoset = await utils.request(this, 'POST', '/annotate-datasets', params);
+					annoset = await utils.request(this, 'POST', '/annotate-datasets', JSON.stringify(params));
 				} catch(e) {
 					return;
 				}

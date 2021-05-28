@@ -6,20 +6,14 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/gorilla/mux"
 )
 
-func NewAnnotateDataset(dataset skyhook.Dataset, inputs []skyhook.Dataset, tool string, params string) (*DBAnnotateDataset, error) {
-	inputIDs := make([]string, len(inputs))
-	for i, input := range inputs {
-		inputIDs[i] = strconv.Itoa(input.ID)
-	}
+func NewAnnotateDataset(dataset skyhook.Dataset, inputs []skyhook.ExecParent, tool string, params string) (*DBAnnotateDataset, error) {
 	res := db.Exec(
 		"INSERT INTO annotate_datasets (dataset_id, inputs, tool, params) VALUES (?, ?, ?, ?)",
-		dataset.ID, strings.Join(inputIDs, ","), tool, params,
+		dataset.ID, string(skyhook.JsonMarshal(inputs)), tool, params,
 	)
 	return GetAnnotateDataset(res.LastInsertId()), nil
 }
@@ -44,24 +38,18 @@ func init() {
 	}).Methods("GET")
 
 	Router.HandleFunc("/annotate-datasets", func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
-		dsID := skyhook.ParseInt(r.PostForm.Get("ds_id"))
-		inputsStr := r.PostForm.Get("inputs")
-		tool := r.PostForm.Get("tool")
-		params := r.PostForm.Get("params")
-
-		dataset := GetDataset(dsID)
-
-		var inputs []skyhook.Dataset
-		for _, inputStr := range strings.Split(inputsStr, ",") {
-			inputStr = strings.TrimSpace(inputStr)
-			if inputStr == "" {
-				continue
-			}
-			inputs = append(inputs, GetDataset(skyhook.ParseInt(inputStr)).Dataset)
+		var request struct {
+			DatasetID int
+			Inputs []skyhook.ExecParent
+			Tool string
+			Params string
+		}
+		if err := skyhook.ParseJsonRequest(w, r, &request); err != nil {
+			return
 		}
 
-		ds, err := NewAnnotateDataset(dataset.Dataset, inputs, tool, params)
+		dataset := GetDataset(request.DatasetID)
+		ds, err := NewAnnotateDataset(dataset.Dataset, request.Inputs, request.Tool, request.Params)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return

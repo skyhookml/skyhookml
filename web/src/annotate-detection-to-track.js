@@ -24,7 +24,7 @@ export default AnnotateGenericUI({
 
 		// get actual detections from source
 		// but don't overwrite if we already loaded detections from on_item_data
-		let srcDataset = this.annoset.Inputs[1];
+		let srcDataset = this.annoset.InputDatasets[1];
 		let params = {
 			format: 'json',
 			t: new Date().getTime(),

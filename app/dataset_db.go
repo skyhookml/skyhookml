@@ -16,6 +16,7 @@ type DBDataset struct {
 type DBAnnotateDataset struct {
 	skyhook.AnnotateDataset
 	loaded bool
+	InputDatasets []skyhook.Dataset
 }
 type DBItem struct {
 	skyhook.Item
@@ -67,15 +68,9 @@ func annotateDatasetListHelper(rows *Rows) []*DBAnnotateDataset {
 		var s DBAnnotateDataset
 		var inputsRaw string
 		rows.Scan(&s.ID, &s.Dataset.ID, &s.Dataset.Name, &s.Dataset.Type, &s.Dataset.DataType, &inputsRaw, &s.Tool, &s.Params)
-		s.Inputs = []skyhook.Dataset{}
-		for _, part := range strings.Split(inputsRaw, ",") {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-			s.Inputs = append(s.Inputs, skyhook.Dataset{
-				ID: skyhook.ParseInt(part),
-			})
+		skyhook.JsonUnmarshal([]byte(inputsRaw), &s.Inputs)
+		if s.Inputs == nil {
+			s.Inputs = []skyhook.ExecParent{}
 		}
 		annosets = append(annosets, &s)
 	}
@@ -103,8 +98,13 @@ func (s *DBAnnotateDataset) Load() {
 	}
 
 	s.Dataset = GetDataset(s.Dataset.ID).Dataset
-	for i := range s.Inputs {
-		s.Inputs[i] = GetDataset(s.Inputs[i].ID).Dataset
+	s.InputDatasets = make([]skyhook.Dataset, len(s.Inputs))
+	for i, input := range s.Inputs {
+		ds, err := ExecParentToDataset(input)
+		if err != nil {
+			continue
+		}
+		s.InputDatasets[i] = ds.Dataset
 	}
 	s.loaded = true
 }
@@ -113,8 +113,13 @@ func (s *DBAnnotateDataset) Load() {
 // TODO: have sampler object so that hash tables can be stored in memory instead of loaded from db each time
 func (s *DBAnnotateDataset) SampleMissingKey() string {
 	var keys map[string]bool
-	for _, ds := range s.Inputs {
-		items := (&DBDataset{Dataset: ds}).ListItems()
+	for _, parent := range s.Inputs {
+		ds, err := ExecParentToDataset(parent)
+		if err != nil {
+			// TODO: probably want to handle this error somehow
+			continue
+		}
+		items := ds.ListItems()
 		curKeys := make(map[string]bool)
 		for _, item := range items {
 			curKeys[item.Key] = true
