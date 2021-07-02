@@ -187,9 +187,9 @@ export default {
 				Parents: null,
 				Workspace: this.$route.params.ws,
 			};
-			utils.request(this, 'POST', '/exec-nodes', JSON.stringify(params), () => {
+			utils.request(this, 'POST', '/exec-nodes', JSON.stringify(params), (node) => {
 				$(this.$refs.modal).modal('hide');
-				this.$emit('closed');
+				this.$emit('closed', node);
 			});
 		},
 		selectOp: function(op) {

@@ -182,9 +182,12 @@ export default {
 				this.showingNewNodeModal = true;
 			}
 		},
-		onNewNodeModalClosed: function() {
+		onNewNodeModalClosed: function(node) {
 			this.showingNewNodeModal = false;
 			this.update();
+			if(node) {
+				this.selectNode(node);
+			}
 		},
 		selectNode: function(node) {
 			if(this.selectedNode) {
