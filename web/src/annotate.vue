@@ -45,15 +45,19 @@ export default {
 	},
 	created: function() {
 		this.fetch();
-		utils.request(this, 'GET', '/datasets', null, (datasets) => {
-			for(let ds of datasets) {
-				this.datasets[ds.ID] = ds;
+		utils.request(this, 'GET', '/datasets', null, (dsList) => {
+			let datasets = {};
+			for(let ds of dsList) {
+				datasets[ds.ID] = ds;
 			}
+			this.datasets = datasets;
 		});
-		utils.request(this, 'GET', '/exec-nodes', null, (nodes) => {
-			for(let node of nodes) {
-				this.nodes[node.ID] = node;
+		utils.request(this, 'GET', '/exec-nodes', null, (nodeList) => {
+			let nodes = {};
+			for(let node of nodeList) {
+				nodes[node.ID] = node;
 			}
+			this.nodes = nodes;
 		});
 	},
 	methods: {
