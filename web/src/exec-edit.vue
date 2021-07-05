@@ -33,7 +33,6 @@ import PytorchYolov5Infer from './exec-edit/pytorch_yolov5_infer.vue';
 import Sample from './exec-edit/sample.vue';
 import SegmentationMask from './exec-edit/segmentation_mask.vue';
 import SimpleTracker from './exec-edit/simple_tracker.vue';
-import SpatialFlowPartition from './exec-edit/spatialflow_partition.vue';
 import Split from './exec-edit/split.vue';
 import ReidTracker from './exec-edit/reid_tracker.vue';
 import Resample from './exec-edit/resample.vue';
@@ -63,7 +62,6 @@ let components = {
 	'sample': Sample,
 	'segmentation_mask': SegmentationMask,
 	'simple_tracker': SimpleTracker,
-	'spatialflow_partition': SpatialFlowPartition,
 	'split': Split,
 	'reid_tracker': ReidTracker,
 	'resample': Resample,

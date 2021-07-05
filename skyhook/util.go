@@ -380,3 +380,17 @@ func FileExists(fname string) bool {
 	_, err := os.Stat(fname)
 	return err == nil
 }
+
+
+// Returns a/b while taking floor (round-down) instead of truncating (round-towards-zero).
+func FloorDiv(a, b int) int {
+	res := a/b
+	isNeg := (a < 0 && b > 0) || (a > 0 && b < 0)
+	if !isNeg {
+		return res
+	}
+	if res*b == a {
+		return res
+	}
+	return res-1
+}

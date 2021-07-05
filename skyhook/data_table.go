@@ -156,7 +156,7 @@ func (s TableDataSpec) Write(data interface{}, format string, metadata_ DataMeta
 		defer os.Remove(tmpFname)
 		err := s.WriteSQLFile(rows, metadata, tmpFname)
 		if err != nil {
-			return fmt.Errorf("error writing as sqlite3", err)
+			return fmt.Errorf("error writing as sqlite3: %v", err)
 		}
 		bytes, err := ioutil.ReadFile(tmpFname)
 		if err != nil {

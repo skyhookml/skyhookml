@@ -166,7 +166,7 @@ export default {
 			}, {
 				ID: "geospatial",
 				Name: "Geospatial",
-				Ops: ['make_geoimage', 'geoimage_to_image', 'geojson_to_shape', 'shape_to_geojson', 'spatialflow_partition'],
+				Ops: ['make_geoimage', 'geoimage_to_image', 'geojson_to_shape', 'shape_to_geojson'],
 			}],
 		};
 	},
