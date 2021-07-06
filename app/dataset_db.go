@@ -225,10 +225,15 @@ func (ds *DBDataset) AddItem(item skyhook.Item) (*DBItem, error) {
 	db := ds.getDB()
 	// We use underlying Exec directly here since it is expected that we may encounter
 	// a unique key constraint error.
-	_, err := db.db.Exec(
-		"INSERT INTO items (k, ext, format, metadata, provider, provider_info) VALUES (?, ?, ?, ?, ?, ?)",
-		item.Key, item.Ext, item.Format, item.Metadata, item.Provider, item.ProviderInfo,
-	)
+	err := func() error {
+		db.mu.Lock()
+		defer db.mu.Unlock()
+		_, err := db.db.Exec(
+			"INSERT INTO items (k, ext, format, metadata, provider, provider_info) VALUES (?, ?, ?, ?, ?, ?)",
+			item.Key, item.Ext, item.Format, item.Metadata, item.Provider, item.ProviderInfo,
+		)
+		return err
+	}()
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return nil, fmt.Errorf("item with key %s already exists in the dataset", item.Key)
