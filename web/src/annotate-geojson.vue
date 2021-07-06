@@ -108,10 +108,16 @@ export default {
 			let tileLayer = L.tileLayer(this.params.TileURL);
 			this.map = new L.Map(this.$refs.map, {
 				layers: [tileLayer, featureLayer],
-				center: new L.LatLng(28.92, -97.86),
-				zoom: 13,
+				center: new L.LatLng(0, 0),
+				zoom: 2,
 			});
 			this.map.pm.addControls();
+
+			// Fit to GeoJSON objects if objects exist.
+			let featureBounds = featureLayer.getBounds();
+			if(featureBounds.isValid()) {
+				this.map.fitBounds(featureBounds);
+			}
 		},
 		saveFeatures: function() {
 			let features = [];
