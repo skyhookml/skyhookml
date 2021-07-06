@@ -104,6 +104,12 @@ export default {
 			// Create GeoJSON layer in Leaflet with https://github.com/geoman-io/leaflet-geoman
 			let featureLayer = L.geoJson(this.featureCollection);
 
+			// Remove previous map container if any.
+			if(this.map) {
+				this.map.off();
+				this.map.remove();
+			}
+
 			// Initialize Leaflet.
 			let tileLayer = L.tileLayer(this.params.TileURL);
 			this.map = new L.Map(this.$refs.map, {
