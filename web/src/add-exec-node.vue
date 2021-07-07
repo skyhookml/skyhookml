@@ -153,7 +153,7 @@ export default {
 				ID: "segmentation",
 				Name: "Segmentation",
 				Ops: [
-					'segmentation_mask',
+					'segmentation_mask', 'extract_polygons',
 				],
 			}, {
 				ID: "code",

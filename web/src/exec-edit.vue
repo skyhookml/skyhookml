@@ -15,6 +15,7 @@
 import utils from './utils.js';
 import CropResize from './exec-edit/cropresize.vue';
 import DetectionFilter from './exec-edit/detection_filter.vue';
+import ExtractPolygons from './exec-edit/extract_polygons.vue';
 import GeoImageToImage from './exec-edit/geoimage_to_image.vue';
 import MakeGeoImage from './exec-edit/make_geoimage.vue';
 import Python from './exec-edit/python.vue';
@@ -44,6 +45,7 @@ import VideoSample from './exec-edit/video_sample.vue';
 let components = {
 	'cropresize': CropResize,
 	'detection_filter': DetectionFilter,
+	'extract_polygons': ExtractPolygons,
 	'geoimage_to_image': GeoImageToImage,
 	'make_geoimage': MakeGeoImage,
 	'python': Python,
