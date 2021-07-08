@@ -157,7 +157,7 @@ export default {
 				Params: JSON.stringify(this.params),
 			}
 			utils.request(this, 'POST', '/annotate-datasets/'+this.annoset.ID, JSON.stringify(request));
-			this.initLeaflet();
+			this.fetch();
 		},
 	},
 };
