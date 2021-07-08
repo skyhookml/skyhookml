@@ -6,6 +6,7 @@ from skyhook.op import per_frame
 
 import cv2
 import json
+import numpy
 
 params = {
 	'DenoiseSize': 5,
@@ -16,7 +17,13 @@ params = {
 @per_frame
 def f(arr_data):
 	def get_polygons(arr, kernel_size_denoise, kernel_size_grow, simplify_threshold):
-		mask = (arr[:, :, 1] > 0.5).astype('uint8')
+		# Get boolean mask.
+		# If arr is integer, then it is probably class label, so we get anything that's not class 0.
+		# If arr is floating, it is likely probability, so we get max probability for classes 1 and up.
+		if issubclass(arr.dtype.type, numpy.integer):
+			mask = (arr[:, :, 0] > 0).astype('uint8')
+		else:
+			mask = (arr[:, :, 1:].max(axis=2) > 0.5).astype('uint8')
 
 		# denoise
 		if kernel_size_denoise is not None:
