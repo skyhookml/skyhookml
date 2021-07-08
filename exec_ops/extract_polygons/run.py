@@ -5,11 +5,7 @@ import skyhook.common as lib
 from skyhook.op import per_frame
 
 import cv2
-import geojson
 import json
-import numpy
-import skimage.io
-import sys
 
 params = {
 	'DenoiseSize': 5,
