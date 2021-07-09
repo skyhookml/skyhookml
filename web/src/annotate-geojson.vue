@@ -24,6 +24,7 @@
 
 <script>
 import utils from './utils.js';
+import LatLonProvider from './geojson/leaflet-geosearch-provider.js';
 
 export default {
 	data: function() {
@@ -117,6 +118,18 @@ export default {
 				center: new L.LatLng(0, 0),
 				zoom: 2,
 			});
+
+			// Add geocoding plugin.
+			let provider = new GeoSearch.OpenStreetMapProvider();
+			provider = LatLonProvider(provider);
+			let search = new GeoSearch.GeoSearchControl({
+				provider: provider,
+				style: 'bar',
+				showMarker: false,
+			});
+			this.map.addControl(search);
+
+			// Add drawing plugin.
 			this.map.pm.addControls();
 
 			// Fit to GeoJSON objects if objects exist.
