@@ -112,12 +112,20 @@ export default {
 			}
 
 			// Initialize Leaflet.
-			let tileLayer = L.tileLayer(this.params.TileURL);
+			let imageryLayer = L.tileLayer(this.params.TileURL);
 			this.map = new L.Map(this.$refs.map, {
-				layers: [tileLayer, featureLayer],
+				layers: [imageryLayer, featureLayer],
 				center: new L.LatLng(0, 0),
 				zoom: 2,
 			});
+
+			// Add layer control, to toggle OSM.
+			let streetsLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+			let baseLayers = {
+				'Imagery': imageryLayer,
+				'OpenStreetMap': streetsLayer,
+			};
+			L.control.layers(baseLayers, null, {collapsed: false}).addTo(this.map);
 
 			// Add geocoding plugin.
 			let provider = new GeoSearch.OpenStreetMapProvider();
